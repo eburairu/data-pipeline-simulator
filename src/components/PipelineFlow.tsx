@@ -13,10 +13,10 @@ const nodeTypes = {
 };
 
 interface PipelineFlowProps {
-  activeStep?: string;
+  activeSteps?: string[];
 }
 
-const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
+const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
   const { collection, delivery, etl } = useSettings();
@@ -48,7 +48,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       id: '2',
       type: 'process',
       position: { x: startX + gapX, y: startY + 20 },
-      data: { label: 'FTP Transfer', isProcessing: activeStep === 'transfer_1' },
+      data: { label: 'FTP Transfer', isProcessing: activeSteps.includes('transfer_1') },
     },
     // 3. Incoming (Store)
     {
@@ -62,7 +62,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       id: '4',
       type: 'process',
       position: { x: startX + gapX * 3, y: startY + 20 },
-      data: { label: 'Distribute', isProcessing: activeStep === 'transfer_2' },
+      data: { label: 'Distribute', isProcessing: activeSteps.includes('transfer_2') },
     },
     // 5. Internal (Store)
     {
@@ -85,7 +85,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       position: { x: startX + gapX * 4, y: startY + rowH + 20 },
       data: {
         label: 'ETL & Load',
-        isProcessing: activeStep === 'process_etl',
+        isProcessing: activeSteps.includes('process_etl'),
         targetPos: Position.Top, // Receive from above
         sourcePos: Position.Left // Send left
       },
@@ -110,7 +110,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       position: { x: startX + gapX * 2, y: startY + rowH + 20 },
       data: {
         label: 'Transform',
-        isProcessing: activeStep === 'process_transform',
+        isProcessing: activeSteps.includes('process_transform'),
         targetPos: Position.Right,
         sourcePos: Position.Left
       },
