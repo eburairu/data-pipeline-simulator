@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileSystemProvider, useFileSystem } from './lib/VirtualFileSystem';
 import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import { SettingsProvider, useSettings } from './lib/SettingsContext';
@@ -21,6 +21,18 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const { insert, select } = useVirtualDB();
   const { dataSource, collection, delivery, etl } = useSettings();
 
+  // Refs for current state access inside intervals to prevent dependency changes from resetting intervals
+  const listFilesRef = useRef(listFiles);
+  const selectRef = useRef(select);
+
+  useEffect(() => {
+    listFilesRef.current = listFiles;
+  }, [listFiles]);
+
+  useEffect(() => {
+    selectRef.current = select;
+  }, [select]);
+
   // Locks for auto-run to prevent overlapping processing in the same stage
   const collectionLock = useRef(false);
   const deliveryLock = useRef(false);
@@ -28,7 +40,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const transformLock = useRef(false);
 
   // Helper to toggle step active state
-  const toggleStep = (step: string, active: boolean) => {
+  const toggleStep = useCallback((step: string, active: boolean) => {
     setActiveSteps(prev => {
       if (active) {
         return prev.includes(step) ? prev : [...prev, step];
@@ -36,7 +48,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         return prev.filter(s => s !== step);
       }
     });
-  };
+  }, [setActiveSteps]);
 
   // Helper for delay
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -59,11 +71,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     const interval = setInterval(async () => {
       if (collectionLock.current) return;
 
-      const files = listFiles(collection.sourcePath);
-      if (files.length === 0) return;
+      const currentFiles = listFilesRef.current(collection.sourcePath);
+      if (currentFiles.length === 0) return;
 
       collectionLock.current = true;
-      const file = files[0];
+      const file = currentFiles[0];
 
       toggleStep('transfer_1', true);
       await delay(collection.processingTime);
@@ -73,7 +85,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       collectionLock.current = false;
     }, collection.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, collection, listFiles, moveFile]);
+  }, [isRunning, collection, moveFile, toggleStep]);
 
   // 3. Delivery (Collection Target -> Delivery Target)
   useEffect(() => {
@@ -81,11 +93,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     const interval = setInterval(async () => {
       if (deliveryLock.current) return;
 
-      const files = listFiles(delivery.sourcePath);
-      if (files.length === 0) return;
+      const currentFiles = listFilesRef.current(delivery.sourcePath);
+      if (currentFiles.length === 0) return;
 
       deliveryLock.current = true;
-      const file = files[0];
+      const file = currentFiles[0];
 
       toggleStep('transfer_2', true);
       await delay(delivery.processingTime);
@@ -95,7 +107,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       deliveryLock.current = false;
     }, delivery.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, delivery, listFiles, moveFile]);
+  }, [isRunning, delivery, moveFile, toggleStep]);
 
   // 4. ETL & Load (Delivery Target -> DB)
   useEffect(() => {
@@ -103,11 +115,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     const interval = setInterval(async () => {
       if (etlLock.current) return;
 
-      const files = listFiles(delivery.targetPath);
-      if (files.length === 0) return;
+      const currentFiles = listFilesRef.current(delivery.targetPath);
+      if (currentFiles.length === 0) return;
 
       etlLock.current = true;
-      const file = files[0];
+      const file = currentFiles[0];
 
       toggleStep('process_etl', true);
       await delay(etl.processingTime);
@@ -119,7 +131,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       etlLock.current = false;
     }, etl.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, etl, delivery.targetPath, listFiles, insert, deleteFile, dataSource.fileContent]);
+  }, [isRunning, etl, delivery.targetPath, insert, deleteFile, dataSource.fileContent, toggleStep]);
 
   // 5. Transform (Raw DB -> Summary DB)
   useEffect(() => {
@@ -127,9 +139,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     const interval = setInterval(async () => {
       if (transformLock.current) return;
 
-      // In a real scenario we'd check for unprocessed records.
-      // Here we just simulate a transform job running periodically if there is data.
-      const rawRecords = select(etl.rawTableName);
+      const rawRecords = selectRef.current(etl.rawTableName);
       if (rawRecords.length === 0) return;
 
       transformLock.current = true;
@@ -146,9 +156,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
       toggleStep('process_transform', false);
       transformLock.current = false;
-    }, etl.executionInterval); // Using same interval as ETL for simplicity or add transform settings
+    }, etl.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, etl, select, insert]);
+  }, [isRunning, etl, insert, toggleStep]);
 
 
   const handleRunSimulation = async () => {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
 export interface VFile {
   name: string;
@@ -20,7 +20,7 @@ const FileSystemContext = createContext<FileSystemContextType | undefined>(undef
 export const FileSystemProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [files, setFiles] = useState<VFile[]>([]);
 
-  const writeFile = (path: string, name: string, content: string) => {
+  const writeFile = useCallback((path: string, name: string, content: string) => {
     const newFile: VFile = {
       name,
       path,
@@ -29,9 +29,9 @@ export const FileSystemProvider: React.FC<{ children: ReactNode }> = ({ children
     };
     setFiles((prev) => [...prev, newFile]);
     console.log(`[FS] Wrote file: ${path}/${name}`);
-  };
+  }, []);
 
-  const moveFile = (fileName: string, fromPath: string, toPath: string) => {
+  const moveFile = useCallback((fileName: string, fromPath: string, toPath: string) => {
     setFiles((prev) =>
       prev.map((f) => {
         if (f.name === fileName && f.path === fromPath) {
@@ -41,12 +41,12 @@ export const FileSystemProvider: React.FC<{ children: ReactNode }> = ({ children
         return f;
       })
     );
-  };
+  }, []);
 
-  const deleteFile = (fileName: string, atPath: string) => {
+  const deleteFile = useCallback((fileName: string, atPath: string) => {
     setFiles((prev) => prev.filter((f) => !(f.name === fileName && f.path === atPath)));
     console.log(`[FS] Deleted file: ${atPath}/${fileName}`);
-  };
+  }, []);
 
   const listFiles = (path: string) => {
     return files.filter((f) => f.path === path);
