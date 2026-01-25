@@ -15,6 +15,21 @@ interface SimulationControlProps {
   setActiveSteps: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
+const generateFileName = (prefix: string) => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mi = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+
+  const highResTime = performance.timeOrigin + performance.now();
+  const microSeconds = Math.floor((highResTime % 1000) * 1000);
+
+  return `${prefix}${yyyy}${mm}${dd}${hh}${mi}${ss}.${microSeconds}.csv`;
+};
+
 const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -61,7 +76,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     if (!isRunning) return;
 
     const interval = setInterval(() => {
-      const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
+      const fileName = generateFileName(dataSource.filePrefix);
       writeFile(dataSource.sourcePath, fileName, dataSource.fileContent);
     }, dataSource.executionInterval);
     return () => clearInterval(interval);
@@ -219,7 +234,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
 
   const handleCreateSourceFile = () => {
-    const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
+    const fileName = generateFileName(dataSource.filePrefix);
     writeFile(dataSource.sourcePath, fileName, dataSource.fileContent);
   };
 
