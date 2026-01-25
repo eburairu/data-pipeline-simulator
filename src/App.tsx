@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FileSystemProvider, useFileSystem } from './lib/VirtualFileSystem';
 import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import PipelineFlow from './components/PipelineFlow';
 import 'reactflow/dist/style.css';
 
-const SimulationControl: React.FC = () => {
+interface SimulationControlProps {
+  onStepChange: (step: string) => void;
+}
+
+const SimulationControl: React.FC<SimulationControlProps> = ({ onStepChange }) => {
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select } = useVirtualDB();
 
@@ -13,25 +17,36 @@ const SimulationControl: React.FC = () => {
     const fileName = `data_${Date.now()}.csv`;
     writeFile('/source', fileName, 'sample,data,123');
 
+    // Start Transfer 1
+    onStepChange('transfer_1');
+
     // Helper for delay
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
     await delay(1000);
     // 2. Collection
     moveFile(fileName, '/source', '/incoming');
+    // Start Transfer 2
+    onStepChange('transfer_2');
 
     await delay(1000);
     // 3. Distribution
     moveFile(fileName, '/incoming', '/internal');
+    // Start ETL
+    onStepChange('process_etl');
 
     await delay(1000);
     // 4. ETL & Load
     insert('raw_data', { file: fileName, content: 'sample,data,123' });
     deleteFile(fileName, '/internal');
+    // Start Transform
+    onStepChange('process_transform');
 
     await delay(1000);
     // 5. Transform
     insert('summary_data', { source: fileName, summary: 'processed', value: Math.floor(Math.random() * 100) });
+    // Finish
+    onStepChange('');
   };
 
   const sourceFiles = listFiles('/source');
@@ -93,24 +108,32 @@ const SimulationControl: React.FC = () => {
   );
 };
 
+const Dashboard = () => {
+  const [activeStep, setActiveStep] = useState<string>('');
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-8 flex flex-col gap-8">
+      <h1 className="text-3xl font-bold text-gray-800">
+        Data Pipeline Simulator
+      </h1>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
+        <div className="flex flex-col gap-4">
+          <SimulationControl onStepChange={setActiveStep} />
+        </div>
+        <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
+           <PipelineFlow activeStep={activeStep} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   return (
     <VirtualDBProvider>
       <FileSystemProvider>
-        <div className="min-h-screen bg-gray-100 p-8 flex flex-col gap-8">
-          <h1 className="text-3xl font-bold text-gray-800">
-            Data Pipeline Simulator
-          </h1>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-            <div className="flex flex-col gap-4">
-              <SimulationControl />
-            </div>
-            <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
-               <PipelineFlow />
-            </div>
-          </div>
-        </div>
+        <Dashboard />
       </FileSystemProvider>
     </VirtualDBProvider>
   );
