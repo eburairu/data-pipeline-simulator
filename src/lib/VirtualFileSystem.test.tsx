@@ -1,7 +1,7 @@
+// @vitest-environment happy-dom
 import { renderHook, act } from '@testing-library/react';
 import { useFileSystem, FileSystemProvider } from './VirtualFileSystem';
 import { describe, it, expect } from 'vitest';
-import React from 'react';
 
 describe('useFileSystem', () => {
   it('should write a file', () => {
