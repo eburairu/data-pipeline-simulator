@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, type ReactNode } from 'reac
 export interface DataSourceJob {
   id: string;
   name: string;
+  host: string;
   sourcePath: string;
   filePrefix: string;
   fileContent: string;
@@ -17,25 +18,31 @@ export interface DataSourceSettings {
 export interface CollectionJob {
   id: string;
   name: string;
+  sourceHost: string;
   sourcePath: string;
   filterRegex: string;
+  targetHost: string;
   targetPath: string;
+  bandwidth: number; // chars per second
   executionInterval: number;
   enabled: boolean;
 }
 
 export interface CollectionSettings {
   jobs: CollectionJob[];
-  processingTime: number;
+  processingTime: number; // Latency/Overhead in ms
 }
 
 export interface DeliveryJob {
   id: string;
   name: string;
+  sourceHost: string;
   sourcePath: string;
+  targetHost: string;
   targetPath: string;
   filterRegex: string;
-  processingTime: number;
+  bandwidth: number; // chars per second
+  processingTime: number; // Latency/Overhead in ms
   executionInterval: number;
   enabled: boolean;
 }
@@ -45,6 +52,7 @@ export interface DeliverySettings {
 }
 
 export interface EtlSettings {
+  sourceHost: string;
   sourcePath: string;
   rawTableName: string;
   summaryTableName: string;
@@ -71,6 +79,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       {
         id: 'ds_job_1',
         name: 'Default Source',
+        host: 'localhost',
         sourcePath: '/source',
         filePrefix: 'data_',
         fileContent: 'sample,data,123',
@@ -85,9 +94,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       {
         id: 'col_job_1',
         name: 'Default Collection',
+        sourceHost: 'localhost',
         sourcePath: '/source',
         filterRegex: '.*',
+        targetHost: 'localhost',
         targetPath: '/incoming',
+        bandwidth: 100,
         executionInterval: 1000,
         enabled: true,
       }
@@ -100,9 +112,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       {
         id: 'del_job_1',
         name: 'Default Delivery',
+        sourceHost: 'localhost',
         sourcePath: '/incoming',
+        targetHost: 'localhost',
         targetPath: '/internal',
         filterRegex: '.*',
+        bandwidth: 100,
         processingTime: 1000,
         executionInterval: 1000,
         enabled: true,
@@ -111,6 +126,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
 
   const [etl, setEtl] = useState<EtlSettings>({
+    sourceHost: 'localhost',
     sourcePath: '/internal',
     rawTableName: 'raw_data',
     summaryTableName: 'summary_data',

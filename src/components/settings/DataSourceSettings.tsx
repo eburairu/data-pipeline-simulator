@@ -16,6 +16,7 @@ const DataSourceSettings: React.FC = () => {
     const newJob: DataSourceJob = {
       id: `ds_job_${Date.now()}`,
       name: `Source ${dataSource.jobs.length + 1}`,
+      host: 'localhost',
       sourcePath: '/source',
       filePrefix: 'data_',
       fileContent: 'sample,data,123',
@@ -62,14 +63,25 @@ const DataSourceSettings: React.FC = () => {
                      />
                    </div>
                 </div>
-                <div>
-                     <label className="block text-xs font-medium text-gray-500">Source Path</label>
-                     <input
-                        type="text"
-                        value={job.sourcePath}
-                        onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
-                     />
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500">Host</label>
+                        <input
+                            type="text"
+                            value={job.host}
+                            onChange={(e) => handleJobChange(job.id, 'host', e.target.value)}
+                            className="w-full border rounded p-1 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500">Source Path</label>
+                        <input
+                            type="text"
+                            value={job.sourcePath}
+                            onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
+                            className="w-full border rounded p-1 text-sm"
+                        />
+                    </div>
                  </div>
                  <div className="grid grid-cols-2 gap-3">
                    <div>

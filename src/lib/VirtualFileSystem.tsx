@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, type ReactNode
 
 export interface VFile {
   name: string;
+  host: string; // ホスト名 (e.g., 'localhost', 'server-1')
   path: string; // ディレクトリパス (e.g., '/source')
   content: string;
   createdAt: number;
@@ -9,10 +10,10 @@ export interface VFile {
 
 interface FileSystemContextType {
   files: VFile[];
-  writeFile: (path: string, name: string, content: string) => void;
-  moveFile: (fileName: string, fromPath: string, toPath: string) => void;
-  deleteFile: (fileName: string, atPath: string) => void;
-  listFiles: (path: string) => VFile[];
+  writeFile: (host: string, path: string, name: string, content: string) => void;
+  moveFile: (fileName: string, fromHost: string, fromPath: string, toHost: string, toPath: string) => void;
+  deleteFile: (host: string, fileName: string, atPath: string) => void;
+  listFiles: (host: string, path: string) => VFile[];
 }
 
 const FileSystemContext = createContext<FileSystemContextType | undefined>(undefined);
@@ -20,37 +21,38 @@ const FileSystemContext = createContext<FileSystemContextType | undefined>(undef
 export const FileSystemProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [files, setFiles] = useState<VFile[]>([]);
 
-  const writeFile = useCallback((path: string, name: string, content: string) => {
+  const writeFile = useCallback((host: string, path: string, name: string, content: string) => {
     const newFile: VFile = {
       name,
+      host,
       path,
       content,
       createdAt: Date.now(),
     };
     setFiles((prev) => [...prev, newFile]);
-    console.log(`[FS] Wrote file: ${path}/${name}`);
+    console.log(`[FS] Wrote file: ${host}:${path}/${name}`);
   }, []);
 
-  const moveFile = useCallback((fileName: string, fromPath: string, toPath: string) => {
+  const moveFile = useCallback((fileName: string, fromHost: string, fromPath: string, toHost: string, toPath: string) => {
     setFiles((prev) =>
       prev.map((f) => {
-        if (f.name === fileName && f.path === fromPath) {
-          console.log(`[FS] Moved file: ${fileName} from ${fromPath} to ${toPath}`);
-          return { ...f, path: toPath };
+        if (f.name === fileName && f.host === fromHost && f.path === fromPath) {
+          console.log(`[FS] Moved file: ${fileName} from ${fromHost}:${fromPath} to ${toHost}:${toPath}`);
+          return { ...f, host: toHost, path: toPath };
         }
         return f;
       })
     );
   }, []);
 
-  const deleteFile = useCallback((fileName: string, atPath: string) => {
-    setFiles((prev) => prev.filter((f) => !(f.name === fileName && f.path === atPath)));
-    console.log(`[FS] Deleted file: ${atPath}/${fileName}`);
+  const deleteFile = useCallback((host: string, fileName: string, atPath: string) => {
+    setFiles((prev) => prev.filter((f) => !(f.name === fileName && f.host === host && f.path === atPath)));
+    console.log(`[FS] Deleted file: ${host}:${atPath}/${fileName}`);
   }, []);
 
-  const listFiles = (path: string) => {
-    return files.filter((f) => f.path === path);
-  };
+  const listFiles = useCallback((host: string, path: string) => {
+    return files.filter((f) => f.host === host && f.path === path);
+  }, [files]);
 
   return (
     <FileSystemContext.Provider value={{ files, writeFile, moveFile, deleteFile, listFiles }}>

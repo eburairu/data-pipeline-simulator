@@ -30,9 +30,14 @@ const generateFileName = (prefix: string) => {
   return `${prefix}${yyyy}${mm}${dd}${hh}${mi}${ss}.${microSeconds}.csv`;
 };
 
-const calculateProcessingTime = (content: string, baseTime: number) => {
-  // Base time + 10ms per character as a simulation of size-based processing
-  return baseTime + (content.length * 10);
+const calculateProcessingTime = (content: string, bandwidth: number, latency: number) => {
+  // Bandwidth: chars per second
+  // Content Length: chars
+  // Transfer Time = (Length / Bandwidth) * 1000 ms
+  // Total Time = Transfer Time + Latency
+  const safeBandwidth = Math.max(0.1, bandwidth); // Prevent divide by zero
+  const transferTime = (content.length / safeBandwidth) * 1000;
+  return transferTime + latency;
 };
 
 const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps }) => {
@@ -86,7 +91,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
       const timer = setInterval(() => {
         const fileName = generateFileName(job.filePrefix);
-        writeFile(job.sourcePath, fileName, job.fileContent);
+        writeFile(job.host, job.sourcePath, fileName, job.fileContent);
       }, job.executionInterval);
       timers.push(timer);
     });
@@ -106,7 +111,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
 
         try {
-          const currentFiles = listFilesRef.current(job.sourcePath);
+          const currentFiles = listFilesRef.current(job.sourceHost, job.sourcePath);
           if (currentFiles.length === 0) return;
 
           let regex: RegExp;
@@ -129,15 +134,15 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
           toggleStep(`transfer_1_${job.id}`, true);
 
-          const processingTime = calculateProcessingTime(file.content, collection.processingTime);
+          const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
           await delay(processingTime);
 
           try {
-             moveFile(file.name, job.sourcePath, job.targetPath);
+             moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
              setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
           } catch (e) {
              setErrors(prev => {
-                const msg = `Collection Job ${job.name}: Failed to move to '${job.targetPath}'`;
+                const msg = `Collection Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
                 return prev.includes(msg) ? prev : [...prev, msg];
              });
           }
@@ -167,7 +172,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         if (Object.values(deliveryLocks.current).some(isActive => isActive)) return;
 
         try {
-          const currentFiles = listFilesRef.current(job.sourcePath);
+          const currentFiles = listFilesRef.current(job.sourceHost, job.sourcePath);
           if (currentFiles.length === 0) return;
 
           let regex: RegExp;
@@ -189,15 +194,15 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
           deliveryLocks.current[job.id] = true;
           toggleStep(`transfer_2_${job.id}`, true);
 
-          const processingTime = calculateProcessingTime(file.content, job.processingTime);
+          const processingTime = calculateProcessingTime(file.content, job.bandwidth, job.processingTime);
           await delay(processingTime);
 
           try {
-            moveFile(file.name, job.sourcePath, job.targetPath);
+            moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
             setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
           } catch (e) {
             setErrors(prev => {
-                const msg = `Delivery Job ${job.name}: Failed to move to '${job.targetPath}'`;
+                const msg = `Delivery Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
                 return prev.includes(msg) ? prev : [...prev, msg];
              });
           }
@@ -220,7 +225,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (etlLock.current) return;
 
       try {
-        const currentFiles = listFilesRef.current(etl.sourcePath);
+        const currentFiles = listFilesRef.current(etl.sourceHost, etl.sourcePath);
         if (currentFiles.length === 0) return;
 
         etlLock.current = true;
@@ -228,11 +233,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
         toggleStep('process_etl', true);
 
-        const processingTime = calculateProcessingTime(file.content, etl.processingTime);
+        // Assume default bandwidth of 100 chars/sec for ETL to match previous simulation speed (len * 10ms)
+        const processingTime = calculateProcessingTime(file.content, 100, etl.processingTime);
         await delay(processingTime);
 
         insert(etl.rawTableName, { file: file.name, content: file.content });
-        deleteFile(file.name, etl.sourcePath);
+        deleteFile(etl.sourceHost, file.name, etl.sourcePath);
 
         toggleStep('process_etl', false);
         etlLock.current = false;
@@ -260,7 +266,8 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       toggleStep('process_transform', true);
 
       const combinedContent = newRawRecords.map(r => r.data['content'] as string || '').join('');
-      const processingTime = calculateProcessingTime(combinedContent, etl.processingTime);
+      // Assume default bandwidth of 100 chars/sec for Transform
+      const processingTime = calculateProcessingTime(combinedContent, 100, etl.processingTime);
       await delay(processingTime);
 
       const currentMaxTime = Math.max(...newRawRecords.map(r => r.insertedAt));
@@ -284,14 +291,14 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     dataSource.jobs.forEach(job => {
         if (job.enabled) {
             const fileName = generateFileName(job.filePrefix);
-            writeFile(job.sourcePath, fileName, job.fileContent);
+            writeFile(job.host, job.sourcePath, fileName, job.fileContent);
         }
     });
   };
 
-  const safeListFiles = (path: string) => {
+  const safeListFiles = (host: string, path: string) => {
     try {
-      return listFiles(path);
+      return listFiles(host, path);
     } catch {
       return [];
     }
@@ -344,12 +351,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
            <h3 className="font-bold border-b text-gray-700">Sources</h3>
            {dataSource.jobs.map(job => (
               <div key={job.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{job.name} ({job.sourcePath})</div>
+                 <div className="font-semibold text-gray-600">{job.name} ({job.host}:{job.sourcePath})</div>
                  <ul className="pl-2">
-                   {safeListFiles(job.sourcePath).map(f => (
+                   {safeListFiles(job.host, job.sourcePath).map(f => (
                      <li key={f.name} className="text-green-600 truncate">{f.name}</li>
                    ))}
-                   {safeListFiles(job.sourcePath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                   {safeListFiles(job.host, job.sourcePath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
                  </ul>
               </div>
            ))}
@@ -360,12 +367,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
             <h3 className="font-bold border-b text-gray-700">Collection / Incoming</h3>
             {collection.jobs.map(job => (
               <div key={job.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{job.name} → {job.targetPath}</div>
+                 <div className="font-semibold text-gray-600">{job.name} → {job.targetHost}:{job.targetPath}</div>
                  <ul className="pl-2">
-                   {safeListFiles(job.targetPath).map(f => (
+                   {safeListFiles(job.targetHost, job.targetPath).map(f => (
                      <li key={f.name} className="text-orange-600 truncate">{f.name}</li>
                    ))}
-                   {safeListFiles(job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                   {safeListFiles(job.targetHost, job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
                  </ul>
               </div>
             ))}
@@ -376,12 +383,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
             <h3 className="font-bold border-b text-gray-700">Delivery / Internal</h3>
             {delivery.jobs.map(job => (
               <div key={job.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{job.name} → {job.targetPath}</div>
+                 <div className="font-semibold text-gray-600">{job.name} → {job.targetHost}:{job.targetPath}</div>
                  <ul className="pl-2">
-                   {safeListFiles(job.targetPath).map(f => (
+                   {safeListFiles(job.targetHost, job.targetPath).map(f => (
                      <li key={f.name} className="text-blue-600 truncate">{f.name}</li>
                    ))}
-                   {safeListFiles(job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                   {safeListFiles(job.targetHost, job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
                  </ul>
               </div>
             ))}
@@ -390,7 +397,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-4">
         <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700">DB: {etl.rawTableName} (From: {etl.sourcePath})</h3>
+          <h3 className="font-bold border-b mb-2 text-gray-700">DB: {etl.rawTableName} (From: {etl.sourceHost}:{etl.sourcePath})</h3>
           <ul className="space-y-1 h-32 overflow-y-auto">
             {dbRaw.length === 0 && <li className="text-gray-400 italic">No records</li>}
             {dbRaw.map(r => <li key={r.id} className="truncate">{JSON.stringify(r.data)}</li>)}
