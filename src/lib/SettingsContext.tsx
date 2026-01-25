@@ -6,11 +6,19 @@ export interface DataSourceSettings {
   executionInterval: number;
 }
 
-export interface CollectionSettings {
+export interface CollectionJob {
+  id: string;
+  name: string;
   sourcePath: string;
+  filterRegex: string;
   targetPath: string;
-  processingTime: number;
   executionInterval: number;
+  enabled: boolean;
+}
+
+export interface CollectionSettings {
+  jobs: CollectionJob[];
+  processingTime: number;
 }
 
 export interface DeliverySettings {
@@ -48,10 +56,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
 
   const [collection, setCollection] = useState<CollectionSettings>({
-    sourcePath: '/source',
-    targetPath: '/incoming',
+    jobs: [
+      {
+        id: 'job_1',
+        name: 'Default Job',
+        sourcePath: '/source',
+        filterRegex: '.*',
+        targetPath: '/incoming',
+        executionInterval: 1000,
+        enabled: true,
+      }
+    ],
     processingTime: 1000,
-    executionInterval: 1000,
   });
 
   const [delivery, setDelivery] = useState<DeliverySettings>({
