@@ -30,6 +30,11 @@ const generateFileName = (prefix: string) => {
   return `${prefix}${yyyy}${mm}${dd}${hh}${mi}${ss}.${microSeconds}.csv`;
 };
 
+const calculateProcessingTime = (content: string, baseTime: number) => {
+  // Base time + 10ms per character as a simulation of size-based processing
+  return baseTime + (content.length * 10);
+};
+
 const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -90,7 +95,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        if (collectionLocks.current[job.id]) return;
+        // Global Mutex for Collection Stage:
+        // If ANY job is currently collecting, skip this execution.
+        if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
 
         try {
           const currentFiles = listFilesRef.current(job.sourcePath);
@@ -111,10 +118,16 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
           const file = currentFiles.find(f => regex.test(f.name));
           if (!file) return;
 
+          // Double check lock before proceeding (though single threaded JS makes this mostly safe)
+          if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
+
           collectionLocks.current[job.id] = true;
 
           toggleStep('transfer_1', true);
-          await delay(collection.processingTime);
+
+          // Dynamic processing time based on file content
+          const processingTime = calculateProcessingTime(file.content, collection.processingTime);
+          await delay(processingTime);
 
           try {
              moveFile(file.name, job.sourcePath, job.targetPath);
@@ -134,6 +147,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
               const msg = `Job ${job.name}: Error accessing '${job.sourcePath}'`;
               return prev.includes(msg) ? prev : [...prev, msg];
            });
+           collectionLocks.current[job.id] = false;
         }
       }, job.executionInterval);
 
@@ -156,13 +170,17 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         const file = currentFiles[0];
 
         toggleStep('transfer_2', true);
-        await delay(delivery.processingTime);
+
+        // Dynamic processing time
+        const processingTime = calculateProcessingTime(file.content, delivery.processingTime);
+        await delay(processingTime);
 
         moveFile(file.name, delivery.sourcePath, delivery.targetPath);
         toggleStep('transfer_2', false);
         deliveryLock.current = false;
       } catch (e) {
         // Silent fail or log? Delivery is not the focus, but let's keep it safe
+        deliveryLock.current = false;
       }
     }, delivery.executionInterval);
     return () => clearInterval(interval);
@@ -181,19 +199,23 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         const file = currentFiles[0];
 
         toggleStep('process_etl', true);
-        await delay(etl.processingTime);
 
-        insert(etl.rawTableName, { file: file.name, content: dataSource.fileContent });
+        // Dynamic processing time
+        const processingTime = calculateProcessingTime(file.content, etl.processingTime);
+        await delay(processingTime);
+
+        insert(etl.rawTableName, { file: file.name, content: file.content });
         deleteFile(file.name, delivery.targetPath);
 
         toggleStep('process_etl', false);
         etlLock.current = false;
       } catch (e) {
         // Silent fail
+        etlLock.current = false;
       }
     }, etl.executionInterval);
     return () => clearInterval(interval);
-  }, [etl, delivery.targetPath, insert, deleteFile, dataSource.fileContent, toggleStep]);
+  }, [etl, delivery.targetPath, insert, deleteFile, toggleStep]);
 
   // 5. Transform (Raw DB -> Summary DB)
   useEffect(() => {
@@ -214,7 +236,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       transformLock.current = true;
 
       toggleStep('process_transform', true);
-      await delay(etl.processingTime);
+
+      // Calculate combined content length for dynamic processing time
+      const combinedContent = newRawRecords.map(r => r.data['content'] as string || '').join('');
+      const processingTime = calculateProcessingTime(combinedContent, etl.processingTime);
+      await delay(processingTime);
 
       const currentMaxTime = Math.max(...newRawRecords.map(r => r.insertedAt));
 
