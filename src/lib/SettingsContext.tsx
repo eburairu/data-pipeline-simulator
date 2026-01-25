@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 
-export interface DataSourceSettings {
+export interface DataSourceJob {
+  id: string;
+  name: string;
   sourcePath: string;
   filePrefix: string;
   fileContent: string;
   executionInterval: number;
+  enabled: boolean;
+}
+
+export interface DataSourceSettings {
+  jobs: DataSourceJob[];
 }
 
 export interface CollectionJob {
@@ -22,14 +29,23 @@ export interface CollectionSettings {
   processingTime: number;
 }
 
-export interface DeliverySettings {
+export interface DeliveryJob {
+  id: string;
+  name: string;
   sourcePath: string;
   targetPath: string;
+  filterRegex: string;
   processingTime: number;
   executionInterval: number;
+  enabled: boolean;
+}
+
+export interface DeliverySettings {
+  jobs: DeliveryJob[];
 }
 
 export interface EtlSettings {
+  sourcePath: string;
   rawTableName: string;
   summaryTableName: string;
   processingTime: number;
@@ -51,17 +67,24 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [dataSource, setDataSource] = useState<DataSourceSettings>({
-    sourcePath: '/source',
-    filePrefix: 'data_',
-    fileContent: 'sample,data,123',
-    executionInterval: 1000,
+    jobs: [
+      {
+        id: 'ds_job_1',
+        name: 'Default Source',
+        sourcePath: '/source',
+        filePrefix: 'data_',
+        fileContent: 'sample,data,123',
+        executionInterval: 1000,
+        enabled: true,
+      }
+    ]
   });
 
   const [collection, setCollection] = useState<CollectionSettings>({
     jobs: [
       {
-        id: 'job_1',
-        name: 'Default Job',
+        id: 'col_job_1',
+        name: 'Default Collection',
         sourcePath: '/source',
         filterRegex: '.*',
         targetPath: '/incoming',
@@ -73,13 +96,22 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
 
   const [delivery, setDelivery] = useState<DeliverySettings>({
-    sourcePath: '/incoming',
-    targetPath: '/internal',
-    processingTime: 1000,
-    executionInterval: 1000,
+    jobs: [
+      {
+        id: 'del_job_1',
+        name: 'Default Delivery',
+        sourcePath: '/incoming',
+        targetPath: '/internal',
+        filterRegex: '.*',
+        processingTime: 1000,
+        executionInterval: 1000,
+        enabled: true,
+      }
+    ]
   });
 
   const [etl, setEtl] = useState<EtlSettings>({
+    sourcePath: '/internal',
     rawTableName: 'raw_data',
     summaryTableName: 'summary_data',
     processingTime: 1000,

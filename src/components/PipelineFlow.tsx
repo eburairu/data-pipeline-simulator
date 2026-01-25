@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useFileSystem } from '../lib/VirtualFileSystem';
@@ -30,198 +30,180 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     }
   };
 
-  const sourceCount = getCount(dataSource.sourcePath);
-  const internalCount = getCount(delivery.targetPath);
-  const rawCount = select(etl.rawTableName).length;
-  const summaryCount = select(etl.summaryTableName).length;
+  const { nodes, edges } = useMemo(() => {
+    const nodes: Node[] = [];
+    const edges: Edge[] = [];
+    const pathNodeMap = new Map<string, Node>(); // path -> Node
 
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
+    // --- 1. Identify Unique Paths & Create Storage Nodes ---
 
-  // Layout Constants
-  const startX = 50;
-  const startY = 50;
-  const gapX = 220;
-  const jobRowHeight = 150;
+    // Collect paths for each "Stage"
+    // Stage 0: Data Source Paths
+    const sourcePaths = Array.from(new Set(dataSource.jobs.map(j => j.sourcePath)));
 
-  // 1. Single Source Node
-  // Positioned vertically centered relative to all jobs
-  const totalJobs = collection.jobs.length;
-  // If no jobs, just assume 1 slot
-  const effectiveJobs = totalJobs || 1;
-  const totalHeight = effectiveJobs * jobRowHeight;
-  const centerY = startY + (totalHeight / 2) - (jobRowHeight / 2);
+    // Stage 1: Incoming Paths (Targets of Collection)
+    const incomingPaths = Array.from(new Set(collection.jobs.map(j => j.targetPath)));
 
-  nodes.push({
-    id: 'source',
-    type: 'storage',
-    position: { x: startX, y: centerY > startY ? centerY : startY },
-    data: { label: dataSource.sourcePath, type: 'fs', count: sourceCount },
-  });
+    // Stage 2: Internal Paths (Targets of Delivery)
+    const internalPaths = Array.from(new Set(delivery.jobs.map(j => j.targetPath)));
 
-  // 2. Job Nodes (Branching)
-  if (totalJobs === 0) {
-     // Optional: Show empty state or nothing?
-     // We just skip adding job nodes.
-  }
+    const addStorageNode = (path: string, colIndex: number, rowIndex: number) => {
+      if (pathNodeMap.has(path)) return pathNodeMap.get(path)!;
 
-  collection.jobs.forEach((job, index) => {
-    const jobY = startY + index * jobRowHeight;
+      const id = `storage-${path.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+      const node: Node = {
+        id,
+        type: 'storage',
+        // Layout: X based on col, Y based on row
+        position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
+        data: { label: path, type: 'fs', count: getCount(path) },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      };
+      nodes.push(node);
+      pathNodeMap.set(path, node);
+      return node;
+    };
 
-    // FTP Process
-    const ftpId = `ftp-${job.id}`;
-    nodes.push({
-      id: ftpId,
-      type: 'process',
-      position: { x: startX + gapX, y: jobY + 20 },
-      data: { label: `FTP (${job.name})`, isProcessing: activeSteps.includes('transfer_1') },
+    // Place Nodes
+    // Priority: If a path appears in Sources, it stays in Col 0.
+    // If it appears in Incoming but NOT Sources, it goes to Col 1.
+    // If it appears in Internal but NOT Sources/Incoming, it goes to Col 2.
+
+    // Col 0: Sources
+    sourcePaths.forEach((path, i) => addStorageNode(path, 0, i));
+
+    // Col 1: Incoming
+    let incomingRow = 0;
+    incomingPaths.forEach((path) => {
+        if (!pathNodeMap.has(path)) {
+            addStorageNode(path, 1, incomingRow++);
+        }
     });
 
-    // Target Storage
-    const targetId = `target-${job.id}`;
-    const targetCount = getCount(job.targetPath);
-    nodes.push({
-      id: targetId,
-      type: 'storage',
-      position: { x: startX + gapX * 2, y: jobY },
-      data: { label: job.targetPath, type: 'fs', count: targetCount },
+    // Col 2: Internal
+    let internalRow = 0;
+    internalPaths.forEach((path) => {
+        if (!pathNodeMap.has(path)) {
+            addStorageNode(path, 2, internalRow++);
+        }
     });
 
-    // Edge: Source -> FTP
-    edges.push({
-      id: `e-source-${ftpId}`,
-      source: 'source',
-      target: ftpId,
-      animated: true,
-      sourceHandle: 'right',
-    });
-
-    // Edge: FTP -> Target
-    edges.push({
-      id: `e-${ftpId}-${targetId}`,
-      source: ftpId,
-      target: targetId,
-      animated: true,
-    });
-  });
-
-  // 3. Delivery & Internal
-  const distId = 'distribute';
-  const internalId = 'internal';
-
-  // Align roughly with center (or at least startY)
-  const distY = (centerY > startY ? centerY : startY) + 20;
-
-  nodes.push({
-    id: distId,
-    type: 'process',
-    position: { x: startX + gapX * 3, y: distY },
-    data: { label: 'Distribute', isProcessing: activeSteps.includes('transfer_2') },
-  });
-
-  nodes.push({
-    id: internalId,
-    type: 'storage',
-    position: { x: startX + gapX * 4, y: distY - 20 },
-    data: {
-      label: delivery.targetPath,
-      type: 'fs',
-      count: internalCount,
-      sourcePos: Position.Bottom
-    },
-  });
-
-  edges.push({
-    id: `e-${distId}-${internalId}`,
-    source: distId,
-    target: internalId,
-    animated: true,
-  });
-
-  // Connect Matching Job Targets to Distribute
-  collection.jobs.forEach(job => {
-    if (job.targetPath === delivery.sourcePath) {
-       edges.push({
-         id: `e-target-${job.id}-${distId}`,
-         source: `target-${job.id}`,
-         target: distId,
-         animated: true,
-       });
+    // Ensure ETL source path exists (put in Col 2 if missing, at bottom)
+    if (!pathNodeMap.has(etl.sourcePath)) {
+        addStorageNode(etl.sourcePath, 2, internalRow++);
     }
-  });
 
-  // 4. ETL Chain (Wrapping back Left)
-  // Place below the lowest element so far.
-  // Lowest job Y = startY + (totalJobs - 1) * jobRowHeight + ...
-  const lowestJobY = startY + (Math.max(0, totalJobs - 1) * jobRowHeight);
-  // Compare with distY logic
-  const contentBottomY = Math.max(lowestJobY, distY);
 
-  const etlY = contentBottomY + 180;
+    // --- 2. Create Process Nodes & Edges ---
 
-  // ETL Process
-  nodes.push({
-    id: 'etl',
-    type: 'process',
-    position: { x: startX + gapX * 4, y: etlY + 20 },
-    data: {
-      label: 'ETL & Load',
-      isProcessing: activeSteps.includes('process_etl'),
-      targetPos: Position.Top,
-      sourcePos: Position.Left
-    },
-  });
+    // Helper to add process node between two storage nodes
+    const addProcessNode = (id: string, label: string, srcPath: string, tgtPath: string, isProcessing: boolean, indexOffset: number) => {
+        const srcNode = pathNodeMap.get(srcPath);
+        const tgtNode = pathNodeMap.get(tgtPath);
 
-  // Connect Internal -> ETL
-  edges.push({
-     id: 'e-internal-etl',
-     source: internalId,
-     target: 'etl',
-     animated: true,
-  });
+        if (!srcNode || !tgtNode) return;
 
-  // Raw DB
-  nodes.push({
-    id: 'raw_db',
-    type: 'storage',
-    position: { x: startX + gapX * 3, y: etlY },
-    data: {
-      label: etl.rawTableName,
-      type: 'db',
-      count: rawCount,
-      targetPos: Position.Right,
-      sourcePos: Position.Left
-    },
-  });
-  edges.push({ id: 'e-etl-raw', source: 'etl', target: 'raw_db', animated: true });
+        // Calculate mid position
+        // If src and tgt are same, or tgt is "behind" src, visual might be weird.
+        // Assuming flow left-to-right mostly.
+        const mx = (srcNode.position.x + tgtNode.position.x) / 2;
 
-  // Transform
-  nodes.push({
-    id: 'transform',
-    type: 'process',
-    position: { x: startX + gapX * 2, y: etlY + 20 },
-    data: {
-      label: 'Transform',
-      isProcessing: activeSteps.includes('process_transform'),
-      targetPos: Position.Right,
-      sourcePos: Position.Left
-    },
-  });
-  edges.push({ id: 'e-raw-transform', source: 'raw_db', target: 'transform', animated: true });
+        // Jitter Y to separate overlapping job lines
+        // If multiple jobs connect same nodes, or close nodes, we want to separate them.
+        // Simple heuristic: average Y + offset based on job index.
+        const my = (srcNode.position.y + tgtNode.position.y) / 2 + (indexOffset * 40) - 20;
 
-  // Summary DB
-  nodes.push({
-    id: 'summary_db',
-    type: 'storage',
-    position: { x: startX + gapX, y: etlY },
-    data: {
-      label: etl.summaryTableName,
-      type: 'db',
-      count: summaryCount,
-      targetPos: Position.Right
-    },
-  });
-  edges.push({ id: 'e-transform-summary', source: 'transform', target: 'summary_db', animated: true });
+        nodes.push({
+            id,
+            type: 'process',
+            position: { x: mx, y: my },
+            data: { label, isProcessing },
+        });
+
+        edges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        edges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+    };
+
+    // Collection Jobs
+    collection.jobs.forEach((job, i) => {
+        if (!job.enabled) return;
+        addProcessNode(
+            `process-col-${job.id}`,
+            job.name,
+            job.sourcePath,
+            job.targetPath,
+            activeSteps.includes(`transfer_1_${job.id}`),
+            i % 3 // slight jitter cycle
+        );
+    });
+
+    // Delivery Jobs
+    delivery.jobs.forEach((job, i) => {
+        if (!job.enabled) return;
+        addProcessNode(
+            `process-del-${job.id}`,
+            job.name,
+            job.sourcePath,
+            job.targetPath,
+            activeSteps.includes(`transfer_2_${job.id}`),
+            i % 3
+        );
+    });
+
+    // --- 3. ETL Chain ---
+    const etlSourceNode = pathNodeMap.get(etl.sourcePath);
+    if (etlSourceNode) {
+         // ETL Process Node
+         const etlId = 'process-etl';
+         // Place to the right of the source node
+         const startX = etlSourceNode.position.x + 300;
+         const startY = etlSourceNode.position.y;
+
+         nodes.push({
+             id: etlId,
+             type: 'process',
+             position: { x: startX, y: startY },
+             data: { label: 'ETL', isProcessing: activeSteps.includes('process_etl') }
+         });
+         edges.push({ id: `e-${etlSourceNode.id}-${etlId}`, source: etlSourceNode.id, target: etlId, animated: true });
+
+         // Raw DB
+         const rawDbId = 'db-raw';
+         nodes.push({
+             id: rawDbId,
+             type: 'storage',
+             position: { x: startX + 200, y: startY },
+             data: { label: etl.rawTableName, type: 'db', count: select(etl.rawTableName).length },
+             sourcePosition: Position.Right,
+             targetPosition: Position.Left
+         });
+         edges.push({ id: `e-${etlId}-${rawDbId}`, source: etlId, target: rawDbId, animated: true });
+
+         // Transform Process
+         const transformId = 'process-transform';
+         nodes.push({
+             id: transformId,
+             type: 'process',
+             position: { x: startX + 400, y: startY },
+             data: { label: 'Transform', isProcessing: activeSteps.includes('process_transform') }
+         });
+         edges.push({ id: `e-${rawDbId}-${transformId}`, source: rawDbId, target: transformId, animated: true });
+
+         // Summary DB
+         const summaryDbId = 'db-summary';
+         nodes.push({
+             id: summaryDbId,
+             type: 'storage',
+             position: { x: startX + 600, y: startY },
+             data: { label: etl.summaryTableName, type: 'db', count: select(etl.summaryTableName).length },
+             targetPosition: Position.Left
+         });
+         edges.push({ id: `e-${transformId}-${summaryDbId}`, source: transformId, target: summaryDbId, animated: true });
+    }
+
+    return { nodes, edges };
+  }, [dataSource, collection, delivery, etl, listFiles, select, activeSteps]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
