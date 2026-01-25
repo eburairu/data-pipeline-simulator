@@ -21,12 +21,30 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { select } = useVirtualDB();
   const { collection, delivery, etl } = useSettings();
 
-  // Counts
-  const sourceCount = listFiles(collection.sourcePath).length;
-  const incomingCount = listFiles(collection.targetPath).length;
+  // Counts (Aggregated for Collection Jobs)
+  const sourceCount = collection.jobs.reduce((acc, job) => {
+    try {
+       return acc + listFiles(job.sourcePath).length;
+    } catch {
+       return acc;
+    }
+  }, 0);
+
+  const incomingCount = collection.jobs.reduce((acc, job) => {
+    try {
+       return acc + listFiles(job.targetPath).length;
+    } catch {
+       return acc;
+    }
+  }, 0);
+
   const internalCount = listFiles(delivery.targetPath).length;
   const rawCount = select(etl.rawTableName).length;
   const summaryCount = select(etl.summaryTableName).length;
+
+  // Labels
+  const sourceLabel = collection.jobs.length === 1 ? collection.jobs[0].sourcePath : `Sources (${collection.jobs.length})`;
+  const targetLabel = collection.jobs.length === 1 ? collection.jobs[0].targetPath : `Incoming (${collection.jobs.length})`;
 
   // Layout Constants
   const startX = 50;
@@ -41,7 +59,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       id: '1',
       type: 'storage',
       position: { x: startX, y: startY },
-      data: { label: collection.sourcePath, type: 'fs', count: sourceCount }, // Default: Target Left, Source Right
+      data: { label: sourceLabel, type: 'fs', count: sourceCount }, // Default: Target Left, Source Right
     },
     // 2. FTP (Process)
     {
@@ -55,7 +73,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       id: '3',
       type: 'storage',
       position: { x: startX + gapX * 2, y: startY },
-      data: { label: collection.targetPath, type: 'fs', count: incomingCount },
+      data: { label: targetLabel, type: 'fs', count: incomingCount },
     },
     // 4. Distribute (Process)
     {

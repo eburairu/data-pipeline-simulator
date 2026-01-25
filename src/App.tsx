@@ -8,7 +8,7 @@ import CollectionSettings from './components/settings/CollectionSettings';
 import DeliverySettings from './components/settings/DeliverySettings';
 import EtlSettings from './components/settings/EtlSettings';
 import 'reactflow/dist/style.css';
-import { Settings, Play, Pause, Activity, FilePlus } from 'lucide-react';
+import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle } from 'lucide-react';
 
 interface SimulationControlProps {
   activeSteps: string[];
@@ -17,6 +17,7 @@ interface SimulationControlProps {
 
 const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps }) => {
   const [isRunning, setIsRunning] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select } = useVirtualDB();
   const { dataSource, collection, delivery, etl } = useSettings();
@@ -34,7 +35,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   }, [select]);
 
   // Locks for auto-run to prevent overlapping processing in the same stage
-  const collectionLock = useRef(false);
+  const collectionLocks = useRef<Record<string, boolean>>({});
   const deliveryLock = useRef(false);
   const etlLock = useRef(false);
   const transformLock = useRef(false);
@@ -58,51 +59,100 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   // 1. Source Generation
   useEffect(() => {
     if (!isRunning) return;
+
+    // Generate files in the first enabled job's source path
+    const targetJob = collection.jobs.find(j => j.enabled);
+    if (!targetJob) return;
+
     const interval = setInterval(() => {
       const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
-      writeFile(collection.sourcePath, fileName, dataSource.fileContent);
+      writeFile(targetJob.sourcePath, fileName, dataSource.fileContent);
     }, dataSource.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, dataSource, collection.sourcePath, writeFile]);
+  }, [isRunning, dataSource, collection.jobs, writeFile]);
 
   // 2. Collection (Source -> Target)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (collectionLock.current) return;
+    const timers: ReturnType<typeof setInterval>[] = [];
 
-      const currentFiles = listFilesRef.current(collection.sourcePath);
-      if (currentFiles.length === 0) return;
+    collection.jobs.forEach(job => {
+      if (!job.enabled) return;
 
-      collectionLock.current = true;
-      const file = currentFiles[0];
+      const timer = setInterval(async () => {
+        if (collectionLocks.current[job.id]) return;
 
-      toggleStep('transfer_1', true);
-      await delay(collection.processingTime);
+        try {
+          const currentFiles = listFilesRef.current(job.sourcePath);
+          if (currentFiles.length === 0) return;
 
-      moveFile(file.name, collection.sourcePath, collection.targetPath);
-      toggleStep('transfer_1', false);
-      collectionLock.current = false;
-    }, collection.executionInterval);
-    return () => clearInterval(interval);
-  }, [collection, moveFile, toggleStep]);
+          // Regex Filter
+          let regex: RegExp;
+          try {
+             regex = new RegExp(job.filterRegex);
+          } catch (e) {
+             setErrors(prev => {
+                const msg = `Job ${job.name}: Invalid Regex`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+             });
+             return;
+          }
+
+          const file = currentFiles.find(f => regex.test(f.name));
+          if (!file) return;
+
+          collectionLocks.current[job.id] = true;
+
+          toggleStep('transfer_1', true);
+          await delay(collection.processingTime);
+
+          try {
+             moveFile(file.name, job.sourcePath, job.targetPath);
+             // Clear specific errors if successful (optional, but good UX)
+             setErrors(prev => prev.filter(e => !e.includes(`Job ${job.name}`)));
+          } catch (e) {
+             setErrors(prev => {
+                const msg = `Job ${job.name}: Failed to move to '${job.targetPath}' (Path exists?)`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+             });
+          }
+
+          toggleStep('transfer_1', false);
+          collectionLocks.current[job.id] = false;
+        } catch (e) {
+           setErrors(prev => {
+              const msg = `Job ${job.name}: Error accessing '${job.sourcePath}'`;
+              return prev.includes(msg) ? prev : [...prev, msg];
+           });
+        }
+      }, job.executionInterval);
+
+      timers.push(timer);
+    });
+
+    return () => timers.forEach(clearInterval);
+  }, [collection.jobs, collection.processingTime, moveFile, toggleStep]);
 
   // 3. Delivery (Collection Target -> Delivery Target)
   useEffect(() => {
     const interval = setInterval(async () => {
       if (deliveryLock.current) return;
 
-      const currentFiles = listFilesRef.current(delivery.sourcePath);
-      if (currentFiles.length === 0) return;
+      try {
+        const currentFiles = listFilesRef.current(delivery.sourcePath);
+        if (currentFiles.length === 0) return;
 
-      deliveryLock.current = true;
-      const file = currentFiles[0];
+        deliveryLock.current = true;
+        const file = currentFiles[0];
 
-      toggleStep('transfer_2', true);
-      await delay(delivery.processingTime);
+        toggleStep('transfer_2', true);
+        await delay(delivery.processingTime);
 
-      moveFile(file.name, delivery.sourcePath, delivery.targetPath);
-      toggleStep('transfer_2', false);
-      deliveryLock.current = false;
+        moveFile(file.name, delivery.sourcePath, delivery.targetPath);
+        toggleStep('transfer_2', false);
+        deliveryLock.current = false;
+      } catch (e) {
+        // Silent fail or log? Delivery is not the focus, but let's keep it safe
+      }
     }, delivery.executionInterval);
     return () => clearInterval(interval);
   }, [delivery, moveFile, toggleStep]);
@@ -112,20 +162,24 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     const interval = setInterval(async () => {
       if (etlLock.current) return;
 
-      const currentFiles = listFilesRef.current(delivery.targetPath);
-      if (currentFiles.length === 0) return;
+      try {
+        const currentFiles = listFilesRef.current(delivery.targetPath);
+        if (currentFiles.length === 0) return;
 
-      etlLock.current = true;
-      const file = currentFiles[0];
+        etlLock.current = true;
+        const file = currentFiles[0];
 
-      toggleStep('process_etl', true);
-      await delay(etl.processingTime);
+        toggleStep('process_etl', true);
+        await delay(etl.processingTime);
 
-      insert(etl.rawTableName, { file: file.name, content: dataSource.fileContent });
-      deleteFile(file.name, delivery.targetPath);
+        insert(etl.rawTableName, { file: file.name, content: dataSource.fileContent });
+        deleteFile(file.name, delivery.targetPath);
 
-      toggleStep('process_etl', false);
-      etlLock.current = false;
+        toggleStep('process_etl', false);
+        etlLock.current = false;
+      } catch (e) {
+        // Silent fail
+      }
     }, etl.executionInterval);
     return () => clearInterval(interval);
   }, [etl, delivery.targetPath, insert, deleteFile, dataSource.fileContent, toggleStep]);
@@ -169,14 +223,40 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
 
   const handleCreateSourceFile = () => {
-    const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
-    writeFile(collection.sourcePath, fileName, dataSource.fileContent);
+    const targetJob = collection.jobs.find(j => j.enabled);
+    if (targetJob) {
+       const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
+       writeFile(targetJob.sourcePath, fileName, dataSource.fileContent);
+    } else {
+       setErrors(prev => {
+          const msg = "No enabled collection jobs to create file for.";
+          return prev.includes(msg) ? prev : [...prev, msg];
+       });
+    }
   };
 
-  const sourceFiles = listFiles(collection.sourcePath);
-  const incomingFiles = listFiles(collection.targetPath);
+  // Aggregated File Lists
+  const sourceFiles = collection.jobs.flatMap(job => {
+     try {
+       return listFiles(job.sourcePath).map(f => ({ ...f, _source: job.name }));
+     } catch {
+       return [];
+     }
+  });
+
+  const incomingFiles = collection.jobs.flatMap(job => {
+     try {
+       return listFiles(job.targetPath).map(f => ({ ...f, _source: job.name }));
+     } catch {
+       return [];
+     }
+  });
+
   // delivery.sourcePath is usually collection.targetPath, but listed separately just in case
-  const internalFiles = listFiles(delivery.targetPath);
+  let internalFiles: any[] = [];
+  try {
+     internalFiles = listFiles(delivery.targetPath);
+  } catch (e) {}
 
   const dbRaw = select(etl.rawTableName);
   const dbSummary = select(etl.summaryTableName);
@@ -186,6 +266,16 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       <h2 className="text-xl font-bold flex items-center gap-2">
         <Activity className="w-5 h-5" /> Simulation Control
       </h2>
+
+      {errors.length > 0 && (
+         <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-sm flex flex-col gap-1">
+            <div className="font-bold flex items-center gap-1"><AlertTriangle size={14}/> Errors Detected:</div>
+            <ul className="list-disc list-inside">
+              {errors.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+            <button onClick={() => setErrors([])} className="text-xs text-red-500 hover:underline self-end">Clear</button>
+         </div>
+      )}
 
       <div className="flex gap-2 flex-wrap">
         <button
@@ -211,17 +301,27 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
         <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">{collection.sourcePath}</h3>
+          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Source Paths (All Jobs)</h3>
           <ul className="space-y-1">
             {sourceFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-            {sourceFiles.map(f => <li key={f.createdAt} className="text-green-600 truncate">{f.name}</li>)}
+            {sourceFiles.map((f, idx) => (
+               <li key={`${f.name}-${idx}`} className="text-green-600 truncate flex justify-between">
+                 <span>{f.name}</span>
+                 <span className="text-xs text-gray-400">{(f as any)._source}</span>
+               </li>
+            ))}
           </ul>
         </div>
         <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">{collection.targetPath}</h3>
+          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Incoming Paths (All Jobs)</h3>
            <ul className="space-y-1">
             {incomingFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-            {incomingFiles.map(f => <li key={f.createdAt} className="text-orange-600 truncate">{f.name}</li>)}
+            {incomingFiles.map((f, idx) => (
+              <li key={`${f.name}-${idx}`} className="text-orange-600 truncate flex justify-between">
+                 <span>{f.name}</span>
+                 <span className="text-xs text-gray-400">{(f as any)._source}</span>
+               </li>
+            ))}
           </ul>
         </div>
         <div className="border p-2 rounded bg-gray-50">
