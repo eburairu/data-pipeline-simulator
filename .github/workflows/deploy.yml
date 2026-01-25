@@ -1,0 +1,59 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Determine Base URL
+        id: base_url
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "URL=/${{ github.event.repository.name }}/dev/" >> $GITHUB_OUTPUT
+          else
+            echo "URL=/${{ github.event.repository.name }}/" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build
+        run: npm run build
+        env:
+          BASE_URL: ${{ steps.base_url.outputs.URL }}
+
+      - name: Deploy to Dev
+        if: github.ref == 'refs/heads/develop'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
+          target-folder: dev
+          clean: true
+
+      - name: Deploy to Prod
+        if: github.ref == 'refs/heads/main'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
+          target-folder: .
+          clean: true
+          clean-exclude: dev
