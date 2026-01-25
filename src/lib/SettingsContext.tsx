@@ -5,7 +5,7 @@ export interface DataSourceJob {
   name: string;
   host: string;
   sourcePath: string;
-  filePrefix: string;
+  fileNamePattern: string;
   fileContent: string;
   executionInterval: number;
   enabled: boolean;
@@ -94,7 +94,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         name: 'Default Source',
         host: 'host1',
         sourcePath: '/source',
-        filePrefix: 'data_',
+        fileNamePattern: '${host}_data_${timestamp}.csv',
         fileContent: 'sample,data,123',
         executionInterval: 1000,
         enabled: true,
