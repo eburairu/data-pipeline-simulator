@@ -16,9 +16,12 @@ const CollectionSettings: React.FC = () => {
     const newJob: CollectionJob = {
       id: `job_${Date.now()}`,
       name: `Job ${collection.jobs.length + 1}`,
+      sourceHost: 'localhost',
       sourcePath: '/source',
       filterRegex: '.*',
+      targetHost: 'localhost',
       targetPath: '/incoming',
+      bandwidth: 100,
       executionInterval: 1000,
       enabled: true,
     };
@@ -39,7 +42,7 @@ const CollectionSettings: React.FC = () => {
 
       {/* Global Settings */}
        <div>
-          <label className="block text-sm font-medium text-gray-700">Processing Time (ms)</label>
+          <label className="block text-sm font-medium text-gray-700">Base Processing Time (Latency) (ms)</label>
           <input
             type="number"
             value={collection.processingTime}
@@ -79,11 +82,31 @@ const CollectionSettings: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                    <div>
+                     <label className="block text-xs font-medium text-gray-500">Source Host</label>
+                     <input
+                        type="text"
+                        value={job.sourceHost}
+                        onChange={(e) => handleJobChange(job.id, 'sourceHost', e.target.value)}
+                        className="w-full border rounded p-1 text-sm"
+                     />
+                   </div>
+                   <div>
                      <label className="block text-xs font-medium text-gray-500">Source Path</label>
                      <input
                         type="text"
                         value={job.sourcePath}
                         onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
+                        className="w-full border rounded p-1 text-sm"
+                     />
+                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                     <label className="block text-xs font-medium text-gray-500">Target Host</label>
+                     <input
+                        type="text"
+                        value={job.targetHost}
+                        onChange={(e) => handleJobChange(job.id, 'targetHost', e.target.value)}
                         className="w-full border rounded p-1 text-sm"
                      />
                    </div>
@@ -97,7 +120,17 @@ const CollectionSettings: React.FC = () => {
                      />
                    </div>
                 </div>
-                <div>
+                <div className="grid grid-cols-2 gap-3">
+                   <div>
+                     <label className="block text-xs font-medium text-gray-500">Bandwidth (chars/sec)</label>
+                     <input
+                        type="number"
+                        value={job.bandwidth}
+                        onChange={(e) => handleJobChange(job.id, 'bandwidth', parseInt(e.target.value) || 0)}
+                        className="w-full border rounded p-1 text-sm"
+                     />
+                   </div>
+                    <div>
                      <label className="block text-xs font-medium text-gray-500">Filter Regex</label>
                      <input
                         type="text"
@@ -106,6 +139,7 @@ const CollectionSettings: React.FC = () => {
                         className="w-full border rounded p-1 text-sm"
                         placeholder=".*"
                      />
+                   </div>
                 </div>
              </div>
           </div>

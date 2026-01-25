@@ -22,9 +22,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { dataSource, collection, delivery, etl } = useSettings();
 
   // Helper for safe counts
-  const getCount = (path: string) => {
+  const getCount = (host: string, path: string) => {
     try {
-      return listFiles(path).length;
+      return listFiles(host, path).length;
     } catch {
       return 0;
     }
@@ -33,74 +33,89 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    const pathNodeMap = new Map<string, Node>(); // path -> Node
+    const keyNodeMap = new Map<string, Node>(); // key (host:path) -> Node
+
+    const getKey = (host: string, path: string) => `${host}:${path}`;
+    const parseKey = (key: string) => {
+        const sepIndex = key.indexOf(':');
+        return {
+            host: key.substring(0, sepIndex),
+            path: key.substring(sepIndex + 1)
+        };
+    };
 
     // --- 1. Identify Unique Paths & Create Storage Nodes ---
 
-    // Collect paths for each "Stage"
-    // Stage 0: Data Source Paths
-    const sourcePaths = Array.from(new Set(dataSource.jobs.map(j => j.sourcePath)));
+    // Collect keys for each "Stage"
+    // Stage 0: Data Source Keys
+    const sourceKeys = Array.from(new Set(dataSource.jobs.map(j => getKey(j.host, j.sourcePath))));
 
-    // Stage 1: Incoming Paths (Targets of Collection)
-    const incomingPaths = Array.from(new Set(collection.jobs.map(j => j.targetPath)));
+    // Stage 1: Incoming Keys (Targets of Collection)
+    const incomingKeys = Array.from(new Set(collection.jobs.map(j => getKey(j.targetHost, j.targetPath))));
 
-    // Stage 2: Internal Paths (Targets of Delivery)
-    const internalPaths = Array.from(new Set(delivery.jobs.map(j => j.targetPath)));
+    // Stage 2: Internal Keys (Targets of Delivery)
+    const internalKeys = Array.from(new Set(delivery.jobs.map(j => getKey(j.targetHost, j.targetPath))));
 
-    const addStorageNode = (path: string, colIndex: number, rowIndex: number) => {
-      if (pathNodeMap.has(path)) return pathNodeMap.get(path)!;
+    const addStorageNode = (host: string, path: string, colIndex: number, rowIndex: number) => {
+      const key = getKey(host, path);
+      if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
 
-      const id = `storage-${path.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+      const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
       const node: Node = {
         id,
         type: 'storage',
         // Layout: X based on col, Y based on row
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
-        data: { label: path, type: 'fs', count: getCount(path) },
+        data: { label: key, type: 'fs', count: getCount(host, path) },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
       nodes.push(node);
-      pathNodeMap.set(path, node);
+      keyNodeMap.set(key, node);
       return node;
     };
 
     // Place Nodes
-    // Priority: If a path appears in Sources, it stays in Col 0.
-    // If it appears in Incoming but NOT Sources, it goes to Col 1.
-    // If it appears in Internal but NOT Sources/Incoming, it goes to Col 2.
-
     // Col 0: Sources
-    sourcePaths.forEach((path, i) => addStorageNode(path, 0, i));
+    sourceKeys.forEach((key, i) => {
+        const { host, path } = parseKey(key);
+        addStorageNode(host, path, 0, i);
+    });
 
     // Col 1: Incoming
     let incomingRow = 0;
-    incomingPaths.forEach((path) => {
-        if (!pathNodeMap.has(path)) {
-            addStorageNode(path, 1, incomingRow++);
+    incomingKeys.forEach((key) => {
+        if (!keyNodeMap.has(key)) {
+            const { host, path } = parseKey(key);
+            addStorageNode(host, path, 1, incomingRow++);
         }
     });
 
     // Col 2: Internal
     let internalRow = 0;
-    internalPaths.forEach((path) => {
-        if (!pathNodeMap.has(path)) {
-            addStorageNode(path, 2, internalRow++);
+    internalKeys.forEach((key) => {
+        if (!keyNodeMap.has(key)) {
+            const { host, path } = parseKey(key);
+            addStorageNode(host, path, 2, internalRow++);
         }
     });
 
     // Ensure ETL source path exists (put in Col 2 if missing, at bottom)
-    if (!pathNodeMap.has(etl.sourcePath)) {
-        addStorageNode(etl.sourcePath, 2, internalRow++);
+    const etlKey = getKey(etl.sourceHost, etl.sourcePath);
+    if (!keyNodeMap.has(etlKey)) {
+        addStorageNode(etl.sourceHost, etl.sourcePath, 2, internalRow++);
     }
 
 
     // --- 2. Create Process Nodes & Edges ---
 
     // Helper to add process node between two storage nodes
-    const addProcessNode = (id: string, label: string, srcPath: string, tgtPath: string, isProcessing: boolean, indexOffset: number) => {
-        const srcNode = pathNodeMap.get(srcPath);
-        const tgtNode = pathNodeMap.get(tgtPath);
+    const addProcessNode = (id: string, label: string, srcHost: string, srcPath: string, tgtHost: string, tgtPath: string, isProcessing: boolean, indexOffset: number) => {
+        const srcKey = getKey(srcHost, srcPath);
+        const tgtKey = getKey(tgtHost, tgtPath);
+
+        const srcNode = keyNodeMap.get(srcKey);
+        const tgtNode = keyNodeMap.get(tgtKey);
 
         if (!srcNode || !tgtNode) return;
 
@@ -131,7 +146,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         addProcessNode(
             `process-col-${job.id}`,
             job.name,
+            job.sourceHost,
             job.sourcePath,
+            job.targetHost,
             job.targetPath,
             activeSteps.includes(`transfer_1_${job.id}`),
             i % 3 // slight jitter cycle
@@ -144,7 +161,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         addProcessNode(
             `process-del-${job.id}`,
             job.name,
+            job.sourceHost,
             job.sourcePath,
+            job.targetHost,
             job.targetPath,
             activeSteps.includes(`transfer_2_${job.id}`),
             i % 3
@@ -152,7 +171,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     });
 
     // --- 3. ETL Chain ---
-    const etlSourceNode = pathNodeMap.get(etl.sourcePath);
+    const etlSourceNode = keyNodeMap.get(etlKey);
     if (etlSourceNode) {
          // ETL Process Node
          const etlId = 'process-etl';

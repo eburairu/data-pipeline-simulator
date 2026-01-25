@@ -16,9 +16,12 @@ const DeliverySettings: React.FC = () => {
     const newJob: DeliveryJob = {
       id: `del_job_${Date.now()}`,
       name: `Delivery ${delivery.jobs.length + 1}`,
+      sourceHost: 'localhost',
       sourcePath: '/incoming',
+      targetHost: 'localhost',
       targetPath: '/internal',
       filterRegex: '.*',
+      bandwidth: 100,
       processingTime: 1000,
       executionInterval: 1000,
       enabled: true,
@@ -65,11 +68,31 @@ const DeliverySettings: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                    <div>
+                     <label className="block text-xs font-medium text-gray-500">Source Host</label>
+                     <input
+                        type="text"
+                        value={job.sourceHost}
+                        onChange={(e) => handleJobChange(job.id, 'sourceHost', e.target.value)}
+                        className="w-full border rounded p-1 text-sm"
+                     />
+                   </div>
+                   <div>
                      <label className="block text-xs font-medium text-gray-500">Source Path</label>
                      <input
                         type="text"
                         value={job.sourcePath}
                         onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
+                        className="w-full border rounded p-1 text-sm"
+                     />
+                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                     <label className="block text-xs font-medium text-gray-500">Target Host</label>
+                     <input
+                        type="text"
+                        value={job.targetHost}
+                        onChange={(e) => handleJobChange(job.id, 'targetHost', e.target.value)}
                         className="w-full border rounded p-1 text-sm"
                      />
                    </div>
@@ -85,7 +108,16 @@ const DeliverySettings: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Processing Time (ms)</label>
+                     <label className="block text-xs font-medium text-gray-500">Bandwidth (chars/sec)</label>
+                     <input
+                        type="number"
+                        value={job.bandwidth}
+                        onChange={(e) => handleJobChange(job.id, 'bandwidth', parseInt(e.target.value) || 0)}
+                        className="w-full border rounded p-1 text-sm"
+                     />
+                   </div>
+                    <div>
+                     <label className="block text-xs font-medium text-gray-500">Latency (ms)</label>
                      <input
                         type="number"
                         value={job.processingTime}
@@ -93,7 +125,8 @@ const DeliverySettings: React.FC = () => {
                         className="w-full border rounded p-1 text-sm"
                      />
                    </div>
-                   <div>
+                </div>
+                <div>
                      <label className="block text-xs font-medium text-gray-500">Filter Regex</label>
                      <input
                         type="text"
@@ -102,7 +135,6 @@ const DeliverySettings: React.FC = () => {
                         className="w-full border rounded p-1 text-sm"
                         placeholder=".*"
                      />
-                   </div>
                 </div>
              </div>
           </div>
