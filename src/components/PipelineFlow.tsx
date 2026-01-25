@@ -3,6 +3,7 @@ import ReactFlow, { type Node, type Edge, Background, Controls, Position } from 
 import 'reactflow/dist/style.css';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
+import { useSettings } from '../lib/SettingsContext';
 import StorageNode from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
 
@@ -18,13 +19,14 @@ interface PipelineFlowProps {
 const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
+  const { collection, delivery, etl } = useSettings();
 
   // Counts
-  const sourceCount = listFiles('/source').length;
-  const incomingCount = listFiles('/incoming').length;
-  const internalCount = listFiles('/internal').length;
-  const rawCount = select('raw_data').length;
-  const summaryCount = select('summary_data').length;
+  const sourceCount = listFiles(collection.sourcePath).length;
+  const incomingCount = listFiles(collection.targetPath).length;
+  const internalCount = listFiles(delivery.targetPath).length;
+  const rawCount = select(etl.rawTableName).length;
+  const summaryCount = select(etl.summaryTableName).length;
 
   // Layout Constants
   const startX = 50;
@@ -39,7 +41,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       id: '1',
       type: 'storage',
       position: { x: startX, y: startY },
-      data: { label: '/source', type: 'fs', count: sourceCount }, // Default: Target Left, Source Right
+      data: { label: collection.sourcePath, type: 'fs', count: sourceCount }, // Default: Target Left, Source Right
     },
     // 2. FTP (Process)
     {
@@ -53,7 +55,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       id: '3',
       type: 'storage',
       position: { x: startX + gapX * 2, y: startY },
-      data: { label: '/incoming', type: 'fs', count: incomingCount },
+      data: { label: collection.targetPath, type: 'fs', count: incomingCount },
     },
     // 4. Distribute (Process)
     {
@@ -68,7 +70,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       type: 'storage',
       position: { x: startX + gapX * 4, y: startY },
       data: {
-        label: '/internal',
+        label: delivery.targetPath,
         type: 'fs',
         count: internalCount,
         sourcePos: Position.Bottom // Turn downwards
@@ -94,7 +96,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       type: 'storage',
       position: { x: startX + gapX * 3, y: startY + rowH },
       data: {
-        label: 'raw_data',
+        label: etl.rawTableName,
         type: 'db',
         count: rawCount,
         targetPos: Position.Right, // Receive from right
@@ -119,7 +121,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeStep = '' }) => {
       type: 'storage',
       position: { x: startX + gapX, y: startY + rowH },
       data: {
-        label: 'summary_data',
+        label: etl.summaryTableName,
         type: 'db',
         count: summaryCount,
         targetPos: Position.Right
