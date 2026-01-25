@@ -42,7 +42,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const { insert, select } = useVirtualDB();
   const { dataSource, collection, delivery, etl } = useSettings();
 
-  // Refs for current state access inside intervals to prevent dependency changes from resetting intervals
+  // Refs for current state access inside intervals
   const listFilesRef = useRef(listFiles);
   const selectRef = useRef(select);
 
@@ -54,9 +54,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     selectRef.current = select;
   }, [select]);
 
-  // Locks for auto-run to prevent overlapping processing in the same stage
+  // Locks
   const collectionLocks = useRef<Record<string, boolean>>({});
-  const deliveryLock = useRef(false);
+  const deliveryLocks = useRef<Record<string, boolean>>({});
   const etlLock = useRef(false);
   const transformLock = useRef(false);
 
@@ -79,15 +79,22 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   // 1. Source Generation
   useEffect(() => {
     if (!isRunning) return;
+    const timers: ReturnType<typeof setInterval>[] = [];
 
-    const interval = setInterval(() => {
-      const fileName = generateFileName(dataSource.filePrefix);
-      writeFile(dataSource.sourcePath, fileName, dataSource.fileContent);
-    }, dataSource.executionInterval);
-    return () => clearInterval(interval);
-  }, [isRunning, dataSource, writeFile]);
+    dataSource.jobs.forEach(job => {
+      if (!job.enabled) return;
 
-  // 2. Collection (Source -> Target)
+      const timer = setInterval(() => {
+        const fileName = generateFileName(job.filePrefix);
+        writeFile(job.sourcePath, fileName, job.fileContent);
+      }, job.executionInterval);
+      timers.push(timer);
+    });
+
+    return () => timers.forEach(clearInterval);
+  }, [isRunning, dataSource.jobs, writeFile]);
+
+  // 2. Collection (Source -> Incoming)
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -95,21 +102,19 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        // Global Mutex for Collection Stage:
-        // If ANY job is currently collecting, skip this execution.
+        // Simple Mutex for Collection Stage to prevent race conditions on shared paths
         if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
 
         try {
           const currentFiles = listFilesRef.current(job.sourcePath);
           if (currentFiles.length === 0) return;
 
-          // Regex Filter
           let regex: RegExp;
           try {
              regex = new RegExp(job.filterRegex);
           } catch (e) {
              setErrors(prev => {
-                const msg = `Job ${job.name}: Invalid Regex`;
+                const msg = `Collection Job ${job.name}: Invalid Regex`;
                 return prev.includes(msg) ? prev : [...prev, msg];
              });
              return;
@@ -118,35 +123,29 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
           const file = currentFiles.find(f => regex.test(f.name));
           if (!file) return;
 
-          // Double check lock before proceeding (though single threaded JS makes this mostly safe)
           if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
 
           collectionLocks.current[job.id] = true;
 
-          toggleStep('transfer_1', true);
+          toggleStep(`transfer_1_${job.id}`, true);
 
-          // Dynamic processing time based on file content
           const processingTime = calculateProcessingTime(file.content, collection.processingTime);
           await delay(processingTime);
 
           try {
              moveFile(file.name, job.sourcePath, job.targetPath);
-             // Clear specific errors if successful (optional, but good UX)
-             setErrors(prev => prev.filter(e => !e.includes(`Job ${job.name}`)));
+             setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
           } catch (e) {
              setErrors(prev => {
-                const msg = `Job ${job.name}: Failed to move to '${job.targetPath}' (Path exists?)`;
+                const msg = `Collection Job ${job.name}: Failed to move to '${job.targetPath}'`;
                 return prev.includes(msg) ? prev : [...prev, msg];
              });
           }
 
-          toggleStep('transfer_1', false);
+          toggleStep(`transfer_1_${job.id}`, false);
           collectionLocks.current[job.id] = false;
         } catch (e) {
-           setErrors(prev => {
-              const msg = `Job ${job.name}: Error accessing '${job.sourcePath}'`;
-              return prev.includes(msg) ? prev : [...prev, msg];
-           });
+           // Ignore read errors (empty path etc)
            collectionLocks.current[job.id] = false;
         }
       }, job.executionInterval);
@@ -157,34 +156,63 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => timers.forEach(clearInterval);
   }, [collection.jobs, collection.processingTime, moveFile, toggleStep]);
 
-  // 3. Delivery (Collection Target -> Delivery Target)
+  // 3. Delivery (Incoming -> Internal)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      if (deliveryLock.current) return;
+    const timers: ReturnType<typeof setInterval>[] = [];
 
-      try {
-        const currentFiles = listFilesRef.current(delivery.sourcePath);
-        if (currentFiles.length === 0) return;
+    delivery.jobs.forEach(job => {
+      if (!job.enabled) return;
 
-        deliveryLock.current = true;
-        const file = currentFiles[0];
+      const timer = setInterval(async () => {
+        if (Object.values(deliveryLocks.current).some(isActive => isActive)) return;
 
-        toggleStep('transfer_2', true);
+        try {
+          const currentFiles = listFilesRef.current(job.sourcePath);
+          if (currentFiles.length === 0) return;
 
-        // Dynamic processing time
-        const processingTime = calculateProcessingTime(file.content, delivery.processingTime);
-        await delay(processingTime);
+          let regex: RegExp;
+          try {
+             regex = new RegExp(job.filterRegex);
+          } catch (e) {
+              setErrors(prev => {
+                const msg = `Delivery Job ${job.name}: Invalid Regex`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+             });
+             return;
+          }
 
-        moveFile(file.name, delivery.sourcePath, delivery.targetPath);
-        toggleStep('transfer_2', false);
-        deliveryLock.current = false;
-      } catch (e) {
-        // Silent fail or log? Delivery is not the focus, but let's keep it safe
-        deliveryLock.current = false;
-      }
-    }, delivery.executionInterval);
-    return () => clearInterval(interval);
-  }, [delivery, moveFile, toggleStep]);
+          const file = currentFiles.find(f => regex.test(f.name));
+          if (!file) return;
+
+          if (Object.values(deliveryLocks.current).some(isActive => isActive)) return;
+
+          deliveryLocks.current[job.id] = true;
+          toggleStep(`transfer_2_${job.id}`, true);
+
+          const processingTime = calculateProcessingTime(file.content, job.processingTime);
+          await delay(processingTime);
+
+          try {
+            moveFile(file.name, job.sourcePath, job.targetPath);
+            setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
+          } catch (e) {
+            setErrors(prev => {
+                const msg = `Delivery Job ${job.name}: Failed to move to '${job.targetPath}'`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+             });
+          }
+
+          toggleStep(`transfer_2_${job.id}`, false);
+          deliveryLocks.current[job.id] = false;
+        } catch (e) {
+          deliveryLocks.current[job.id] = false;
+        }
+      }, job.executionInterval);
+
+      timers.push(timer);
+    });
+    return () => timers.forEach(clearInterval);
+  }, [delivery.jobs, moveFile, toggleStep]);
 
   // 4. ETL & Load (Delivery Target -> DB)
   useEffect(() => {
@@ -192,7 +220,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (etlLock.current) return;
 
       try {
-        const currentFiles = listFilesRef.current(delivery.targetPath);
+        const currentFiles = listFilesRef.current(etl.sourcePath);
         if (currentFiles.length === 0) return;
 
         etlLock.current = true;
@@ -200,22 +228,20 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
         toggleStep('process_etl', true);
 
-        // Dynamic processing time
         const processingTime = calculateProcessingTime(file.content, etl.processingTime);
         await delay(processingTime);
 
         insert(etl.rawTableName, { file: file.name, content: file.content });
-        deleteFile(file.name, delivery.targetPath);
+        deleteFile(file.name, etl.sourcePath);
 
         toggleStep('process_etl', false);
         etlLock.current = false;
       } catch (e) {
-        // Silent fail
         etlLock.current = false;
       }
     }, etl.executionInterval);
     return () => clearInterval(interval);
-  }, [etl, delivery.targetPath, insert, deleteFile, toggleStep]);
+  }, [etl, insert, deleteFile, toggleStep]);
 
   // 5. Transform (Raw DB -> Summary DB)
   useEffect(() => {
@@ -225,26 +251,20 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       const summaryRecords = selectRef.current(etl.summaryTableName);
       const rawRecords = selectRef.current(etl.rawTableName);
 
-      // Find max lastProcessedTimestamp from existing summaries
       const lastProcessedTime = Math.max(0, ...summaryRecords.map(r => (r.data['lastProcessedTimestamp'] as number) || 0));
-
-      // Filter for new records only
       const newRawRecords = rawRecords.filter(r => r.insertedAt > lastProcessedTime);
 
       if (newRawRecords.length === 0) return;
 
       transformLock.current = true;
-
       toggleStep('process_transform', true);
 
-      // Calculate combined content length for dynamic processing time
       const combinedContent = newRawRecords.map(r => r.data['content'] as string || '').join('');
       const processingTime = calculateProcessingTime(combinedContent, etl.processingTime);
       await delay(processingTime);
 
       const currentMaxTime = Math.max(...newRawRecords.map(r => r.insertedAt));
 
-      // Simulate aggregation
       insert(etl.summaryTableName, {
         summary: 'processed_batch',
         count: newRawRecords.length,
@@ -260,8 +280,13 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
 
   const handleCreateSourceFile = () => {
-    const fileName = generateFileName(dataSource.filePrefix);
-    writeFile(dataSource.sourcePath, fileName, dataSource.fileContent);
+    // Generate file for ALL enabled data source jobs
+    dataSource.jobs.forEach(job => {
+        if (job.enabled) {
+            const fileName = generateFileName(job.filePrefix);
+            writeFile(job.sourcePath, fileName, job.fileContent);
+        }
+    });
   };
 
   const safeListFiles = (path: string) => {
@@ -271,8 +296,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       return [];
     }
   };
-
-  const internalFiles = safeListFiles(delivery.targetPath);
 
   const dbRaw = select(etl.rawTableName);
   const dbSummary = select(etl.summaryTableName);
@@ -316,54 +339,58 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-        {collection.jobs.map((job) => {
-          const sFiles = safeListFiles(job.sourcePath);
-          const tFiles = safeListFiles(job.targetPath);
-          return (
-            <React.Fragment key={job.id}>
-              <div className="border p-2 rounded bg-gray-50">
-                <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Source: {job.name}</h3>
-                <p className="text-xs text-gray-500 mb-1 truncate">{job.sourcePath}</p>
-                <ul className="space-y-1">
-                  {sFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-                  {sFiles.map((f) => (
-                    <li key={f.name} className="text-green-600 truncate">
-                      {f.name}
-                    </li>
-                  ))}
-                </ul>
+        {/* Source Files (grouped by DS Job) */}
+        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
+           <h3 className="font-bold border-b text-gray-700">Sources</h3>
+           {dataSource.jobs.map(job => (
+              <div key={job.id} className="text-xs">
+                 <div className="font-semibold text-gray-600">{job.name} ({job.sourcePath})</div>
+                 <ul className="pl-2">
+                   {safeListFiles(job.sourcePath).map(f => (
+                     <li key={f.name} className="text-green-600 truncate">{f.name}</li>
+                   ))}
+                   {safeListFiles(job.sourcePath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                 </ul>
               </div>
-              <div className="border p-2 rounded bg-gray-50">
-                <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Incoming: {job.name}</h3>
-                 <p className="text-xs text-gray-500 mb-1 truncate">{job.targetPath}</p>
-                <ul className="space-y-1">
-                  {tFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-                  {tFiles.map((f) => (
-                    <li key={f.name} className="text-orange-600 truncate">
-                      {f.name}
-                    </li>
-                  ))}
-                </ul>
+           ))}
+        </div>
+
+        {/* Collection/Incoming Files (grouped by Collection Job) */}
+        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
+            <h3 className="font-bold border-b text-gray-700">Collection / Incoming</h3>
+            {collection.jobs.map(job => (
+              <div key={job.id} className="text-xs">
+                 <div className="font-semibold text-gray-600">{job.name} → {job.targetPath}</div>
+                 <ul className="pl-2">
+                   {safeListFiles(job.targetPath).map(f => (
+                     <li key={f.name} className="text-orange-600 truncate">{f.name}</li>
+                   ))}
+                   {safeListFiles(job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                 </ul>
               </div>
-            </React.Fragment>
-          );
-        })}
-        <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Internal</h3>
-          <p className="text-xs text-gray-500 mb-1 truncate">{delivery.targetPath}</p>
-          <ul className="space-y-1">
-            {internalFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-            {internalFiles.map((f) => (
-              <li key={f.createdAt} className="text-blue-600 truncate">
-                {f.name}
-              </li>
             ))}
-          </ul>
+        </div>
+
+        {/* Delivery/Internal Files (grouped by Delivery Job) */}
+        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
+            <h3 className="font-bold border-b text-gray-700">Delivery / Internal</h3>
+            {delivery.jobs.map(job => (
+              <div key={job.id} className="text-xs">
+                 <div className="font-semibold text-gray-600">{job.name} → {job.targetPath}</div>
+                 <ul className="pl-2">
+                   {safeListFiles(job.targetPath).map(f => (
+                     <li key={f.name} className="text-blue-600 truncate">{f.name}</li>
+                   ))}
+                   {safeListFiles(job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                 </ul>
+              </div>
+            ))}
         </div>
       </div>
+
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-4">
         <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700">DB: {etl.rawTableName}</h3>
+          <h3 className="font-bold border-b mb-2 text-gray-700">DB: {etl.rawTableName} (From: {etl.sourcePath})</h3>
           <ul className="space-y-1 h-32 overflow-y-auto">
             {dbRaw.length === 0 && <li className="text-gray-400 italic">No records</li>}
             {dbRaw.map(r => <li key={r.id} className="truncate">{JSON.stringify(r.data)}</li>)}
