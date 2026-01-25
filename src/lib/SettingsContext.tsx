@@ -44,28 +44,28 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [dataSource, setDataSource] = useState<DataSourceSettings>({
     filePrefix: 'data_',
     fileContent: 'sample,data,123',
-    executionInterval: 5000,
+    executionInterval: 1000,
   });
 
   const [collection, setCollection] = useState<CollectionSettings>({
     sourcePath: '/source',
     targetPath: '/incoming',
     processingTime: 1000,
-    executionInterval: 5000,
+    executionInterval: 1000,
   });
 
   const [delivery, setDelivery] = useState<DeliverySettings>({
     sourcePath: '/incoming',
     targetPath: '/internal',
     processingTime: 1000,
-    executionInterval: 5000,
+    executionInterval: 1000,
   });
 
   const [etl, setEtl] = useState<EtlSettings>({
     rawTableName: 'raw_data',
     summaryTableName: 'summary_data',
     processingTime: 1000,
-    executionInterval: 5000,
+    executionInterval: 1000,
   });
 
   return (
