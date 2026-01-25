@@ -7,6 +7,7 @@ import DataSourceSettings from './components/settings/DataSourceSettings';
 import CollectionSettings from './components/settings/CollectionSettings';
 import DeliverySettings from './components/settings/DeliverySettings';
 import EtlSettings from './components/settings/EtlSettings';
+import InfrastructureSettings from './components/settings/InfrastructureSettings';
 import 'reactflow/dist/style.css';
 import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle } from 'lucide-react';
 
@@ -418,6 +419,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 const SettingsPanel = () => {
   return (
     <div className="space-y-6">
+      <InfrastructureSettings />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DataSourceSettings />
         <CollectionSettings />

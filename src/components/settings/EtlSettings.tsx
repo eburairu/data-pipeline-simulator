@@ -2,14 +2,24 @@ import React from 'react';
 import { useSettings } from '../../lib/SettingsContext';
 
 const EtlSettings: React.FC = () => {
-  const { etl, setEtl } = useSettings();
+  const { etl, setEtl, hosts } = useSettings();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setEtl({
       ...etl,
       [name]: (name === 'processingTime' || name === 'executionInterval') ? parseInt(value) || 0 : value,
     });
+  };
+
+  const handleHostChange = (newHostName: string) => {
+     const selectedHost = hosts.find(h => h.name === newHostName);
+     const newPath = selectedHost && selectedHost.directories.length > 0 ? selectedHost.directories[0] : '';
+     setEtl({
+        ...etl,
+        sourceHost: newHostName,
+        sourcePath: newPath
+     });
   };
 
   return (
@@ -19,23 +29,29 @@ const EtlSettings: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
              <div>
               <label className="block text-sm font-medium text-gray-700">Source Host</label>
-              <input
-                type="text"
+              <select
                 name="sourceHost"
                 value={etl.sourceHost}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              />
+                onChange={(e) => handleHostChange(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 bg-white"
+              >
+                {hosts.map(h => (
+                    <option key={h.name} value={h.name}>{h.name}</option>
+                ))}
+              </select>
             </div>
              <div>
               <label className="block text-sm font-medium text-gray-700">Source Path</label>
-              <input
-                type="text"
+              <select
                 name="sourcePath"
                 value={etl.sourcePath}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-              />
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 bg-white"
+              >
+                 {hosts.find(h => h.name === etl.sourceHost)?.directories.map(dir => (
+                    <option key={dir} value={dir}>{dir}</option>
+                )) || <option value="">Select Host First</option>}
+              </select>
               <p className="text-xs text-gray-500 mt-1">Directory to watch for ETL processing</p>
             </div>
         </div>

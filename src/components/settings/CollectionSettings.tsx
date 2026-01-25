@@ -3,7 +3,7 @@ import { useSettings, type CollectionJob } from '../../lib/SettingsContext';
 import { Trash2, Plus } from 'lucide-react';
 
 const CollectionSettings: React.FC = () => {
-  const { collection, setCollection } = useSettings();
+  const { collection, setCollection, hosts } = useSettings();
 
   const handleJobChange = (id: string, field: keyof CollectionJob, value: any) => {
     const newJobs = collection.jobs.map(job =>
@@ -12,15 +12,34 @@ const CollectionSettings: React.FC = () => {
     setCollection({ ...collection, jobs: newJobs });
   };
 
+  const handleHostChange = (id: string, hostField: 'sourceHost' | 'targetHost', pathField: 'sourcePath' | 'targetPath', newHostName: string) => {
+    const selectedHost = hosts.find(h => h.name === newHostName);
+    const newPath = selectedHost && selectedHost.directories.length > 0 ? selectedHost.directories[0] : '';
+
+    const newJobs = collection.jobs.map(job =>
+      job.id === id ? { ...job, [hostField]: newHostName, [pathField]: newPath } : job
+    );
+    setCollection({ ...collection, jobs: newJobs });
+  };
+
   const addJob = () => {
+    // Default to the first available host and directory
+    const defaultHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: [] };
+    const defaultPath = defaultHost.directories.length > 0 ? defaultHost.directories[0] : '/source';
+
+    // For target, try to pick a different one if possible, or same
+    const defaultTargetHost = hosts.length > 1 ? hosts[1] : defaultHost;
+    const defaultTargetPath = defaultTargetHost.directories.length > 0 ? defaultTargetHost.directories[0] : '/incoming';
+
+
     const newJob: CollectionJob = {
       id: `job_${Date.now()}`,
       name: `Job ${collection.jobs.length + 1}`,
-      sourceHost: 'localhost',
-      sourcePath: '/source',
+      sourceHost: defaultHost.name,
+      sourcePath: defaultPath,
       filterRegex: '.*',
-      targetHost: 'localhost',
-      targetPath: '/incoming',
+      targetHost: defaultTargetHost.name,
+      targetPath: defaultTargetPath,
       bandwidth: 100,
       executionInterval: 1000,
       enabled: true,
@@ -83,41 +102,53 @@ const CollectionSettings: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                    <div>
                      <label className="block text-xs font-medium text-gray-500">Source Host</label>
-                     <input
-                        type="text"
+                     <select
                         value={job.sourceHost}
-                        onChange={(e) => handleJobChange(job.id, 'sourceHost', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
-                     />
+                        onChange={(e) => handleHostChange(job.id, 'sourceHost', 'sourcePath', e.target.value)}
+                        className="w-full border rounded p-1 text-sm bg-white"
+                     >
+                        {hosts.map(h => (
+                            <option key={h.name} value={h.name}>{h.name}</option>
+                        ))}
+                     </select>
                    </div>
                    <div>
                      <label className="block text-xs font-medium text-gray-500">Source Path</label>
-                     <input
-                        type="text"
+                     <select
                         value={job.sourcePath}
                         onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
-                     />
+                        className="w-full border rounded p-1 text-sm bg-white"
+                     >
+                        {hosts.find(h => h.name === job.sourceHost)?.directories.map(dir => (
+                            <option key={dir} value={dir}>{dir}</option>
+                        )) || <option value="">Select Host First</option>}
+                     </select>
                    </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                      <label className="block text-xs font-medium text-gray-500">Target Host</label>
-                     <input
-                        type="text"
+                     <select
                         value={job.targetHost}
-                        onChange={(e) => handleJobChange(job.id, 'targetHost', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
-                     />
+                        onChange={(e) => handleHostChange(job.id, 'targetHost', 'targetPath', e.target.value)}
+                        className="w-full border rounded p-1 text-sm bg-white"
+                     >
+                        {hosts.map(h => (
+                            <option key={h.name} value={h.name}>{h.name}</option>
+                        ))}
+                     </select>
                    </div>
                     <div>
                      <label className="block text-xs font-medium text-gray-500">Target Path</label>
-                     <input
-                        type="text"
+                     <select
                         value={job.targetPath}
                         onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
-                     />
+                        className="w-full border rounded p-1 text-sm bg-white"
+                     >
+                        {hosts.find(h => h.name === job.targetHost)?.directories.map(dir => (
+                            <option key={dir} value={dir}>{dir}</option>
+                        )) || <option value="">Select Host First</option>}
+                     </select>
                    </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
