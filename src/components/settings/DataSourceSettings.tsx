@@ -17,6 +17,17 @@ const DataSourceSettings: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Data Source Settings</h3>
       <div className="grid gap-4">
         <div>
+          <label className="block text-sm font-medium text-gray-700">Source Path</label>
+          <input
+            type="text"
+            name="sourcePath"
+            value={dataSource.sourcePath}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+          />
+          <p className="text-xs text-gray-500 mt-1">Directory where files are created</p>
+        </div>
+        <div>
           <label className="block text-sm font-medium text-gray-700">Generation Interval (ms)</label>
           <input
             type="number"

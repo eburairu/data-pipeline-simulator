@@ -60,16 +60,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   useEffect(() => {
     if (!isRunning) return;
 
-    // Generate files in the first enabled job's source path
-    const targetJob = collection.jobs.find(j => j.enabled);
-    if (!targetJob) return;
-
     const interval = setInterval(() => {
       const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
-      writeFile(targetJob.sourcePath, fileName, dataSource.fileContent);
+      writeFile(dataSource.sourcePath, fileName, dataSource.fileContent);
     }, dataSource.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, dataSource, collection.jobs, writeFile]);
+  }, [isRunning, dataSource, writeFile]);
 
   // 2. Collection (Source -> Target)
   useEffect(() => {
@@ -223,40 +219,19 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
 
   const handleCreateSourceFile = () => {
-    const targetJob = collection.jobs.find(j => j.enabled);
-    if (targetJob) {
-       const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
-       writeFile(targetJob.sourcePath, fileName, dataSource.fileContent);
-    } else {
-       setErrors(prev => {
-          const msg = "No enabled collection jobs to create file for.";
-          return prev.includes(msg) ? prev : [...prev, msg];
-       });
+    const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
+    writeFile(dataSource.sourcePath, fileName, dataSource.fileContent);
+  };
+
+  const safeListFiles = (path: string) => {
+    try {
+      return listFiles(path);
+    } catch {
+      return [];
     }
   };
 
-  // Aggregated File Lists
-  const sourceFiles = collection.jobs.flatMap(job => {
-     try {
-       return listFiles(job.sourcePath).map(f => ({ ...f, _source: job.name }));
-     } catch {
-       return [];
-     }
-  });
-
-  const incomingFiles = collection.jobs.flatMap(job => {
-     try {
-       return listFiles(job.targetPath).map(f => ({ ...f, _source: job.name }));
-     } catch {
-       return [];
-     }
-  });
-
-  // delivery.sourcePath is usually collection.targetPath, but listed separately just in case
-  let internalFiles: any[] = [];
-  try {
-     internalFiles = listFiles(delivery.targetPath);
-  } catch (e) {}
+  const internalFiles = safeListFiles(delivery.targetPath);
 
   const dbRaw = select(etl.rawTableName);
   const dbSummary = select(etl.summaryTableName);
@@ -300,35 +275,48 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        {collection.jobs.map((job) => {
+          const sFiles = safeListFiles(job.sourcePath);
+          const tFiles = safeListFiles(job.targetPath);
+          return (
+            <React.Fragment key={job.id}>
+              <div className="border p-2 rounded bg-gray-50">
+                <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Source: {job.name}</h3>
+                <p className="text-xs text-gray-500 mb-1 truncate">{job.sourcePath}</p>
+                <ul className="space-y-1">
+                  {sFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
+                  {sFiles.map((f) => (
+                    <li key={f.name} className="text-green-600 truncate">
+                      {f.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="border p-2 rounded bg-gray-50">
+                <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Incoming: {job.name}</h3>
+                 <p className="text-xs text-gray-500 mb-1 truncate">{job.targetPath}</p>
+                <ul className="space-y-1">
+                  {tFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
+                  {tFiles.map((f) => (
+                    <li key={f.name} className="text-orange-600 truncate">
+                      {f.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </React.Fragment>
+          );
+        })}
         <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Source Paths (All Jobs)</h3>
+          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Internal</h3>
+          <p className="text-xs text-gray-500 mb-1 truncate">{delivery.targetPath}</p>
           <ul className="space-y-1">
-            {sourceFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-            {sourceFiles.map((f, idx) => (
-               <li key={`${f.name}-${idx}`} className="text-green-600 truncate flex justify-between">
-                 <span>{f.name}</span>
-                 <span className="text-xs text-gray-400">{(f as any)._source}</span>
-               </li>
-            ))}
-          </ul>
-        </div>
-        <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">Incoming Paths (All Jobs)</h3>
-           <ul className="space-y-1">
-            {incomingFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-            {incomingFiles.map((f, idx) => (
-              <li key={`${f.name}-${idx}`} className="text-orange-600 truncate flex justify-between">
-                 <span>{f.name}</span>
-                 <span className="text-xs text-gray-400">{(f as any)._source}</span>
-               </li>
-            ))}
-          </ul>
-        </div>
-        <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700 break-all">{delivery.targetPath}</h3>
-           <ul className="space-y-1">
             {internalFiles.length === 0 && <li className="text-gray-400 italic">Empty</li>}
-            {internalFiles.map(f => <li key={f.createdAt} className="text-blue-600 truncate">{f.name}</li>)}
+            {internalFiles.map((f) => (
+              <li key={f.createdAt} className="text-blue-600 truncate">
+                {f.name}
+              </li>
+            ))}
           </ul>
         </div>
       </div>
