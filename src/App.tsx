@@ -142,19 +142,30 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (isManualRun.current) return;
       if (transformLock.current) return;
 
+      const summaryRecords = selectRef.current(etl.summaryTableName);
       const rawRecords = selectRef.current(etl.rawTableName);
-      if (rawRecords.length === 0) return;
+
+      // Find max lastProcessedTimestamp from existing summaries
+      const lastProcessedTime = Math.max(0, ...summaryRecords.map(r => (r.data['lastProcessedTimestamp'] as number) || 0));
+
+      // Filter for new records only
+      const newRawRecords = rawRecords.filter(r => r.insertedAt > lastProcessedTime);
+
+      if (newRawRecords.length === 0) return;
 
       transformLock.current = true;
 
       toggleStep('process_transform', true);
       await delay(etl.processingTime);
 
+      const currentMaxTime = Math.max(...newRawRecords.map(r => r.insertedAt));
+
       // Simulate aggregation
       insert(etl.summaryTableName, {
         summary: 'processed_batch',
-        count: rawRecords.length,
-        timestamp: Date.now()
+        count: newRawRecords.length,
+        timestamp: Date.now(),
+        lastProcessedTimestamp: currentMaxTime
       });
 
       toggleStep('process_transform', false);
