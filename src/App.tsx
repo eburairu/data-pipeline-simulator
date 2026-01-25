@@ -39,6 +39,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const etlLock = useRef(false);
   const transformLock = useRef(false);
 
+  // Track if a manual run is in progress to pause background intervals
+  const isManualRun = useRef(false);
+
   // Helper to toggle step active state
   const toggleStep = useCallback((step: string, active: boolean) => {
     setActiveSteps(prev => {
@@ -67,8 +70,8 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
   // 2. Collection (Source -> Target)
   useEffect(() => {
-    if (!isRunning) return;
     const interval = setInterval(async () => {
+      if (isManualRun.current) return;
       if (collectionLock.current) return;
 
       const currentFiles = listFilesRef.current(collection.sourcePath);
@@ -85,12 +88,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       collectionLock.current = false;
     }, collection.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, collection, moveFile, toggleStep]);
+  }, [collection, moveFile, toggleStep]);
 
   // 3. Delivery (Collection Target -> Delivery Target)
   useEffect(() => {
-    if (!isRunning) return;
     const interval = setInterval(async () => {
+      if (isManualRun.current) return;
       if (deliveryLock.current) return;
 
       const currentFiles = listFilesRef.current(delivery.sourcePath);
@@ -107,12 +110,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       deliveryLock.current = false;
     }, delivery.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, delivery, moveFile, toggleStep]);
+  }, [delivery, moveFile, toggleStep]);
 
   // 4. ETL & Load (Delivery Target -> DB)
   useEffect(() => {
-    if (!isRunning) return;
     const interval = setInterval(async () => {
+      if (isManualRun.current) return;
       if (etlLock.current) return;
 
       const currentFiles = listFilesRef.current(delivery.targetPath);
@@ -131,12 +134,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       etlLock.current = false;
     }, etl.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, etl, delivery.targetPath, insert, deleteFile, dataSource.fileContent, toggleStep]);
+  }, [etl, delivery.targetPath, insert, deleteFile, dataSource.fileContent, toggleStep]);
 
   // 5. Transform (Raw DB -> Summary DB)
   useEffect(() => {
-    if (!isRunning) return;
     const interval = setInterval(async () => {
+      if (isManualRun.current) return;
       if (transformLock.current) return;
 
       const rawRecords = selectRef.current(etl.rawTableName);
@@ -158,38 +161,43 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       transformLock.current = false;
     }, etl.executionInterval);
     return () => clearInterval(interval);
-  }, [isRunning, etl, insert, toggleStep]);
+  }, [etl, insert, toggleStep]);
 
 
   const handleRunSimulation = async () => {
-    // 1. Source: Generate File
-    const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
-    writeFile(collection.sourcePath, fileName, dataSource.fileContent);
+    isManualRun.current = true;
+    try {
+      // 1. Source: Generate File
+      const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
+      writeFile(collection.sourcePath, fileName, dataSource.fileContent);
 
-    // Start Transfer 1
-    toggleStep('transfer_1', true);
-    await delay(collection.processingTime);
-    moveFile(fileName, collection.sourcePath, collection.targetPath);
-    toggleStep('transfer_1', false);
+      // Start Transfer 1
+      toggleStep('transfer_1', true);
+      await delay(collection.processingTime);
+      moveFile(fileName, collection.sourcePath, collection.targetPath);
+      toggleStep('transfer_1', false);
 
-    // Start Transfer 2
-    toggleStep('transfer_2', true);
-    await delay(delivery.processingTime);
-    moveFile(fileName, delivery.sourcePath, delivery.targetPath);
-    toggleStep('transfer_2', false);
+      // Start Transfer 2
+      toggleStep('transfer_2', true);
+      await delay(delivery.processingTime);
+      moveFile(fileName, delivery.sourcePath, delivery.targetPath);
+      toggleStep('transfer_2', false);
 
-    // Start ETL
-    toggleStep('process_etl', true);
-    await delay(etl.processingTime);
-    insert(etl.rawTableName, { file: fileName, content: dataSource.fileContent });
-    deleteFile(fileName, delivery.targetPath);
-    toggleStep('process_etl', false);
+      // Start ETL
+      toggleStep('process_etl', true);
+      await delay(etl.processingTime);
+      insert(etl.rawTableName, { file: fileName, content: dataSource.fileContent });
+      deleteFile(fileName, delivery.targetPath);
+      toggleStep('process_etl', false);
 
-    // Start Transform
-    toggleStep('process_transform', true);
-    await delay(etl.processingTime);
-    insert(etl.summaryTableName, { source: fileName, summary: 'processed', value: Math.floor(Math.random() * 100) });
-    toggleStep('process_transform', false);
+      // Start Transform
+      toggleStep('process_transform', true);
+      await delay(etl.processingTime);
+      insert(etl.summaryTableName, { source: fileName, summary: 'processed', value: Math.floor(Math.random() * 100) });
+      toggleStep('process_transform', false);
+    } finally {
+      isManualRun.current = false;
+    }
   };
 
   const sourceFiles = listFiles(collection.sourcePath);
