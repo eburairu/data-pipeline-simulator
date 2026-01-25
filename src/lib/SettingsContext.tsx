@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
 
 export interface DataSourceSettings {
+  sourcePath: string;
   filePrefix: string;
   fileContent: string;
   executionInterval: number;
@@ -50,6 +51,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [dataSource, setDataSource] = useState<DataSourceSettings>({
+    sourcePath: '/source',
     filePrefix: 'data_',
     fileContent: 'sample,data,123',
     executionInterval: 1000,
