@@ -8,6 +8,7 @@ import CollectionSettings from './components/settings/CollectionSettings';
 import DeliverySettings from './components/settings/DeliverySettings';
 import EtlSettings from './components/settings/EtlSettings';
 import InfrastructureSettings from './components/settings/InfrastructureSettings';
+import { processTemplate } from './lib/templateUtils';
 import 'reactflow/dist/style.css';
 import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle } from 'lucide-react';
 
@@ -15,21 +16,6 @@ interface SimulationControlProps {
   activeSteps: string[];
   setActiveSteps: React.Dispatch<React.SetStateAction<string[]>>;
 }
-
-const generateFileName = (prefix: string) => {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-
-  const highResTime = performance.timeOrigin + performance.now();
-  const microSeconds = Math.floor((highResTime % 1000) * 1000);
-
-  return `${prefix}${yyyy}${mm}${dd}${hh}${mi}${ss}.${microSeconds}.csv`;
-};
 
 const calculateProcessingTime = (content: string, bandwidth: number, latency: number) => {
   // 帯域幅: 1秒あたりの文字数
@@ -110,8 +96,10 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (!job.enabled) return;
 
       const timer = setInterval(() => {
-        const fileName = generateFileName(job.filePrefix);
-        writeFile(job.host, job.sourcePath, fileName, job.fileContent);
+        const context = { hostname: job.host, timestamp: new Date() };
+        const fileName = processTemplate(job.fileNamePattern, context);
+        const fileContent = processTemplate(job.fileContent, context);
+        writeFile(job.host, job.sourcePath, fileName, fileContent);
       }, job.executionInterval);
       timers.push(timer);
     });
@@ -331,8 +319,10 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     // すべての有効なデータソースジョブに対してファイルを生成
     dataSource.jobs.forEach(job => {
         if (job.enabled) {
-            const fileName = generateFileName(job.filePrefix);
-            writeFile(job.host, job.sourcePath, fileName, job.fileContent);
+            const context = { hostname: job.host, timestamp: new Date() };
+            const fileName = processTemplate(job.fileNamePattern, context);
+            const fileContent = processTemplate(job.fileContent, context);
+            writeFile(job.host, job.sourcePath, fileName, fileContent);
         }
     });
   };

@@ -33,7 +33,7 @@ const DataSourceSettings: React.FC = () => {
       name: `Source ${dataSource.jobs.length + 1}`,
       host: defaultHost.name,
       sourcePath: defaultPath,
-      filePrefix: 'data_',
+      fileNamePattern: '${host}_data_${timestamp}.csv',
       fileContent: 'sample,data,123',
       executionInterval: 1000,
       enabled: true,
@@ -106,12 +106,13 @@ const DataSourceSettings: React.FC = () => {
                  </div>
                  <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-xs font-medium text-gray-500">File Prefix</label>
+                     <label className="block text-xs font-medium text-gray-500">File Name Pattern</label>
                      <input
                         type="text"
-                        value={job.filePrefix}
-                        onChange={(e) => handleJobChange(job.id, 'filePrefix', e.target.value)}
+                        value={job.fileNamePattern}
+                        onChange={(e) => handleJobChange(job.id, 'fileNamePattern', e.target.value)}
                         className="w-full border rounded p-1 text-sm"
+                        placeholder="${host}_${timestamp}.csv"
                      />
                    </div>
                     <div>
