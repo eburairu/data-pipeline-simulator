@@ -8,7 +8,7 @@ import CollectionSettings from './components/settings/CollectionSettings';
 import DeliverySettings from './components/settings/DeliverySettings';
 import EtlSettings from './components/settings/EtlSettings';
 import 'reactflow/dist/style.css';
-import { Settings, Play, Pause, Activity, RefreshCw } from 'lucide-react';
+import { Settings, Play, Pause, Activity, FilePlus } from 'lucide-react';
 
 interface SimulationControlProps {
   activeSteps: string[];
@@ -39,9 +39,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const etlLock = useRef(false);
   const transformLock = useRef(false);
 
-  // Track if a manual run is in progress to pause background intervals
-  const isManualRun = useRef(false);
-
   // Helper to toggle step active state
   const toggleStep = useCallback((step: string, active: boolean) => {
     setActiveSteps(prev => {
@@ -71,7 +68,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   // 2. Collection (Source -> Target)
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (isManualRun.current) return;
       if (collectionLock.current) return;
 
       const currentFiles = listFilesRef.current(collection.sourcePath);
@@ -93,7 +89,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   // 3. Delivery (Collection Target -> Delivery Target)
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (isManualRun.current) return;
       if (deliveryLock.current) return;
 
       const currentFiles = listFilesRef.current(delivery.sourcePath);
@@ -115,7 +110,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   // 4. ETL & Load (Delivery Target -> DB)
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (isManualRun.current) return;
       if (etlLock.current) return;
 
       const currentFiles = listFilesRef.current(delivery.targetPath);
@@ -139,7 +133,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   // 5. Transform (Raw DB -> Summary DB)
   useEffect(() => {
     const interval = setInterval(async () => {
-      if (isManualRun.current) return;
       if (transformLock.current) return;
 
       const summaryRecords = selectRef.current(etl.summaryTableName);
@@ -175,40 +168,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   }, [etl, insert, toggleStep]);
 
 
-  const handleRunSimulation = async () => {
-    isManualRun.current = true;
-    try {
-      // 1. Source: Generate File
-      const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
-      writeFile(collection.sourcePath, fileName, dataSource.fileContent);
-
-      // Start Transfer 1
-      toggleStep('transfer_1', true);
-      await delay(collection.processingTime);
-      moveFile(fileName, collection.sourcePath, collection.targetPath);
-      toggleStep('transfer_1', false);
-
-      // Start Transfer 2
-      toggleStep('transfer_2', true);
-      await delay(delivery.processingTime);
-      moveFile(fileName, delivery.sourcePath, delivery.targetPath);
-      toggleStep('transfer_2', false);
-
-      // Start ETL
-      toggleStep('process_etl', true);
-      await delay(etl.processingTime);
-      insert(etl.rawTableName, { file: fileName, content: dataSource.fileContent });
-      deleteFile(fileName, delivery.targetPath);
-      toggleStep('process_etl', false);
-
-      // Start Transform
-      toggleStep('process_transform', true);
-      await delay(etl.processingTime);
-      insert(etl.summaryTableName, { source: fileName, summary: 'processed', value: Math.floor(Math.random() * 100) });
-      toggleStep('process_transform', false);
-    } finally {
-      isManualRun.current = false;
-    }
+  const handleCreateSourceFile = () => {
+    const fileName = `${dataSource.filePrefix}${Date.now()}.csv`;
+    writeFile(collection.sourcePath, fileName, dataSource.fileContent);
   };
 
   const sourceFiles = listFiles(collection.sourcePath);
@@ -239,12 +201,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         </button>
 
         <button
-          onClick={handleRunSimulation}
-          disabled={isRunning}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleCreateSourceFile}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors w-full sm:w-auto"
         >
-          <RefreshCw className="w-4 h-4" />
-          One-time Run
+          <FilePlus className="w-4 h-4" />
+          Create Source File
         </button>
       </div>
 
