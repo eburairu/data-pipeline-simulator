@@ -66,6 +66,25 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const etlLock = useRef(false);
   const transformLock = useRef(false);
 
+  // ファイルロック (排他制御用)
+  const fileLocks = useRef<Set<string>>(new Set());
+
+  const getFileLockKey = useCallback((host: string, path: string, fileName: string) => {
+    return `${host}:${path}/${fileName}`;
+  }, []);
+
+  const isFileLocked = useCallback((host: string, path: string, fileName: string) => {
+    return fileLocks.current.has(getFileLockKey(host, path, fileName));
+  }, [getFileLockKey]);
+
+  const lockFile = useCallback((host: string, path: string, fileName: string) => {
+    fileLocks.current.add(getFileLockKey(host, path, fileName));
+  }, [getFileLockKey]);
+
+  const unlockFile = useCallback((host: string, path: string, fileName: string) => {
+    fileLocks.current.delete(getFileLockKey(host, path, fileName));
+  }, [getFileLockKey]);
+
   // ステップのアクティブ状態を切り替えるヘルパー
   const toggleStep = useCallback((step: string, active: boolean) => {
     setActiveSteps(prev => {
@@ -108,8 +127,8 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        // 共有パスでの競合状態を防ぐための収集ステージ用の単純なミューテックス
-        if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
+        // ジョブの再入防止
+        if (collectionLocks.current[job.id]) return;
 
         try {
           const currentFiles = listFilesRef.current(job.sourceHost, job.sourcePath);
@@ -126,33 +145,38 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
              return;
           }
 
-          const file = currentFiles.find(f => regex.test(f.name));
+          // ロックされていないファイルを探す
+          const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(job.sourceHost, job.sourcePath, f.name));
           if (!file) return;
 
-          if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
-
           collectionLocks.current[job.id] = true;
+          lockFile(job.sourceHost, job.sourcePath, file.name);
 
           toggleStep(`transfer_1_${job.id}`, true);
 
-          const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
-          await delay(processingTime);
-
           try {
-             moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
-             setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
-          } catch (e) {
-             setErrors(prev => {
-                const msg = `Collection Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
-                return prev.includes(msg) ? prev : [...prev, msg];
-             });
-          }
+            const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
+            await delay(processingTime);
 
-          toggleStep(`transfer_1_${job.id}`, false);
-          collectionLocks.current[job.id] = false;
+            try {
+               moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
+               setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
+            } catch (e) {
+               setErrors(prev => {
+                  const msg = `Collection Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
+                  return prev.includes(msg) ? prev : [...prev, msg];
+               });
+            }
+          } finally {
+            unlockFile(job.sourceHost, job.sourcePath, file.name);
+            toggleStep(`transfer_1_${job.id}`, false);
+            collectionLocks.current[job.id] = false;
+          }
         } catch (e) {
            // 読み取りエラー（空のパスなど）を無視
-           collectionLocks.current[job.id] = false;
+           if (collectionLocks.current[job.id]) {
+             collectionLocks.current[job.id] = false;
+           }
         }
       }, job.executionInterval);
 
@@ -170,7 +194,8 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        if (Object.values(deliveryLocks.current).some(isActive => isActive)) return;
+        // ジョブの再入防止
+        if (deliveryLocks.current[job.id]) return;
 
         try {
           const currentFiles = listFilesRef.current(job.sourceHost, job.sourcePath);
@@ -187,31 +212,37 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
              return;
           }
 
-          const file = currentFiles.find(f => regex.test(f.name));
+          // ロックされていないファイルを探す
+          const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(job.sourceHost, job.sourcePath, f.name));
           if (!file) return;
 
-          if (Object.values(deliveryLocks.current).some(isActive => isActive)) return;
-
           deliveryLocks.current[job.id] = true;
+          lockFile(job.sourceHost, job.sourcePath, file.name);
+
           toggleStep(`transfer_2_${job.id}`, true);
 
-          const processingTime = calculateProcessingTime(file.content, job.bandwidth, job.processingTime);
-          await delay(processingTime);
-
           try {
-            moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
-            setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
-          } catch (e) {
-            setErrors(prev => {
-                const msg = `Delivery Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
-                return prev.includes(msg) ? prev : [...prev, msg];
-             });
-          }
+            const processingTime = calculateProcessingTime(file.content, job.bandwidth, job.processingTime);
+            await delay(processingTime);
 
-          toggleStep(`transfer_2_${job.id}`, false);
-          deliveryLocks.current[job.id] = false;
+            try {
+              moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
+              setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
+            } catch (e) {
+              setErrors(prev => {
+                  const msg = `Delivery Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
+                  return prev.includes(msg) ? prev : [...prev, msg];
+               });
+            }
+          } finally {
+            unlockFile(job.sourceHost, job.sourcePath, file.name);
+            toggleStep(`transfer_2_${job.id}`, false);
+            deliveryLocks.current[job.id] = false;
+          }
         } catch (e) {
-          deliveryLocks.current[job.id] = false;
+          if (deliveryLocks.current[job.id]) {
+            deliveryLocks.current[job.id] = false;
+          }
         }
       }, job.executionInterval);
 
@@ -229,22 +260,31 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         const currentFiles = listFilesRef.current(etl.sourceHost, etl.sourcePath);
         if (currentFiles.length === 0) return;
 
+        // ロックされていないファイルを探す
+        const file = currentFiles.find(f => !isFileLocked(etl.sourceHost, etl.sourcePath, f.name));
+        if (!file) return;
+
         etlLock.current = true;
-        const file = currentFiles[0];
+        lockFile(etl.sourceHost, etl.sourcePath, file.name);
 
         toggleStep('process_etl', true);
 
-        // 以前のシミュレーション速度 (len * 10ms) に合わせるため、ETLのデフォルト帯域幅を 100文字/秒と仮定
-        const processingTime = calculateProcessingTime(file.content, 100, etl.processingTime);
-        await delay(processingTime);
+        try {
+          // 以前のシミュレーション速度 (len * 10ms) に合わせるため、ETLのデフォルト帯域幅を 100文字/秒と仮定
+          const processingTime = calculateProcessingTime(file.content, 100, etl.processingTime);
+          await delay(processingTime);
 
-        insert(etl.rawTableName, { file: file.name, content: file.content });
-        deleteFile(etl.sourceHost, file.name, etl.sourcePath);
-
-        toggleStep('process_etl', false);
-        etlLock.current = false;
+          insert(etl.rawTableName, { file: file.name, content: file.content });
+          deleteFile(etl.sourceHost, file.name, etl.sourcePath);
+        } finally {
+          unlockFile(etl.sourceHost, etl.sourcePath, file.name);
+          toggleStep('process_etl', false);
+          etlLock.current = false;
+        }
       } catch (e) {
-        etlLock.current = false;
+        if (etlLock.current) {
+          etlLock.current = false;
+        }
       }
     }, etl.executionInterval);
     return () => clearInterval(interval);
