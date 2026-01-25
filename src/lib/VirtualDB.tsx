@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
 export interface DBRecord {
   id: string;
@@ -18,7 +18,7 @@ const VirtualDBContext = createContext<VirtualDBContextType | undefined>(undefin
 export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [records, setRecords] = useState<DBRecord[]>([]);
 
-  const insert = (table: string, data: Record<string, unknown>) => {
+  const insert = useCallback((table: string, data: Record<string, unknown>) => {
     const newRecord: DBRecord = {
       id: Math.random().toString(36).substring(7),
       data,
@@ -27,7 +27,7 @@ export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children 
     };
     setRecords((prev) => [...prev, newRecord]);
     console.log(`[DB] Inserted into ${table}:`, data);
-  };
+  }, []);
 
   const select = (table: string) => {
     return records.filter((r) => r.table === table);
