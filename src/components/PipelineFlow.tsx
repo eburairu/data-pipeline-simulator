@@ -21,7 +21,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { select } = useVirtualDB();
   const { dataSource, collection, delivery, etl } = useSettings();
 
-  // Helper for safe counts
+  // 安全にカウントを取得するヘルパー
   const getCount = (host: string, path: string) => {
     try {
       return listFiles(host, path).length;
@@ -33,7 +33,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    const keyNodeMap = new Map<string, Node>(); // key (host:path) -> Node
+    const keyNodeMap = new Map<string, Node>(); // キー (host:path) -> Node
 
     const getKey = (host: string, path: string) => `${host}:${path}`;
     const parseKey = (key: string) => {
@@ -44,16 +44,16 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         };
     };
 
-    // --- 1. Identify Unique Paths & Create Storage Nodes ---
+    // --- 1. ユニークなパスを特定してストレージノードを作成 ---
 
-    // Collect keys for each "Stage"
-    // Stage 0: Data Source Keys
+    // 各「ステージ」のキーを収集
+    // ステージ 0: データソースのキー
     const sourceKeys = Array.from(new Set(dataSource.jobs.map(j => getKey(j.host, j.sourcePath))));
 
-    // Stage 1: Incoming Keys (Targets of Collection)
+    // ステージ 1: 受信キー (Collectionのターゲット)
     const incomingKeys = Array.from(new Set(collection.jobs.map(j => getKey(j.targetHost, j.targetPath))));
 
-    // Stage 2: Internal Keys (Targets of Delivery)
+    // ステージ 2: 内部キー (Deliveryのターゲット)
     const internalKeys = Array.from(new Set(delivery.jobs.map(j => getKey(j.targetHost, j.targetPath))));
 
     const addStorageNode = (host: string, path: string, colIndex: number, rowIndex: number) => {
@@ -64,7 +64,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       const node: Node = {
         id,
         type: 'storage',
-        // Layout: X based on col, Y based on row
+        // レイアウト: 列に基づいてX、行に基づいてY
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
         data: { label: key, type: 'fs', count: getCount(host, path) },
         sourcePosition: Position.Right,
@@ -75,14 +75,14 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       return node;
     };
 
-    // Place Nodes
-    // Col 0: Sources
+    // ノードの配置
+    // 列 0: ソース
     sourceKeys.forEach((key, i) => {
         const { host, path } = parseKey(key);
         addStorageNode(host, path, 0, i);
     });
 
-    // Col 1: Incoming
+    // 列 1: 受信
     let incomingRow = 0;
     incomingKeys.forEach((key) => {
         if (!keyNodeMap.has(key)) {
@@ -91,7 +91,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         }
     });
 
-    // Col 2: Internal
+    // 列 2: 内部
     let internalRow = 0;
     internalKeys.forEach((key) => {
         if (!keyNodeMap.has(key)) {
@@ -100,16 +100,16 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         }
     });
 
-    // Ensure ETL source path exists (put in Col 2 if missing, at bottom)
+    // ETLソースパスが存在することを確認 (ない場合は列2の下部に配置)
     const etlKey = getKey(etl.sourceHost, etl.sourcePath);
     if (!keyNodeMap.has(etlKey)) {
         addStorageNode(etl.sourceHost, etl.sourcePath, 2, internalRow++);
     }
 
 
-    // --- 2. Create Process Nodes & Edges ---
+    // --- 2. プロセスノードとエッジの作成 ---
 
-    // Helper to add process node between two storage nodes
+    // 2つのストレージノード間にプロセスノードを追加するヘルパー
     const addProcessNode = (id: string, label: string, srcHost: string, srcPath: string, tgtHost: string, tgtPath: string, isProcessing: boolean, indexOffset: number) => {
         const srcKey = getKey(srcHost, srcPath);
         const tgtKey = getKey(tgtHost, tgtPath);
@@ -119,14 +119,14 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
         if (!srcNode || !tgtNode) return;
 
-        // Calculate mid position
-        // If src and tgt are same, or tgt is "behind" src, visual might be weird.
-        // Assuming flow left-to-right mostly.
+        // 中間位置を計算
+        // srcとtgtが同じ場合、またはtgtがsrcの「後ろ」にある場合、表示がおかしくなる可能性があります。
+        // 基本的に左から右へのフローを想定しています。
         const mx = (srcNode.position.x + tgtNode.position.x) / 2;
 
-        // Jitter Y to separate overlapping job lines
-        // If multiple jobs connect same nodes, or close nodes, we want to separate them.
-        // Simple heuristic: average Y + offset based on job index.
+        // 重複するジョブラインを分離するためにYを少しずらす
+        // 複数のジョブが同じノード、または近いノードを接続する場合、それらを分離したい。
+        // 単純なヒューリスティック: 平均Y + ジョブインデックスに基づくオフセット。
         const my = (srcNode.position.y + tgtNode.position.y) / 2 + (indexOffset * 40) - 20;
 
         nodes.push({
@@ -140,7 +140,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         edges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
     };
 
-    // Collection Jobs
+    // 収集ジョブ
     collection.jobs.forEach((job, i) => {
         if (!job.enabled) return;
         addProcessNode(
@@ -151,11 +151,11 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
             job.targetHost,
             job.targetPath,
             activeSteps.includes(`transfer_1_${job.id}`),
-            i % 3 // slight jitter cycle
+            i % 3 // わずかなジッターサイクル
         );
     });
 
-    // Delivery Jobs
+    // 配信ジョブ
     delivery.jobs.forEach((job, i) => {
         if (!job.enabled) return;
         addProcessNode(
@@ -170,12 +170,12 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         );
     });
 
-    // --- 3. ETL Chain ---
+    // --- 3. ETLチェーン ---
     const etlSourceNode = keyNodeMap.get(etlKey);
     if (etlSourceNode) {
-         // ETL Process Node
+         // ETLプロセスノード
          const etlId = 'process-etl';
-         // Place to the right of the source node
+         // ソースノードの右側に配置
          const startX = etlSourceNode.position.x + 300;
          const startY = etlSourceNode.position.y;
 
@@ -199,7 +199,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
          });
          edges.push({ id: `e-${etlId}-${rawDbId}`, source: etlId, target: rawDbId, animated: true });
 
-         // Transform Process
+         // 変換プロセス
          const transformId = 'process-transform';
          nodes.push({
              id: transformId,
