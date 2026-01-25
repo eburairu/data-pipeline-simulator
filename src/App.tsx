@@ -31,11 +31,11 @@ const generateFileName = (prefix: string) => {
 };
 
 const calculateProcessingTime = (content: string, bandwidth: number, latency: number) => {
-  // Bandwidth: chars per second
-  // Content Length: chars
-  // Transfer Time = (Length / Bandwidth) * 1000 ms
-  // Total Time = Transfer Time + Latency
-  const safeBandwidth = Math.max(0.1, bandwidth); // Prevent divide by zero
+  // 帯域幅: 1秒あたりの文字数
+  // コンテンツ長: 文字数
+  //転送時間 = (長さ / 帯域幅) * 1000 ms
+  // 合計時間 = 転送時間 + レイテンシ
+  const safeBandwidth = Math.max(0.1, bandwidth); // ゼロ除算を防止
   const transferTime = (content.length / safeBandwidth) * 1000;
   return transferTime + latency;
 };
@@ -47,7 +47,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const { insert, select } = useVirtualDB();
   const { dataSource, collection, delivery, etl } = useSettings();
 
-  // Refs for current state access inside intervals
+  // interval内で現在の状態にアクセスするためのRef
   const listFilesRef = useRef(listFiles);
   const selectRef = useRef(select);
 
@@ -59,13 +59,13 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     selectRef.current = select;
   }, [select]);
 
-  // Locks
+  // ロック
   const collectionLocks = useRef<Record<string, boolean>>({});
   const deliveryLocks = useRef<Record<string, boolean>>({});
   const etlLock = useRef(false);
   const transformLock = useRef(false);
 
-  // Helper to toggle step active state
+  // ステップのアクティブ状態を切り替えるヘルパー
   const toggleStep = useCallback((step: string, active: boolean) => {
     setActiveSteps(prev => {
       if (active) {
@@ -76,12 +76,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     });
   }, [setActiveSteps]);
 
-  // Helper for delay
+  // 遅延用のヘルパー
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-  // --- Auto Run Effects ---
+  // --- 自動実行のエフェクト ---
 
-  // 1. Source Generation
+  // 1. ソース生成
   useEffect(() => {
     if (!isRunning) return;
     const timers: ReturnType<typeof setInterval>[] = [];
@@ -99,7 +99,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => timers.forEach(clearInterval);
   }, [isRunning, dataSource.jobs, writeFile]);
 
-  // 2. Collection (Source -> Incoming)
+  // 2. 収集 (Source -> Incoming)
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -107,7 +107,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        // Simple Mutex for Collection Stage to prevent race conditions on shared paths
+        // 共有パスでの競合状態を防ぐための収集ステージ用の単純なミューテックス
         if (Object.values(collectionLocks.current).some(isActive => isActive)) return;
 
         try {
@@ -150,7 +150,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
           toggleStep(`transfer_1_${job.id}`, false);
           collectionLocks.current[job.id] = false;
         } catch (e) {
-           // Ignore read errors (empty path etc)
+           // 読み取りエラー（空のパスなど）を無視
            collectionLocks.current[job.id] = false;
         }
       }, job.executionInterval);
@@ -161,7 +161,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => timers.forEach(clearInterval);
   }, [collection.jobs, collection.processingTime, moveFile, toggleStep]);
 
-  // 3. Delivery (Incoming -> Internal)
+  // 3. 配信 (Incoming -> Internal)
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -219,7 +219,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => timers.forEach(clearInterval);
   }, [delivery.jobs, moveFile, toggleStep]);
 
-  // 4. ETL & Load (Delivery Target -> DB)
+  // 4. ETL & ロード (Delivery Target -> DB)
   useEffect(() => {
     const interval = setInterval(async () => {
       if (etlLock.current) return;
@@ -233,7 +233,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
         toggleStep('process_etl', true);
 
-        // Assume default bandwidth of 100 chars/sec for ETL to match previous simulation speed (len * 10ms)
+        // 以前のシミュレーション速度 (len * 10ms) に合わせるため、ETLのデフォルト帯域幅を 100文字/秒と仮定
         const processingTime = calculateProcessingTime(file.content, 100, etl.processingTime);
         await delay(processingTime);
 
@@ -249,7 +249,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => clearInterval(interval);
   }, [etl, insert, deleteFile, toggleStep]);
 
-  // 5. Transform (Raw DB -> Summary DB)
+  // 5. 変換 (Raw DB -> Summary DB)
   useEffect(() => {
     const interval = setInterval(async () => {
       if (transformLock.current) return;
@@ -266,7 +266,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       toggleStep('process_transform', true);
 
       const combinedContent = newRawRecords.map(r => r.data['content'] as string || '').join('');
-      // Assume default bandwidth of 100 chars/sec for Transform
+      // 変換用にデフォルト帯域幅を 100文字/秒と仮定
       const processingTime = calculateProcessingTime(combinedContent, 100, etl.processingTime);
       await delay(processingTime);
 
@@ -287,7 +287,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
 
   const handleCreateSourceFile = () => {
-    // Generate file for ALL enabled data source jobs
+    // すべての有効なデータソースジョブに対してファイルを生成
     dataSource.jobs.forEach(job => {
         if (job.enabled) {
             const fileName = generateFileName(job.filePrefix);
@@ -346,7 +346,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-        {/* Source Files (grouped by DS Job) */}
+        {/* ソースファイル (DSジョブごとにグループ化) */}
         <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
            <h3 className="font-bold border-b text-gray-700">Sources</h3>
            {dataSource.jobs.map(job => (
@@ -362,7 +362,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
            ))}
         </div>
 
-        {/* Collection/Incoming Files (grouped by Collection Job) */}
+        {/* 収集/受信ファイル (Collectionジョブごとにグループ化) */}
         <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
             <h3 className="font-bold border-b text-gray-700">Collection / Incoming</h3>
             {collection.jobs.map(job => (
@@ -378,7 +378,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
             ))}
         </div>
 
-        {/* Delivery/Internal Files (grouped by Delivery Job) */}
+        {/* 配信/内部ファイル (Deliveryジョブごとにグループ化) */}
         <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
             <h3 className="font-bold border-b text-gray-700">Delivery / Internal</h3>
             {delivery.jobs.map(job => (

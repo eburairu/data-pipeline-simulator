@@ -23,14 +23,14 @@ export interface CollectionJob {
   filterRegex: string;
   targetHost: string;
   targetPath: string;
-  bandwidth: number; // chars per second
+  bandwidth: number; // 帯域幅 (文字数/秒)
   executionInterval: number;
   enabled: boolean;
 }
 
 export interface CollectionSettings {
   jobs: CollectionJob[];
-  processingTime: number; // Latency/Overhead in ms
+  processingTime: number; // レイテンシ/オーバーヘッド (ms)
 }
 
 export interface DeliveryJob {
@@ -41,8 +41,8 @@ export interface DeliveryJob {
   targetHost: string;
   targetPath: string;
   filterRegex: string;
-  bandwidth: number; // chars per second
-  processingTime: number; // Latency/Overhead in ms
+  bandwidth: number; // 帯域幅 (文字数/秒)
+  processingTime: number; // レイテンシ/オーバーヘッド (ms)
   executionInterval: number;
   enabled: boolean;
 }
