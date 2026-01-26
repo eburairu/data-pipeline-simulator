@@ -17,6 +17,8 @@ export const formatDate = (date: Date, format: string): string => {
 export interface TemplateContext {
   hostname: string;
   timestamp: Date;
+  collectionHost?: string;
+  fileName?: string;
 }
 
 export const processTemplate = (template: string, context: TemplateContext): string => {
@@ -29,6 +31,10 @@ export const processTemplate = (template: string, context: TemplateContext): str
       case 'host':
       case 'hostname':
         return context.hostname;
+      case 'collectionHost':
+        return context.collectionHost || '';
+      case 'fileName':
+        return context.fileName || '';
       case 'timestamp':
         if (format) {
           return formatDate(context.timestamp, format);

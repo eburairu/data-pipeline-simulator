@@ -11,7 +11,7 @@ export interface VFile {
 interface FileSystemContextType {
   files: VFile[];
   writeFile: (host: string, path: string, name: string, content: string) => void;
-  moveFile: (fileName: string, fromHost: string, fromPath: string, toHost: string, toPath: string) => void;
+  moveFile: (fileName: string, fromHost: string, fromPath: string, toHost: string, toPath: string, newFileName?: string) => void;
   deleteFile: (host: string, fileName: string, atPath: string) => void;
   listFiles: (host: string, path: string) => VFile[];
 }
@@ -33,12 +33,13 @@ export const FileSystemProvider: React.FC<{ children: ReactNode }> = ({ children
     console.log(`[FS] Wrote file: ${host}:${path}/${name}`);
   }, []);
 
-  const moveFile = useCallback((fileName: string, fromHost: string, fromPath: string, toHost: string, toPath: string) => {
+  const moveFile = useCallback((fileName: string, fromHost: string, fromPath: string, toHost: string, toPath: string, newFileName?: string) => {
     setFiles((prev) =>
       prev.map((f) => {
         if (f.name === fileName && f.host === fromHost && f.path === fromPath) {
-          console.log(`[FS] Moved file: ${fileName} from ${fromHost}:${fromPath} to ${toHost}:${toPath}`);
-          return { ...f, host: toHost, path: toPath };
+          const targetName = newFileName || fileName;
+          console.log(`[FS] Moved file: ${fileName} from ${fromHost}:${fromPath} to ${toHost}:${toPath} as ${targetName}`);
+          return { ...f, host: toHost, path: toPath, name: targetName };
         }
         return f;
       })

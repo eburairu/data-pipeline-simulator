@@ -41,6 +41,7 @@ const CollectionSettings: React.FC = () => {
       targetHost: defaultTargetHost.name,
       targetPath: defaultTargetPath,
       bandwidth: 100,
+      renamePattern: '${fileName}',
       executionInterval: 1000,
       enabled: true,
     };
@@ -171,6 +172,15 @@ const CollectionSettings: React.FC = () => {
                         placeholder=".*"
                      />
                    </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500">Rename Pattern (Vars: {'${fileName}'}, {'${collectionHost}'}, {'${timestamp}'})</label>
+                  <input
+                    type="text"
+                    value={job.renamePattern || '${fileName}'}
+                    onChange={(e) => handleJobChange(job.id, 'renamePattern', e.target.value)}
+                    className="w-full border rounded p-1 text-sm"
+                  />
                 </div>
              </div>
           </div>

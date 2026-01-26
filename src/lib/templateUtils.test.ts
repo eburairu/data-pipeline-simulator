@@ -5,6 +5,8 @@ describe('templateUtils', () => {
   const context = {
     hostname: 'test-host',
     timestamp: new Date('2023-10-27T10:00:00.123Z'),
+    collectionHost: 'dest-host',
+    fileName: 'original.csv'
   };
 
   it('should replace hostname', () => {
@@ -14,15 +16,11 @@ describe('templateUtils', () => {
 
   it('should replace timestamp with default format', () => {
     // Default format is YYYYMMDDHHmmss (local time)
-    // Note: The test environment might have different timezone.
-    // We should rely on formatDate logic or mock the date, but simple regex check works too.
     const result = processTemplate('file_${timestamp}.csv', context);
     expect(result).toMatch(/file_\d{14}\.csv/);
   });
 
   it('should replace timestamp with specified format', () => {
-    // Since we use getFullYear etc, it depends on local time.
-    // Let's verify the format structure matches.
     const result = processTemplate('file_${timestamp:YYYY-MM-DD}.csv', context);
     expect(result).toMatch(/file_\d{4}-\d{2}-\d{2}\.csv/);
   });
@@ -38,9 +36,23 @@ describe('templateUtils', () => {
 
   it('should handle milliseconds', () => {
      const result = processTemplate('${timestamp:SSS}', context);
-     // 123 is the ms in our date, but again, local time vs UTC might shift day/hour, ms should be same?
-     // Actually Date.getMilliseconds() returns local ms? No, ms is timezone independent usually unless we cross boundaries, wait.
-     // new Date('...Z') creates a UTC date. getMilliseconds() returns the ms part.
      expect(result).toBe('123');
+  });
+
+  it('should replace collectionHost', () => {
+    expect(processTemplate('to_${collectionHost}.csv', context)).toBe('to_dest-host.csv');
+  });
+
+  it('should replace fileName', () => {
+    expect(processTemplate('copy_${fileName}', context)).toBe('copy_original.csv');
+  });
+
+  it('should handle missing optional fields gracefully', () => {
+    const minimalContext = {
+      hostname: 'test-host',
+      timestamp: new Date()
+    };
+    expect(processTemplate('to_${collectionHost}.csv', minimalContext)).toBe('to_.csv');
+    expect(processTemplate('copy_${fileName}', minimalContext)).toBe('copy_');
   });
 });
