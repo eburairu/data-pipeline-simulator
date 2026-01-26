@@ -37,6 +37,25 @@ describe('useFileSystem', () => {
     expect(file.host).toBe('localhost');
   });
 
+  it('should move and rename a file', () => {
+    const { result } = renderHook(() => useFileSystem(), {
+      wrapper: FileSystemProvider,
+    });
+
+    act(() => {
+      result.current.writeFile('localhost', '/source', 'original.csv', 'content');
+    });
+
+    act(() => {
+        result.current.moveFile('original.csv', 'localhost', '/source', 'remote-host', '/dest', 'renamed.csv');
+    });
+
+    const file = result.current.files[0];
+    expect(file.host).toBe('remote-host');
+    expect(file.path).toBe('/dest');
+    expect(file.name).toBe('renamed.csv');
+  });
+
    it('should delete a file', () => {
     const { result } = renderHook(() => useFileSystem(), {
       wrapper: FileSystemProvider,

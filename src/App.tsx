@@ -147,7 +147,16 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
             await delay(processingTime);
 
             try {
-               moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
+               const context = {
+                 hostname: job.sourceHost,
+                 timestamp: new Date(),
+                 collectionHost: job.targetHost,
+                 fileName: file.name
+               };
+               const renamePattern = job.renamePattern || '${fileName}';
+               const newFileName = processTemplate(renamePattern, context);
+
+               moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath, newFileName);
                setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
             } catch (e) {
                setErrors(prev => {

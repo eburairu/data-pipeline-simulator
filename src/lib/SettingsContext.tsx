@@ -24,6 +24,7 @@ export interface CollectionJob {
   targetHost: string;
   targetPath: string;
   bandwidth: number; // 帯域幅 (文字数/秒)
+  renamePattern: string;
   executionInterval: number;
   enabled: boolean;
 }
@@ -113,6 +114,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         targetHost: 'localhost',
         targetPath: '/incoming',
         bandwidth: 100,
+        renamePattern: '${fileName}',
         executionInterval: 1000,
         enabled: true,
       }
