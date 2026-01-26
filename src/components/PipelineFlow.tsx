@@ -1,6 +1,8 @@
-import React, { useMemo } from 'react';
-import ReactFlow, { type Node, type Edge, Background, Controls, Position } from 'reactflow';
+import React, { useEffect, useCallback, useState } from 'react';
+import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
+import dagre from 'dagre';
+import { LayoutGrid } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings } from '../lib/SettingsContext';
@@ -21,18 +23,22 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { select } = useVirtualDB();
   const { dataSource, collection, delivery, etl } = useSettings();
 
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+
   // 安全にカウントを取得するヘルパー
-  const getCount = (host: string, path: string) => {
+  const getCount = useCallback((host: string, path: string) => {
     try {
       return listFiles(host, path).length;
     } catch {
       return 0;
     }
-  };
+  }, [listFiles]);
 
-  const { nodes, edges } = useMemo(() => {
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
+  useEffect(() => {
+    const calculatedNodes: Node[] = [];
+    const calculatedEdges: Edge[] = [];
     const keyNodeMap = new Map<string, Node>(); // キー (host:path) -> Node
 
     const getKey = (host: string, path: string) => `${host}:${path}`;
@@ -70,44 +76,73 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
-      nodes.push(node);
+      calculatedNodes.push(node);
       keyNodeMap.set(key, node);
       return node;
     };
 
     // ノードの配置
-    // 列 0: ソース
+    // 列 1: ソース
     sourceKeys.forEach((key, i) => {
         const { host, path } = parseKey(key);
-        addStorageNode(host, path, 0, i);
+        addStorageNode(host, path, 1, i);
     });
 
-    // 列 1: 受信
+    // 列 2: 受信
     let incomingRow = 0;
     incomingKeys.forEach((key) => {
         if (!keyNodeMap.has(key)) {
             const { host, path } = parseKey(key);
-            addStorageNode(host, path, 1, incomingRow++);
+            addStorageNode(host, path, 2, incomingRow++);
         }
     });
 
-    // 列 2: 内部
+    // 列 3: 内部
     let internalRow = 0;
     internalKeys.forEach((key) => {
         if (!keyNodeMap.has(key)) {
             const { host, path } = parseKey(key);
-            addStorageNode(host, path, 2, internalRow++);
+            addStorageNode(host, path, 3, internalRow++);
         }
     });
 
-    // ETLソースパスが存在することを確認 (ない場合は列2の下部に配置)
+    // ETLソースパスが存在することを確認 (ない場合は列3の下部に配置)
     const etlKey = getKey(etl.sourceHost, etl.sourcePath);
     if (!keyNodeMap.has(etlKey)) {
-        addStorageNode(etl.sourceHost, etl.sourcePath, 2, internalRow++);
+        addStorageNode(etl.sourceHost, etl.sourcePath, 3, internalRow++);
     }
 
 
     // --- 2. プロセスノードとエッジの作成 ---
+
+    // 0. 生成ジョブ (列 0)
+    dataSource.jobs.forEach((job) => {
+        if (!job.enabled) return;
+
+        const def = dataSource.definitions.find(d => d.id === job.dataSourceId);
+        if (!def) return;
+
+        const targetKey = getKey(def.host, def.path);
+        const targetNode = keyNodeMap.get(targetKey);
+
+        if (!targetNode) return;
+
+        const id = `process-gen-${job.id}`;
+        // ターゲットノードの左側に配置
+        // 複数のジョブが同じソースを指す場合の重なりを避けるため、Yを少しずらす
+        const sameTargetJobs = dataSource.jobs.filter(j => j.dataSourceId === job.dataSourceId && j.enabled);
+        const jobIndex = sameTargetJobs.findIndex(j => j.id === job.id);
+        const yOffset = (jobIndex - (sameTargetJobs.length - 1) / 2) * 80;
+
+        calculatedNodes.push({
+            id,
+            type: 'process',
+            position: { x: targetNode.position.x - 250, y: targetNode.position.y + yOffset },
+            data: { label: job.name, isProcessing: false },
+        });
+
+        calculatedEdges.push({ id: `e-${id}-${targetNode.id}`, source: id, target: targetNode.id, animated: true });
+    });
 
     // 2つのストレージノード間にプロセスノードを追加するヘルパー
     const addProcessNode = (id: string, label: string, srcHost: string, srcPath: string, tgtHost: string, tgtPath: string, isProcessing: boolean, indexOffset: number) => {
@@ -129,15 +164,15 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         // 単純なヒューリスティック: 平均Y + ジョブインデックスに基づくオフセット。
         const my = (srcNode.position.y + tgtNode.position.y) / 2 + (indexOffset * 40) - 20;
 
-        nodes.push({
+        calculatedNodes.push({
             id,
             type: 'process',
             position: { x: mx, y: my },
             data: { label, isProcessing },
         });
 
-        edges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-        edges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
     };
 
     // 収集ジョブ
@@ -179,17 +214,17 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
          const startX = etlSourceNode.position.x + 300;
          const startY = etlSourceNode.position.y;
 
-         nodes.push({
+         calculatedNodes.push({
              id: etlId,
              type: 'process',
              position: { x: startX, y: startY },
              data: { label: 'ETL', isProcessing: activeSteps.includes('process_etl') }
          });
-         edges.push({ id: `e-${etlSourceNode.id}-${etlId}`, source: etlSourceNode.id, target: etlId, animated: true });
+         calculatedEdges.push({ id: `e-${etlSourceNode.id}-${etlId}`, source: etlSourceNode.id, target: etlId, animated: true });
 
          // Raw DB
          const rawDbId = 'db-raw';
-         nodes.push({
+         calculatedNodes.push({
              id: rawDbId,
              type: 'storage',
              position: { x: startX + 200, y: startY },
@@ -197,44 +232,121 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
              sourcePosition: Position.Right,
              targetPosition: Position.Left
          });
-         edges.push({ id: `e-${etlId}-${rawDbId}`, source: etlId, target: rawDbId, animated: true });
+         calculatedEdges.push({ id: `e-${etlId}-${rawDbId}`, source: etlId, target: rawDbId, animated: true });
 
          // 変換プロセス
          const transformId = 'process-transform';
-         nodes.push({
+         calculatedNodes.push({
              id: transformId,
              type: 'process',
              position: { x: startX + 400, y: startY },
              data: { label: 'Transform', isProcessing: activeSteps.includes('process_transform') }
          });
-         edges.push({ id: `e-${rawDbId}-${transformId}`, source: rawDbId, target: transformId, animated: true });
+         calculatedEdges.push({ id: `e-${rawDbId}-${transformId}`, source: rawDbId, target: transformId, animated: true });
 
          // Summary DB
          const summaryDbId = 'db-summary';
-         nodes.push({
+         calculatedNodes.push({
              id: summaryDbId,
              type: 'storage',
              position: { x: startX + 600, y: startY },
              data: { label: etl.summaryTableName, type: 'db', count: select(etl.summaryTableName).length },
              targetPosition: Position.Left
          });
-         edges.push({ id: `e-${transformId}-${summaryDbId}`, source: transformId, target: summaryDbId, animated: true });
+         calculatedEdges.push({ id: `e-${transformId}-${summaryDbId}`, source: transformId, target: summaryDbId, animated: true });
     }
 
-    return { nodes, edges };
-  }, [dataSource, collection, delivery, etl, listFiles, select, activeSteps]);
+    // Merge logic to preserve positions of existing nodes
+    setNodes((prevNodes) => {
+       const prevNodeMap = new Map(prevNodes.map(n => [n.id, n]));
+       return calculatedNodes.map(n => {
+         const prev = prevNodeMap.get(n.id);
+         if (prev) {
+             return {
+                 ...n,
+                 position: prev.position,
+                 width: prev.width,
+                 height: prev.height,
+                 selected: prev.selected,
+                 dragging: prev.dragging,
+             };
+         }
+         return n;
+       });
+    });
+
+    setEdges(calculatedEdges);
+
+  }, [dataSource, collection, delivery, etl, listFiles, select, activeSteps, getCount, setNodes, setEdges]);
+
+  const onLayout = useCallback(() => {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+    const getWidth = (node: Node) => (node.type === 'storage' ? 220 : 100);
+    const getHeight = (node: Node) => (node.type === 'storage' ? 120 : 100);
+
+    dagreGraph.setGraph({ rankdir: 'LR' });
+
+    nodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
+    });
+
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      return {
+        ...node,
+        targetPosition: Position.Left,
+        sourcePosition: Position.Right,
+        width: getWidth(node),
+        height: getHeight(node),
+        // dagre returns center position, we need top left
+        position: {
+          x: nodeWithPosition.x - getWidth(node) / 2,
+          y: nodeWithPosition.y - getHeight(node) / 2,
+        },
+      };
+    });
+
+    setNodes(layoutedNodes);
+
+    if (rfInstance) {
+      window.requestAnimationFrame(() => {
+        rfInstance.fitView({ padding: 0.2, duration: 800 });
+      });
+    }
+  }, [nodes, edges, setNodes, rfInstance]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
+        onInit={setRfInstance}
         fitView
         attributionPosition="bottom-right"
       >
         <Background />
         <Controls />
+        <Panel position="top-right">
+          <button
+            onClick={onLayout}
+            className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 cursor-pointer"
+            title="Auto-align nodes"
+          >
+            <LayoutGrid size={16} />
+            Align Layout
+          </button>
+        </Panel>
       </ReactFlow>
     </div>
   );
