@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSettings, type CollectionJob } from '../../lib/SettingsContext';
+import { validateCollectionJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const CollectionSettings: React.FC = () => {
@@ -67,12 +68,18 @@ const CollectionSettings: React.FC = () => {
             type="number"
             value={collection.processingTime}
             onChange={handleProcessingTimeChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 ${collection.processingTime < 0 ? 'border-red-500 bg-red-50' : ''}`}
+            title={collection.processingTime < 0 ? "Cannot be negative" : ""}
           />
         </div>
 
       <div className="space-y-4">
-        {collection.jobs.map((job) => (
+        {collection.jobs.map((job) => {
+          const errors = validateCollectionJob(job);
+          const hasError = (field: string) => errors.some(e => e.field === field);
+          const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+
+          return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
              <div className="absolute top-2 right-2">
                 <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job">
@@ -87,7 +94,8 @@ const CollectionSettings: React.FC = () => {
                         type="text"
                         value={job.name}
                         onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('name')}
                      />
                    </div>
                     <div>
@@ -96,7 +104,8 @@ const CollectionSettings: React.FC = () => {
                         type="number"
                         value={job.executionInterval}
                         onChange={(e) => handleJobChange(job.id, 'executionInterval', parseInt(e.target.value) || 0)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('executionInterval') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('executionInterval')}
                      />
                    </div>
                 </div>
@@ -106,7 +115,8 @@ const CollectionSettings: React.FC = () => {
                      <select
                         value={job.sourceHost}
                         onChange={(e) => handleHostChange(job.id, 'sourceHost', 'sourcePath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceHost') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('sourceHost')}
                      >
                         {hosts.map(h => (
                             <option key={h.name} value={h.name}>{h.name}</option>
@@ -118,7 +128,8 @@ const CollectionSettings: React.FC = () => {
                      <select
                         value={job.sourcePath}
                         onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('sourcePath')}
                      >
                         {hosts.find(h => h.name === job.sourceHost)?.directories.map(dir => (
                             <option key={dir} value={dir}>{dir}</option>
@@ -132,7 +143,8 @@ const CollectionSettings: React.FC = () => {
                      <select
                         value={job.targetHost}
                         onChange={(e) => handleHostChange(job.id, 'targetHost', 'targetPath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetHost') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('targetHost')}
                      >
                         {hosts.map(h => (
                             <option key={h.name} value={h.name}>{h.name}</option>
@@ -144,7 +156,8 @@ const CollectionSettings: React.FC = () => {
                      <select
                         value={job.targetPath}
                         onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('targetPath')}
                      >
                         {hosts.find(h => h.name === job.targetHost)?.directories.map(dir => (
                             <option key={dir} value={dir}>{dir}</option>
@@ -159,7 +172,8 @@ const CollectionSettings: React.FC = () => {
                         type="number"
                         value={job.bandwidth}
                         onChange={(e) => handleJobChange(job.id, 'bandwidth', parseInt(e.target.value) || 0)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('bandwidth') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('bandwidth')}
                      />
                    </div>
                     <div>
@@ -168,7 +182,8 @@ const CollectionSettings: React.FC = () => {
                         type="text"
                         value={job.filterRegex}
                         onChange={(e) => handleJobChange(job.id, 'filterRegex', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('filterRegex') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('filterRegex')}
                         placeholder=".*"
                      />
                    </div>
@@ -184,7 +199,8 @@ const CollectionSettings: React.FC = () => {
                 </div>
              </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <button

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSettings, type DeliveryJob } from '../../lib/SettingsContext';
+import { validateDeliveryJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const DeliverySettings: React.FC = () => {
@@ -57,7 +58,12 @@ const DeliverySettings: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Delivery Settings</h3>
 
       <div className="space-y-4">
-        {delivery.jobs.map((job) => (
+        {delivery.jobs.map((job) => {
+          const errors = validateDeliveryJob(job);
+          const hasError = (field: string) => errors.some(e => e.field === field);
+          const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+
+          return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
              <div className="absolute top-2 right-2">
                 <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job">
@@ -72,7 +78,8 @@ const DeliverySettings: React.FC = () => {
                         type="text"
                         value={job.name}
                         onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('name')}
                      />
                    </div>
                     <div>
@@ -81,7 +88,8 @@ const DeliverySettings: React.FC = () => {
                         type="number"
                         value={job.executionInterval}
                         onChange={(e) => handleJobChange(job.id, 'executionInterval', parseInt(e.target.value) || 0)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('executionInterval') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('executionInterval')}
                      />
                    </div>
                 </div>
@@ -91,7 +99,8 @@ const DeliverySettings: React.FC = () => {
                      <select
                         value={job.sourceHost}
                         onChange={(e) => handleHostChange(job.id, 'sourceHost', 'sourcePath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceHost') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('sourceHost')}
                      >
                         {hosts.map(h => (
                             <option key={h.name} value={h.name}>{h.name}</option>
@@ -103,7 +112,8 @@ const DeliverySettings: React.FC = () => {
                      <select
                         value={job.sourcePath}
                         onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('sourcePath')}
                      >
                         {hosts.find(h => h.name === job.sourceHost)?.directories.map(dir => (
                             <option key={dir} value={dir}>{dir}</option>
@@ -117,7 +127,8 @@ const DeliverySettings: React.FC = () => {
                      <select
                         value={job.targetHost}
                         onChange={(e) => handleHostChange(job.id, 'targetHost', 'targetPath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetHost') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('targetHost')}
                      >
                         {hosts.map(h => (
                             <option key={h.name} value={h.name}>{h.name}</option>
@@ -129,7 +140,8 @@ const DeliverySettings: React.FC = () => {
                      <select
                         value={job.targetPath}
                         onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
-                        className="w-full border rounded p-1 text-sm bg-white"
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('targetPath')}
                      >
                         {hosts.find(h => h.name === job.targetHost)?.directories.map(dir => (
                             <option key={dir} value={dir}>{dir}</option>
@@ -144,7 +156,8 @@ const DeliverySettings: React.FC = () => {
                         type="number"
                         value={job.bandwidth}
                         onChange={(e) => handleJobChange(job.id, 'bandwidth', parseInt(e.target.value) || 0)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('bandwidth') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('bandwidth')}
                      />
                    </div>
                     <div>
@@ -153,7 +166,8 @@ const DeliverySettings: React.FC = () => {
                         type="number"
                         value={job.processingTime}
                         onChange={(e) => handleJobChange(job.id, 'processingTime', parseInt(e.target.value) || 0)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('processingTime') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('processingTime')}
                      />
                    </div>
                 </div>
@@ -163,13 +177,15 @@ const DeliverySettings: React.FC = () => {
                         type="text"
                         value={job.filterRegex}
                         onChange={(e) => handleJobChange(job.id, 'filterRegex', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('filterRegex') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('filterRegex')}
                         placeholder=".*"
                      />
                 </div>
              </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <button

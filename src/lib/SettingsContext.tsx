@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, type ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
+import { validateAllSettings, type ValidationError } from './validation';
 
 export interface DataSourceJob {
   id: string;
@@ -83,6 +84,8 @@ interface SettingsContextType {
   removeDirectory: (hostName: string, path: string) => void;
   isHostInUse: (hostName: string) => boolean;
   isDirectoryInUse: (hostName: string, path: string) => boolean;
+
+  saveSettings: () => { success: boolean; errors?: ValidationError[] };
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -155,6 +158,45 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     { name: 'localhost', directories: ['/incoming', '/internal'] },
   ]);
 
+  // Load settings from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('pipeline-simulator-settings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.dataSource) setDataSource(parsed.dataSource);
+        if (parsed.collection) setCollection(parsed.collection);
+        if (parsed.delivery) setDelivery(parsed.delivery);
+        if (parsed.etl) setEtl(parsed.etl);
+        if (parsed.hosts) setHosts(parsed.hosts);
+      } catch (e) {
+        console.error('Failed to parse settings', e);
+      }
+    }
+  }, []);
+
+  const saveSettings = useCallback(() => {
+    const errors = validateAllSettings(dataSource, collection, delivery, etl);
+    if (errors.length > 0) {
+      return { success: false, errors };
+    }
+
+    const settingsToSave = {
+      dataSource,
+      collection,
+      delivery,
+      etl,
+      hosts
+    };
+    try {
+      localStorage.setItem('pipeline-simulator-settings', JSON.stringify(settingsToSave));
+      return { success: true };
+    } catch (e) {
+      console.error("Failed to save settings", e);
+      return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
+    }
+  }, [dataSource, collection, delivery, etl, hosts]);
+
   const addHost = useCallback((name: string) => {
     setHosts(prev => {
       if (prev.some(h => h.name === name)) return prev;
@@ -223,6 +265,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         removeDirectory,
         isHostInUse,
         isDirectoryInUse,
+        saveSettings,
       }}
     >
       {children}

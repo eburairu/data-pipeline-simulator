@@ -472,6 +472,18 @@ const SettingsPanel = () => {
 const Dashboard = () => {
   const [activeSteps, setActiveSteps] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'simulation' | 'settings'>('simulation');
+  const { saveSettings } = useSettings();
+  const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+  const handleSave = () => {
+    const result = saveSettings();
+    if (result.success) {
+      setSaveMessage({ type: 'success', text: 'Settings saved successfully.' });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } else {
+      setSaveMessage({ type: 'error', text: 'Failed to save settings. Please fix the errors highlighted below.' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8 flex flex-col gap-8">
@@ -510,9 +522,26 @@ const Dashboard = () => {
         </div>
       ) : (
         <div className="bg-white rounded shadow p-6 border border-gray-200">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-             <Settings className="w-6 h-6" /> Pipeline Configuration
-          </h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+               <Settings className="w-6 h-6" /> Pipeline Configuration
+            </h2>
+            <button
+               onClick={handleSave}
+               className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              Save Settings
+            </button>
+          </div>
+          {saveMessage && (
+            <div className={`mb-4 p-3 rounded border text-sm ${
+              saveMessage.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              {saveMessage.text}
+            </div>
+          )}
           <SettingsPanel />
         </div>
       )}
