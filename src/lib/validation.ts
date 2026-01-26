@@ -1,4 +1,4 @@
-import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceJob, CollectionJob, DeliveryJob } from './SettingsContext';
+import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob } from './SettingsContext';
 
 export interface ValidationError {
   id?: string; // Job ID if applicable
@@ -15,11 +15,23 @@ const isValidRegex = (pattern: string): boolean => {
   }
 };
 
-export const validateDataSourceJob = (job: DataSourceJob): ValidationError[] => {
+export const validateDataSourceDefinition = (def: DataSourceDefinition): ValidationError[] => {
+  const errors: ValidationError[] = [];
+  if (!def.name.trim()) errors.push({ id: def.id, field: 'name', message: 'Name is required' });
+  if (!def.host) errors.push({ id: def.id, field: 'host', message: 'Host is required' });
+  if (!def.path) errors.push({ id: def.id, field: 'path', message: 'Path is required' });
+  return errors;
+};
+
+export const validateGenerationJob = (job: GenerationJob, definitions: DataSourceDefinition[]): ValidationError[] => {
   const errors: ValidationError[] = [];
   if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
-  if (!job.host) errors.push({ id: job.id, field: 'host', message: 'Host is required' });
-  if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
+  if (!job.dataSourceId) errors.push({ id: job.id, field: 'dataSourceId', message: 'Target Data Source is required' });
+
+  if (!definitions.some(d => d.id === job.dataSourceId)) {
+     errors.push({ id: job.id, field: 'dataSourceId', message: 'Invalid Data Source Reference' });
+  }
+
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (!job.fileNamePattern.trim()) errors.push({ id: job.id, field: 'fileNamePattern', message: 'File Name Pattern is required' });
   return errors;
@@ -71,8 +83,12 @@ export const validateAllSettings = (
 ): ValidationError[] => {
   let errors: ValidationError[] = [];
 
+  dataSource.definitions.forEach(def => {
+    errors = [...errors, ...validateDataSourceDefinition(def)];
+  });
+
   dataSource.jobs.forEach(job => {
-    errors = [...errors, ...validateDataSourceJob(job)];
+    errors = [...errors, ...validateGenerationJob(job, dataSource.definitions)];
   });
 
   if (collection.processingTime < 0) {
