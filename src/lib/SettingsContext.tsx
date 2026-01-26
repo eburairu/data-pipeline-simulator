@@ -1,11 +1,17 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
 import { validateAllSettings, type ValidationError } from './validation';
 
-export interface DataSourceJob {
+export interface DataSourceDefinition {
   id: string;
   name: string;
   host: string;
-  sourcePath: string;
+  path: string;
+}
+
+export interface GenerationJob {
+  id: string;
+  name: string;
+  dataSourceId: string; // Refers to DataSourceDefinition.id
   fileNamePattern: string;
   fileContent: string;
   executionInterval: number;
@@ -13,7 +19,8 @@ export interface DataSourceJob {
 }
 
 export interface DataSourceSettings {
-  jobs: DataSourceJob[];
+  definitions: DataSourceDefinition[];
+  jobs: GenerationJob[];
 }
 
 export interface CollectionJob {
@@ -92,12 +99,19 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [dataSource, setDataSource] = useState<DataSourceSettings>({
+    definitions: [
+      {
+        id: 'ds_def_1',
+        name: 'Default Source Location',
+        host: 'host1',
+        path: '/source'
+      }
+    ],
     jobs: [
       {
-        id: 'ds_job_1',
-        name: 'Default Source',
-        host: 'host1',
-        sourcePath: '/source',
+        id: 'gen_job_1',
+        name: 'Default Source Generator',
+        dataSourceId: 'ds_def_1',
         fileNamePattern: '${host}_data_${timestamp}.csv',
         fileContent: 'sample,data,123',
         executionInterval: 1000,
@@ -164,7 +178,41 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.dataSource) setDataSource(parsed.dataSource);
+        if (parsed.dataSource) {
+          // Check if it's the new structure
+          if (parsed.dataSource.definitions && parsed.dataSource.jobs) {
+            setDataSource(parsed.dataSource);
+          } else if (Array.isArray(parsed.dataSource.jobs)) {
+             // Basic migration for old structure
+             // Old job: { id, name, host, sourcePath, ... }
+             // We need to split this into definitions and generation jobs
+             const newDefinitions: DataSourceDefinition[] = [];
+             const newJobs: GenerationJob[] = [];
+
+             parsed.dataSource.jobs.forEach((oldJob: any) => {
+                const defId = `ds_def_${oldJob.id}`;
+                // Check if we already have a definition for this host/path?
+                // For simplicity, 1:1 migration
+                newDefinitions.push({
+                  id: defId,
+                  name: `${oldJob.name} Location`,
+                  host: oldJob.host,
+                  path: oldJob.sourcePath
+                });
+
+                newJobs.push({
+                  id: oldJob.id,
+                  name: oldJob.name,
+                  dataSourceId: defId,
+                  fileNamePattern: oldJob.fileNamePattern,
+                  fileContent: oldJob.fileContent,
+                  executionInterval: oldJob.executionInterval,
+                  enabled: oldJob.enabled
+                });
+             });
+             setDataSource({ definitions: newDefinitions, jobs: newJobs });
+          }
+        }
         if (parsed.collection) setCollection(parsed.collection);
         if (parsed.delivery) setDelivery(parsed.delivery);
         if (parsed.etl) setEtl(parsed.etl);
@@ -224,7 +272,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   const isHostInUse = useCallback((hostName: string) => {
-    const inDataSource = dataSource.jobs.some(j => j.host === hostName);
+    const inDataSource = dataSource.definitions.some(d => d.host === hostName);
     const inCollection = collection.jobs.some(j => j.sourceHost === hostName || j.targetHost === hostName);
     const inDelivery = delivery.jobs.some(j => j.sourceHost === hostName || j.targetHost === hostName);
     const inEtl = etl.sourceHost === hostName;
@@ -233,7 +281,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [dataSource, collection, delivery, etl]);
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
-    const inDataSource = dataSource.jobs.some(j => j.host === hostName && j.sourcePath === path);
+    const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
     const inCollection = collection.jobs.some(j =>
       (j.sourceHost === hostName && j.sourcePath === path) ||
       (j.targetHost === hostName && j.targetPath === path)

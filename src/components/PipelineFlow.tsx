@@ -48,7 +48,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     // 各「ステージ」のキーを収集
     // ステージ 0: データソースのキー
-    const sourceKeys = Array.from(new Set(dataSource.jobs.map(j => getKey(j.host, j.sourcePath))));
+    const sourceKeys = Array.from(new Set(dataSource.definitions.map(d => getKey(d.host, d.path))));
 
     // ステージ 1: 受信キー (Collectionのターゲット)
     const incomingKeys = Array.from(new Set(collection.jobs.map(j => getKey(j.targetHost, j.targetPath))));

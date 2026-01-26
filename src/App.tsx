@@ -95,17 +95,20 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     dataSource.jobs.forEach(job => {
       if (!job.enabled) return;
 
+      const definition = dataSource.definitions.find(d => d.id === job.dataSourceId);
+      if (!definition) return;
+
       const timer = setInterval(() => {
-        const context = { hostname: job.host, timestamp: new Date() };
+        const context = { hostname: definition.host, timestamp: new Date() };
         const fileName = processTemplate(job.fileNamePattern, context);
         const fileContent = processTemplate(job.fileContent, context);
-        writeFile(job.host, job.sourcePath, fileName, fileContent);
+        writeFile(definition.host, definition.path, fileName, fileContent);
       }, job.executionInterval);
       timers.push(timer);
     });
 
     return () => timers.forEach(clearInterval);
-  }, [isRunning, dataSource.jobs, writeFile]);
+  }, [isRunning, dataSource.jobs, dataSource.definitions, writeFile]);
 
   // 2. 収集 (Source -> Incoming)
   useEffect(() => {
@@ -328,10 +331,13 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     // すべての有効なデータソースジョブに対してファイルを生成
     dataSource.jobs.forEach(job => {
         if (job.enabled) {
-            const context = { hostname: job.host, timestamp: new Date() };
+            const definition = dataSource.definitions.find(d => d.id === job.dataSourceId);
+            if (!definition) return;
+
+            const context = { hostname: definition.host, timestamp: new Date() };
             const fileName = processTemplate(job.fileNamePattern, context);
             const fileContent = processTemplate(job.fileContent, context);
-            writeFile(job.host, job.sourcePath, fileName, fileContent);
+            writeFile(definition.host, definition.path, fileName, fileContent);
         }
     });
   };
@@ -386,17 +392,17 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-        {/* ソースファイル (DSジョブごとにグループ化) */}
+        {/* ソースファイル (Definitionごとにグループ化) */}
         <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
            <h3 className="font-bold border-b text-gray-700">Sources</h3>
-           {dataSource.jobs.map(job => (
-              <div key={job.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{job.name} ({job.host}:{job.sourcePath})</div>
+           {dataSource.definitions.map(def => (
+              <div key={def.id} className="text-xs">
+                 <div className="font-semibold text-gray-600">{def.name} ({def.host}:{def.path})</div>
                  <ul className="pl-2">
-                   {safeListFiles(job.host, job.sourcePath).map(f => (
+                   {safeListFiles(def.host, def.path).map(f => (
                      <li key={f.name} className="text-green-600 truncate">{f.name}</li>
                    ))}
-                   {safeListFiles(job.host, job.sourcePath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                   {safeListFiles(def.host, def.path).length === 0 && <span className="text-gray-400 italic">Empty</span>}
                  </ul>
               </div>
            ))}
