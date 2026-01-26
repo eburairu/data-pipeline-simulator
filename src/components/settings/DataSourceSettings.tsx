@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSettings, type DataSourceJob } from '../../lib/SettingsContext';
+import { validateDataSourceJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const DataSourceSettings: React.FC = () => {
@@ -50,7 +51,12 @@ const DataSourceSettings: React.FC = () => {
       <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Data Source Settings</h3>
 
       <div className="space-y-4">
-        {dataSource.jobs.map((job) => (
+        {dataSource.jobs.map((job) => {
+          const errors = validateDataSourceJob(job);
+          const hasError = (field: string) => errors.some(e => e.field === field);
+          const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+
+          return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
              <div className="absolute top-2 right-2">
                 <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job">
@@ -65,7 +71,8 @@ const DataSourceSettings: React.FC = () => {
                         type="text"
                         value={job.name}
                         onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('name')}
                      />
                    </div>
                     <div>
@@ -74,7 +81,8 @@ const DataSourceSettings: React.FC = () => {
                         type="number"
                         value={job.executionInterval}
                         onChange={(e) => handleJobChange(job.id, 'executionInterval', parseInt(e.target.value) || 0)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('executionInterval') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('executionInterval')}
                      />
                    </div>
                 </div>
@@ -84,7 +92,8 @@ const DataSourceSettings: React.FC = () => {
                         <select
                             value={job.host}
                             onChange={(e) => handleHostChange(job.id, e.target.value)}
-                            className="w-full border rounded p-1 text-sm bg-white"
+                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('host') ? 'border-red-500 bg-red-50' : ''}`}
+                            title={getErrorMsg('host')}
                         >
                             {hosts.map(h => (
                                 <option key={h.name} value={h.name}>{h.name}</option>
@@ -96,7 +105,8 @@ const DataSourceSettings: React.FC = () => {
                         <select
                             value={job.sourcePath}
                             onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                            className="w-full border rounded p-1 text-sm bg-white"
+                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
+                            title={getErrorMsg('sourcePath')}
                         >
                             {hosts.find(h => h.name === job.host)?.directories.map(dir => (
                                 <option key={dir} value={dir}>{dir}</option>
@@ -111,7 +121,8 @@ const DataSourceSettings: React.FC = () => {
                         type="text"
                         value={job.fileNamePattern}
                         onChange={(e) => handleJobChange(job.id, 'fileNamePattern', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className={`w-full border rounded p-1 text-sm ${hasError('fileNamePattern') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('fileNamePattern')}
                         placeholder="${host}_${timestamp}.csv"
                      />
                    </div>
@@ -127,7 +138,8 @@ const DataSourceSettings: React.FC = () => {
                 </div>
              </div>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       <button

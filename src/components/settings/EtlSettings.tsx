@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSettings } from '../../lib/SettingsContext';
+import { validateEtlSettings } from '../../lib/validation';
 
 const EtlSettings: React.FC = () => {
   const { etl, setEtl, hosts } = useSettings();
@@ -22,6 +23,10 @@ const EtlSettings: React.FC = () => {
      });
   };
 
+  const errors = validateEtlSettings(etl);
+  const hasError = (field: string) => errors.some(e => e.field === field);
+  const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+
   return (
     <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
       <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">ETL Settings</h3>
@@ -33,7 +38,8 @@ const EtlSettings: React.FC = () => {
                 name="sourceHost"
                 value={etl.sourceHost}
                 onChange={(e) => handleHostChange(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 bg-white"
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 bg-white ${hasError('sourceHost') ? 'border-red-500 bg-red-50' : ''}`}
+                title={getErrorMsg('sourceHost')}
               >
                 {hosts.map(h => (
                     <option key={h.name} value={h.name}>{h.name}</option>
@@ -46,7 +52,8 @@ const EtlSettings: React.FC = () => {
                 name="sourcePath"
                 value={etl.sourcePath}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 bg-white"
+                className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
+                title={getErrorMsg('sourcePath')}
               >
                  {hosts.find(h => h.name === etl.sourceHost)?.directories.map(dir => (
                     <option key={dir} value={dir}>{dir}</option>
@@ -62,7 +69,8 @@ const EtlSettings: React.FC = () => {
             name="executionInterval"
             value={etl.executionInterval}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 ${hasError('executionInterval') ? 'border-red-500 bg-red-50' : ''}`}
+            title={getErrorMsg('executionInterval')}
           />
         </div>
         <div>
@@ -72,7 +80,8 @@ const EtlSettings: React.FC = () => {
             name="rawTableName"
             value={etl.rawTableName}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 ${hasError('rawTableName') ? 'border-red-500 bg-red-50' : ''}`}
+            title={getErrorMsg('rawTableName')}
           />
         </div>
         <div>
@@ -82,7 +91,8 @@ const EtlSettings: React.FC = () => {
             name="summaryTableName"
             value={etl.summaryTableName}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 ${hasError('summaryTableName') ? 'border-red-500 bg-red-50' : ''}`}
+            title={getErrorMsg('summaryTableName')}
           />
         </div>
         <div>
@@ -92,7 +102,8 @@ const EtlSettings: React.FC = () => {
             name="processingTime"
             value={etl.processingTime}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2 ${hasError('processingTime') ? 'border-red-500 bg-red-50' : ''}`}
+            title={getErrorMsg('processingTime')}
           />
         </div>
       </div>
