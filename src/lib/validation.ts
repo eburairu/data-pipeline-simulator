@@ -1,4 +1,4 @@
-import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob } from './SettingsContext';
+import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob, Topic } from './SettingsContext';
 
 export interface ValidationError {
   id?: string; // Job ID if applicable
@@ -42,8 +42,14 @@ export const validateCollectionJob = (job: CollectionJob): ValidationError[] => 
   if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
   if (!job.sourceHost) errors.push({ id: job.id, field: 'sourceHost', message: 'Source Host is required' });
   if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
-  if (!job.targetHost) errors.push({ id: job.id, field: 'targetHost', message: 'Target Host is required' });
-  if (!job.targetPath) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
+
+  if (job.targetType === 'topic') {
+      if (!job.targetTopicId) errors.push({ id: job.id, field: 'targetTopicId', message: 'Target Topic is required' });
+  } else {
+      if (!job.targetHost) errors.push({ id: job.id, field: 'targetHost', message: 'Target Host is required' });
+      if (!job.targetPath) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
+  }
+
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (!isValidRegex(job.filterRegex)) errors.push({ id: job.id, field: 'filterRegex', message: 'Invalid Regular Expression' });
@@ -53,8 +59,14 @@ export const validateCollectionJob = (job: CollectionJob): ValidationError[] => 
 export const validateDeliveryJob = (job: DeliveryJob): ValidationError[] => {
   const errors: ValidationError[] = [];
   if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
-  if (!job.sourceHost) errors.push({ id: job.id, field: 'sourceHost', message: 'Source Host is required' });
-  if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
+
+  if (job.sourceType === 'topic') {
+      if (!job.sourceTopicId) errors.push({ id: job.id, field: 'sourceTopicId', message: 'Source Topic is required' });
+  } else {
+      if (!job.sourceHost) errors.push({ id: job.id, field: 'sourceHost', message: 'Source Host is required' });
+      if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
+  }
+
   if (!job.targetHost) errors.push({ id: job.id, field: 'targetHost', message: 'Target Host is required' });
   if (!job.targetPath) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
@@ -75,11 +87,19 @@ export const validateEtlSettings = (settings: EtlSettings): ValidationError[] =>
   return errors;
 };
 
+export const validateTopic = (topic: Topic): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    if (!topic.name.trim()) errors.push({ id: topic.id, field: 'name', message: 'Topic Name is required' });
+    if (topic.retentionPeriod < 0) errors.push({ id: topic.id, field: 'retentionPeriod', message: 'Retention Period cannot be negative' });
+    return errors;
+};
+
 export const validateAllSettings = (
   dataSource: DataSourceSettings,
   collection: CollectionSettings,
   delivery: DeliverySettings,
-  etl: EtlSettings
+  etl: EtlSettings,
+  topics: Topic[]
 ): ValidationError[] => {
   let errors: ValidationError[] = [];
 
@@ -103,6 +123,10 @@ export const validateAllSettings = (
   });
 
   errors = [...errors, ...validateEtlSettings(etl)];
+
+  topics.forEach(topic => {
+      errors = [...errors, ...validateTopic(topic)];
+  });
 
   return errors;
 };

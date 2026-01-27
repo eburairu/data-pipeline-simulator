@@ -4,7 +4,7 @@ import { validateDeliveryJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const DeliverySettings: React.FC = () => {
-  const { delivery, setDelivery, hosts } = useSettings();
+  const { delivery, setDelivery, hosts, topics } = useSettings();
 
   const handleJobChange = (id: string, field: keyof DeliveryJob, value: any) => {
     const newJobs = delivery.jobs.map(job =>
@@ -23,6 +23,29 @@ const DeliverySettings: React.FC = () => {
     setDelivery({ ...delivery, jobs: newJobs });
   };
 
+  const handleSourceTypeChange = (id: string, type: 'host' | 'topic') => {
+      const newJobs = delivery.jobs.map(job => {
+          if (job.id !== id) return job;
+
+          if (type === 'host') {
+             const defaultHost = hosts[0];
+             return {
+                 ...job,
+                 sourceType: type,
+                 sourceHost: job.sourceHost || defaultHost?.name || '',
+                 sourcePath: job.sourcePath || defaultHost?.directories[0] || ''
+             };
+          } else {
+             return {
+                 ...job,
+                 sourceType: type,
+                 sourceTopicId: job.sourceTopicId || (topics.length > 0 ? topics[0].id : '')
+             };
+          }
+      });
+      setDelivery({ ...delivery, jobs: newJobs });
+  };
+
   const addJob = () => {
     // Default to available hosts
     const defaultHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: [] };
@@ -36,6 +59,7 @@ const DeliverySettings: React.FC = () => {
     const newJob: DeliveryJob = {
       id: `del_job_${Date.now()}`,
       name: `Delivery ${delivery.jobs.length + 1}`,
+      sourceType: 'host',
       sourceHost: defaultHost.name,
       sourcePath: defaultPath,
       targetHost: defaultTargetHost.name,
@@ -93,34 +117,76 @@ const DeliverySettings: React.FC = () => {
                      />
                    </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                   <div>
-                     <label className="block text-xs font-medium text-gray-500">Source Host</label>
-                     <select
-                        value={job.sourceHost}
-                        onChange={(e) => handleHostChange(job.id, 'sourceHost', 'sourcePath', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceHost') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('sourceHost')}
-                     >
-                        {hosts.map(h => (
-                            <option key={h.name} value={h.name}>{h.name}</option>
-                        ))}
-                     </select>
-                   </div>
-                   <div>
-                     <label className="block text-xs font-medium text-gray-500">Source Path</label>
-                     <select
-                        value={job.sourcePath}
-                        onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('sourcePath')}
-                     >
-                        {hosts.find(h => h.name === job.sourceHost)?.directories.map(dir => (
-                            <option key={dir} value={dir}>{dir}</option>
-                        )) || <option value="">Select Host First</option>}
-                     </select>
-                   </div>
+
+                {/* Source Config */}
+                <div className="border-b pb-2 mb-2 bg-gray-100 p-2 rounded">
+                    <label className="block text-xs font-bold text-gray-700 mb-2">Source Origin</label>
+                    <div className="flex gap-4 mb-2">
+                        <label className="flex items-center text-xs cursor-pointer">
+                            <input
+                                type="radio"
+                                checked={job.sourceType !== 'topic'}
+                                onChange={() => handleSourceTypeChange(job.id, 'host')}
+                                className="mr-1"
+                            /> Host / Directory
+                        </label>
+                        <label className="flex items-center text-xs cursor-pointer">
+                            <input
+                                type="radio"
+                                checked={job.sourceType === 'topic'}
+                                onChange={() => handleSourceTypeChange(job.id, 'topic')}
+                                className="mr-1"
+                            /> Topic (CIH)
+                        </label>
+                    </div>
+
+                    {job.sourceType === 'topic' ? (
+                         <div>
+                             <label className="block text-xs font-medium text-gray-500">Source Topic</label>
+                             <select
+                                value={job.sourceTopicId || ''}
+                                onChange={(e) => handleJobChange(job.id, 'sourceTopicId', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceTopicId') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('sourceTopicId')}
+                             >
+                                <option value="">Select Topic</option>
+                                {topics.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                             </select>
+                         </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                           <div>
+                             <label className="block text-xs font-medium text-gray-500">Source Host</label>
+                             <select
+                                value={job.sourceHost}
+                                onChange={(e) => handleHostChange(job.id, 'sourceHost', 'sourcePath', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceHost') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('sourceHost')}
+                             >
+                                {hosts.map(h => (
+                                    <option key={h.name} value={h.name}>{h.name}</option>
+                                ))}
+                             </select>
+                           </div>
+                           <div>
+                             <label className="block text-xs font-medium text-gray-500">Source Path</label>
+                             <select
+                                value={job.sourcePath}
+                                onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('sourcePath')}
+                             >
+                                {hosts.find(h => h.name === job.sourceHost)?.directories.map(dir => (
+                                    <option key={dir} value={dir}>{dir}</option>
+                                )) || <option value="">Select Host First</option>}
+                             </select>
+                           </div>
+                        </div>
+                    )}
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                      <label className="block text-xs font-medium text-gray-500">Target Host</label>
