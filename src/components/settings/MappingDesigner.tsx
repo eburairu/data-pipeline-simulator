@@ -6,8 +6,6 @@ import ReactFlow, {
     type Edge,
     Handle,
     Position,
-    useNodesState,
-    useEdgesState,
     MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -23,7 +21,7 @@ import {
     type ExpressionConfig,
     type AggregatorConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, PlayCircle } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3 } from 'lucide-react';
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
