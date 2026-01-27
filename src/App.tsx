@@ -138,13 +138,13 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
           let regex: RegExp;
           try {
-             regex = new RegExp(job.filterRegex);
+            regex = new RegExp(job.filterRegex);
           } catch (e) {
-             setErrors(prev => {
-                const msg = `Collection Job ${job.name}: Invalid Regex`;
-                return prev.includes(msg) ? prev : [...prev, msg];
-             });
-             return;
+            setErrors(prev => {
+              const msg = `Collection Job ${job.name}: Invalid Regex`;
+              return prev.includes(msg) ? prev : [...prev, msg];
+            });
+            return;
           }
 
           const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(job.sourceHost, job.sourcePath, f.name));
@@ -163,27 +163,27 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
             let targetPath = job.targetPath;
 
             if (job.targetType === 'topic' && job.targetTopicId) {
-                 targetHost = 'localhost';
-                 targetPath = `/topics/${job.targetTopicId}`;
+              targetHost = 'localhost';
+              targetPath = `/topics/${job.targetTopicId}`;
             }
 
             try {
-               const context = {
-                 hostname: job.sourceHost,
-                 timestamp: new Date(),
-                 collectionHost: targetHost,
-                 fileName: file.name
-               };
-               const renamePattern = job.renamePattern || '${fileName}';
-               const newFileName = processTemplate(renamePattern, context);
+              const context = {
+                hostname: job.sourceHost,
+                timestamp: new Date(),
+                collectionHost: targetHost,
+                fileName: file.name
+              };
+              const renamePattern = job.renamePattern || '${fileName}';
+              const newFileName = processTemplate(renamePattern, context);
 
-               moveFile(file.name, job.sourceHost, job.sourcePath, targetHost, targetPath, newFileName);
-               setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
+              moveFile(file.name, job.sourceHost, job.sourcePath, targetHost, targetPath, newFileName);
+              setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
             } catch (e) {
-               setErrors(prev => {
-                  const msg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
-                  return prev.includes(msg) ? prev : [...prev, msg];
-               });
+              setErrors(prev => {
+                const msg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+              });
             }
           } finally {
             unlockFile(job.sourceHost, job.sourcePath, file.name);
@@ -191,9 +191,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
             collectionLocks.current[job.id] = false;
           }
         } catch (e) {
-           if (collectionLocks.current[job.id]) {
-             collectionLocks.current[job.id] = false;
-           }
+          if (collectionLocks.current[job.id]) {
+            collectionLocks.current[job.id] = false;
+          }
         }
       }, job.executionInterval);
 
@@ -218,28 +218,28 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
           let sourcePath = job.sourcePath;
 
           if (job.sourceType === 'topic' && job.sourceTopicId) {
-              sourceHost = 'localhost';
-              sourcePath = `/topics/${job.sourceTopicId}`;
+            sourceHost = 'localhost';
+            sourcePath = `/topics/${job.sourceTopicId}`;
           }
 
           let currentFiles = listFilesRef.current(sourceHost, sourcePath);
           if (currentFiles.length === 0) return;
 
           if (job.sourceType === 'topic') {
-             currentFiles = currentFiles.filter(f => !processedFilesRef.current.has(`${job.id}:${f.name}`));
+            currentFiles = currentFiles.filter(f => !processedFilesRef.current.has(`${job.id}:${f.name}`));
           }
 
           if (currentFiles.length === 0) return;
 
           let regex: RegExp;
           try {
-             regex = new RegExp(job.filterRegex);
+            regex = new RegExp(job.filterRegex);
           } catch (e) {
-              setErrors(prev => {
-                const msg = `Delivery Job ${job.name}: Invalid Regex`;
-                return prev.includes(msg) ? prev : [...prev, msg];
-             });
-             return;
+            setErrors(prev => {
+              const msg = `Delivery Job ${job.name}: Invalid Regex`;
+              return prev.includes(msg) ? prev : [...prev, msg];
+            });
+            return;
           }
 
           const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(sourceHost, sourcePath, f.name));
@@ -256,17 +256,17 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
             try {
               if (job.sourceType === 'topic') {
-                 writeFile(job.targetHost, job.targetPath, file.name, file.content);
-                 processedFilesRef.current.add(`${job.id}:${file.name}`);
+                writeFile(job.targetHost, job.targetPath, file.name, file.content);
+                processedFilesRef.current.add(`${job.id}:${file.name}`);
               } else {
-                 moveFile(file.name, sourceHost, sourcePath, job.targetHost, job.targetPath);
+                moveFile(file.name, sourceHost, sourcePath, job.targetHost, job.targetPath);
               }
               setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
             } catch (e) {
               setErrors(prev => {
-                  const msg = `Delivery Job ${job.name}: Failed to move/copy to '${job.targetHost}:${job.targetPath}'`;
-                  return prev.includes(msg) ? prev : [...prev, msg];
-               });
+                const msg = `Delivery Job ${job.name}: Failed to move/copy to '${job.targetHost}:${job.targetPath}'`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+              });
             }
           } finally {
             unlockFile(sourceHost, sourcePath, file.name);
@@ -287,104 +287,126 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
   // 6. Topic Retention
   useEffect(() => {
-      if (!isRunning) return;
+    if (!isRunning) return;
 
-      const interval = setInterval(() => {
-          topics.forEach(topic => {
-              const files = listFilesRef.current('localhost', `/topics/${topic.id}`);
-              const now = Date.now();
-              files.forEach(f => {
-                  if (now - f.createdAt > topic.retentionPeriod) {
-                      deleteFile('localhost', f.name, `/topics/${topic.id}`);
-                      console.log(`[Retention] Deleted expired file ${f.name} from topic ${topic.name}`);
-                  }
-              });
-          });
-      }, 1000);
-      return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      topics.forEach(topic => {
+        const files = listFilesRef.current('localhost', `/topics/${topic.id}`);
+        const now = Date.now();
+        files.forEach(f => {
+          if (now - f.createdAt > topic.retentionPeriod) {
+            deleteFile('localhost', f.name, `/topics/${topic.id}`);
+            console.log(`[Retention] Deleted expired file ${f.name} from topic ${topic.name}`);
+          }
+        });
+      });
+    }, 1000);
+    return () => clearInterval(interval);
   }, [isRunning, topics, deleteFile]);
 
   // 7. Mapping Tasks Execution
   useEffect(() => {
+    if (!isRunning) return; // Only run when simulation is active
+
     const timers: ReturnType<typeof setInterval>[] = [];
 
     mappingTasks.forEach(task => {
-        if (!task.enabled) return;
+      if (!task.enabled) return;
 
-        const timer = setInterval(async () => {
-            if (mappingLocks.current[task.id]) return;
+      const timer = setInterval(async () => {
+        if (mappingLocks.current[task.id]) return;
 
-            const mapping = mappings.find(m => m.id === task.mappingId);
-            if (!mapping) return;
+        const mapping = mappings.find(m => m.id === task.mappingId);
+        if (!mapping) {
+          console.warn(`[MappingTask] Mapping not found for task ${task.name} (mappingId: ${task.mappingId})`);
+          return;
+        }
 
-            mappingLocks.current[task.id] = true;
-            toggleStep(`mapping_task_${task.id}`, true);
+        // Check if mapping has source nodes with valid connections
+        const sources = mapping.transformations.filter(t => t.type === 'source');
+        if (sources.length === 0) {
+          console.warn(`[MappingTask] No source nodes in mapping for task ${task.name}`);
+          return;
+        }
 
-            try {
-                if (!mappingStates.current[task.id]) {
-                    mappingStates.current[task.id] = {};
+        mappingLocks.current[task.id] = true;
+        toggleStep(`mapping_task_${task.id}`, true);
+
+        try {
+          if (!mappingStates.current[task.id]) {
+            mappingStates.current[task.id] = {};
+          }
+
+          const { stats, newState } = await executeMappingTaskRecursive(
+            task,
+            mapping,
+            connections,
+            tables,
+            {
+              listFiles: listFilesRef.current,
+              readFile: (h, p, f) => {
+                const files = listFilesRef.current(h, p);
+                const file = files.find(fi => fi.name === f);
+                if (!file) {
+                  console.warn(`[MappingTask] File not found: ${h}:${p}/${f}`);
                 }
+                return file ? file.content : '';
+              },
+              deleteFile: deleteFile,
+              writeFile: writeFile
+            },
+            {
+              select: selectRef.current,
+              insert: insert
+            },
+            mappingStates.current[task.id]
+          );
 
-                const { stats, newState } = await executeMappingTaskRecursive(
-                    task,
-                    mapping,
-                    connections,
-                    tables,
-                    {
-                        listFiles: listFilesRef.current,
-                        readFile: (h, p, f) => {
-                             const files = listFilesRef.current(h, p);
-                             const file = files.find(fi => fi.name === f);
-                             return file ? file.content : '';
-                        },
-                        deleteFile: deleteFile,
-                        writeFile: writeFile
-                    },
-                    {
-                        select: selectRef.current,
-                        insert: insert
-                    },
-                    mappingStates.current[task.id]
-                );
+          mappingStates.current[task.id] = newState;
 
-                mappingStates.current[task.id] = newState;
+          // Log execution stats for debugging
+          const totalInput = Object.values(stats).reduce((acc, s) => acc + s.input, 0);
+          const totalOutput = Object.values(stats).reduce((acc, s) => acc + s.output, 0);
+          if (totalInput > 0 || totalOutput > 0) {
+            console.log(`[MappingTask] ${task.name}: input=${totalInput}, output=${totalOutput}`);
+          }
 
-                const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
-                if (totalErrors > 0) {
-                     setErrors(prev => {
-                        const msg = `Task ${task.name}: ${totalErrors} errors`;
-                        return prev.includes(msg) ? prev : [...prev, msg];
-                     });
-                } else {
-                     setErrors(prev => prev.filter(e => !e.includes(`Task ${task.name}`)));
-                }
+          const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
+          if (totalErrors > 0) {
+            setErrors(prev => {
+              const msg = `Task ${task.name}: ${totalErrors} errors`;
+              return prev.includes(msg) ? prev : [...prev, msg];
+            });
+          } else {
+            setErrors(prev => prev.filter(e => !e.includes(`Task ${task.name}`)));
+          }
 
-            } catch (e) {
-                console.error(`Task ${task.name} failed`, e);
-            } finally {
-                // Short delay to show the active state
-                await new Promise(res => setTimeout(res, 500));
-                toggleStep(`mapping_task_${task.id}`, false);
-                mappingLocks.current[task.id] = false;
-            }
-        }, task.executionInterval);
-        timers.push(timer);
+        } catch (e) {
+          console.error(`Task ${task.name} failed`, e);
+        } finally {
+          // Short delay to show the active state
+          await new Promise(res => setTimeout(res, 500));
+          toggleStep(`mapping_task_${task.id}`, false);
+          mappingLocks.current[task.id] = false;
+        }
+      }, task.executionInterval);
+      timers.push(timer);
     });
 
     return () => timers.forEach(clearInterval);
-  }, [mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile, moveFile]);
+  }, [isRunning, mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile]);
 
   const handleCreateSourceFile = () => {
     dataSource.jobs.forEach(job => {
-        if (job.enabled) {
-            const definition = dataSource.definitions.find(d => d.id === job.dataSourceId);
-            if (!definition) return;
+      if (job.enabled) {
+        const definition = dataSource.definitions.find(d => d.id === job.dataSourceId);
+        if (!definition) return;
 
-            const context = { hostname: definition.host, timestamp: new Date() };
-            const fileName = processTemplate(job.fileNamePattern, context);
-            const fileContent = processTemplate(job.fileContent, context);
-            writeFile(definition.host, definition.path, fileName, fileContent);
-        }
+        const context = { hostname: definition.host, timestamp: new Date() };
+        const fileName = processTemplate(job.fileNamePattern, context);
+        const fileContent = processTemplate(job.fileContent, context);
+        writeFile(definition.host, definition.path, fileName, fileContent);
+      }
     });
   };
 
@@ -451,8 +473,8 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
         <button
           onClick={() => setIsRunning(!isRunning)}
           className={`flex items-center gap-2 px-4 py-2 rounded transition-colors w-full sm:w-auto ${isRunning
-              ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-              : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
+            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+            : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
             }`}
         >
           {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -532,88 +554,88 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
         {/* Database Status */}
         <div className="border p-3 rounded bg-gray-50">
-           <div className="flex justify-between items-center mb-3 border-b pb-2">
+          <div className="flex justify-between items-center mb-3 border-b pb-2">
             <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm">
-                <span className="w-2 h-2 rounded-full bg-gray-600"></span>
-                Database Status
+              <span className="w-2 h-2 rounded-full bg-gray-600"></span>
+              Database Status
             </h3>
             <div className="flex bg-white rounded border p-0.5">
-                <button
-                    onClick={() => setDbViewMode('text')}
-                    className={`p-1 rounded ${dbViewMode === 'text' ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}
-                    title="Text View"
-                >
-                    <List size={14} />
-                </button>
-                <button
-                    onClick={() => setDbViewMode('table')}
-                    className={`p-1 rounded ${dbViewMode === 'table' ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}
-                    title="Table View"
-                >
-                    <Grid3X3 size={14} />
-                </button>
+              <button
+                onClick={() => setDbViewMode('text')}
+                className={`p-1 rounded ${dbViewMode === 'text' ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}
+                title="Text View"
+              >
+                <List size={14} />
+              </button>
+              <button
+                onClick={() => setDbViewMode('table')}
+                className={`p-1 rounded ${dbViewMode === 'table' ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}
+                title="Table View"
+              >
+                <Grid3X3 size={14} />
+              </button>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tables.map(table => {
-                const records = select(table.name);
-                return (
-                    <div key={table.id} className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
-                        <h4 className="font-semibold text-gray-700 mb-1 truncate" title={table.name}>{table.name}</h4>
-                        <div className="h-48 overflow-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow relative">
-                            {dbViewMode === 'text' ? (
-                                records.length === 0 ? (
-                                    <span className="text-gray-400 italic text-[10px]">No records</span>
-                                ) : (
-                                    <ul className="space-y-1">
-                                        {records.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
-                                    </ul>
-                                )
+              const records = select(table.name);
+              return (
+                <div key={table.id} className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
+                  <h4 className="font-semibold text-gray-700 mb-1 truncate" title={table.name}>{table.name}</h4>
+                  <div className="h-48 overflow-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow relative">
+                    {dbViewMode === 'text' ? (
+                      records.length === 0 ? (
+                        <span className="text-gray-400 italic text-[10px]">No records</span>
+                      ) : (
+                        <ul className="space-y-1">
+                          {records.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
+                        </ul>
+                      )
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-100 sticky top-0">
+                          <tr>
+                            {table.columns.length > 0 ? (
+                              table.columns.map(col => (
+                                <th key={col.name} className="p-1 border-b border-gray-200 font-medium text-gray-600 whitespace-nowrap">{col.name}</th>
+                              ))
                             ) : (
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="bg-gray-100 sticky top-0">
-                                        <tr>
-                                            {table.columns.length > 0 ? (
-                                                table.columns.map(col => (
-                                                    <th key={col.name} className="p-1 border-b border-gray-200 font-medium text-gray-600 whitespace-nowrap">{col.name}</th>
-                                                ))
-                                            ) : (
-                                                Object.keys(records[0]?.data as object || {}).map(key => (
-                                                    <th key={key} className="p-1 border-b border-gray-200 font-medium text-gray-600 whitespace-nowrap">{key}</th>
-                                                ))
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {records.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={table.columns.length || 1} className="p-2 text-center text-gray-400 italic text-xs">No records</td>
-                                            </tr>
-                                        ) : (
-                                            records.map((r, i) => (
-                                            <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                                {table.columns.length > 0 ? (
-                                                    table.columns.map(col => (
-                                                        <td key={col.name} className="p-1 border-b border-gray-100 truncate max-w-[150px]" title={String((r.data as any)[col.name] ?? '')}>
-                                                            {String((r.data as any)[col.name] ?? '')}
-                                                        </td>
-                                                    ))
-                                                ) : (
-                                                    Object.keys(records[0]?.data as object || {}).map(key => (
-                                                        <td key={key} className="p-1 border-b border-gray-100 truncate max-w-[150px]" title={String((r.data as any)[key] ?? '')}>
-                                                            {String((r.data as any)[key] ?? '')}
-                                                        </td>
-                                                    ))
-                                                )}
-                                            </tr>
-                                        ))
-                                        )}
-                                    </tbody>
-                                </table>
+                              Object.keys(records[0]?.data as object || {}).map(key => (
+                                <th key={key} className="p-1 border-b border-gray-200 font-medium text-gray-600 whitespace-nowrap">{key}</th>
+                              ))
                             )}
-                        </div>
-                    </div>
-                );
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {records.length === 0 ? (
+                            <tr>
+                              <td colSpan={table.columns.length || 1} className="p-2 text-center text-gray-400 italic text-xs">No records</td>
+                            </tr>
+                          ) : (
+                            records.map((r, i) => (
+                              <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                {table.columns.length > 0 ? (
+                                  table.columns.map(col => (
+                                    <td key={col.name} className="p-1 border-b border-gray-100 truncate max-w-[150px]" title={String((r.data as any)[col.name] ?? '')}>
+                                      {String((r.data as any)[col.name] ?? '')}
+                                    </td>
+                                  ))
+                                ) : (
+                                  Object.keys(records[0]?.data as object || {}).map(key => (
+                                    <td key={key} className="p-1 border-b border-gray-100 truncate max-w-[150px]" title={String((r.data as any)[key] ?? '')}>
+                                      {String((r.data as any)[key] ?? '')}
+                                    </td>
+                                  ))
+                                )}
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              );
             })}
             {tables.length === 0 && <span className="text-gray-400 italic text-xs">No tables defined</span>}
           </div>
@@ -631,7 +653,7 @@ const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
   const [activeSteps, setActiveSteps] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'simulation' | 'settings'>('simulation');
   const { saveSettings } = useSettings();
-  const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleSave = () => {
     const result = saveSettings();
@@ -652,17 +674,15 @@ const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
         <div className="flex bg-white rounded-lg shadow p-1">
           <button
             onClick={() => setActiveTab('simulation')}
-            className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${
-              activeTab === 'simulation' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${activeTab === 'simulation' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
             <Activity className="w-4 h-4" /> Simulation
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${
-              activeTab === 'settings' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
             <Settings className="w-4 h-4" /> Settings
           </button>
@@ -679,28 +699,27 @@ const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
             />
           </div>
           <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
-             <PipelineFlow activeSteps={activeSteps} />
+            <PipelineFlow activeSteps={activeSteps} />
           </div>
         </div>
       ) : (
         <div className="bg-white rounded shadow p-6 border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
-               <Settings className="w-6 h-6" /> Pipeline Configuration
+              <Settings className="w-6 h-6" /> Pipeline Configuration
             </h2>
             <button
-               onClick={handleSave}
-               className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors shadow-sm"
+              onClick={handleSave}
+              className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors shadow-sm"
             >
               Save Settings
             </button>
           </div>
           {saveMessage && (
-            <div className={`mb-4 p-3 rounded border text-sm ${
-              saveMessage.type === 'success'
+            <div className={`mb-4 p-3 rounded border text-sm ${saveMessage.type === 'success'
                 ? 'bg-green-50 border-green-200 text-green-700'
                 : 'bg-red-50 border-red-200 text-red-700'
-            }`}>
+              }`}>
               {saveMessage.text}
             </div>
           )}
