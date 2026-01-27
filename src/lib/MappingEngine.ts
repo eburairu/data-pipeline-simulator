@@ -70,7 +70,7 @@ const traverse = (
         stats[nextNode.id].input += batch.length;
 
         try {
-             switch (nextNode.type) {
+            switch (nextNode.type) {
                 case 'filter': {
                     const conf = nextNode.config as FilterConfig;
                     processedBatch = batch.filter(row => evaluateExpression(row, conf.condition));
@@ -89,7 +89,7 @@ const traverse = (
                 }
                 case 'aggregator': {
                     const conf = nextNode.config as AggregatorConfig;
-                     const groups: Record<string, any[]> = {};
+                    const groups: Record<string, any[]> = {};
                     batch.forEach(row => {
                         const key = conf.groupBy.map(g => row[g]).join('::');
                         if (!groups[key]) groups[key] = [];
@@ -187,37 +187,45 @@ export const executeMappingTaskRecursive = async (
         let records: any[] = [];
 
         if (conn.type === 'file') {
-             const files = fs.listFiles(conn.host!, conn.path!);
-             const processedSet = state.processedFiles || new Set<string>();
-             // Only process ONE file per interval to simulate flow visibly
-             const file = files.find(f => !processedSet.has(`${task.id}:${f.name}`));
+            const files = fs.listFiles(conn.host!, conn.path!);
+            const processedSet = state.processedFiles || new Set<string>();
+            // Only process ONE file per interval to simulate flow visibly
+            const file = files.find(f => !processedSet.has(`${task.id}:${f.name}`));
 
-             if (file) {
+            if (file) {
                 let content = fs.readFile(conn.host!, conn.path!, file.name);
                 if (file.name.endsWith('.csv')) {
-                   try {
-                       const lines = content.split(/\r?\n/);
-                       const headers = lines[0].split(',');
-                       records = lines.slice(1).filter(l => l.trim()).map(line => {
-                           const vals = line.split(',');
-                           const rec: any = {};
-                           headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
-                           return rec;
-                       });
-                       if (records.length === 0) {
-                           console.warn(`[MappingEngine] No records parsed from CSV file: ${file.name}`);
-                       }
-                   } catch (e) {
-                       console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
-                   }
+                    try {
+                        const lines = content.split(/\r?\n/);
+                        const headers = lines[0].split(',');
+                        records = lines.slice(1).filter(l => l.trim()).map(line => {
+                            const vals = line.split(',');
+                            const rec: any = {};
+                            headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
+                            return rec;
+                        });
+                        if (records.length === 0) {
+                            console.warn(`[MappingEngine] No records parsed from CSV file: ${file.name}`);
+                        }
+                    } catch (e) {
+                        console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
+                    }
                 } else {
-                   try {
+                    try {
                         // Try JSON
                         records = JSON.parse(content);
                         if (!Array.isArray(records)) records = [records];
-                   } catch {
-                       records = [{ file: file.name, content: content }];
-                   }
+                    } catch {
+                        records = [{ file: file.name, content: content }];
+                    }
+                }
+
+                // Add source filename as column if configured (IDMC CDI feature)
+                if (config.filenameColumn && config.filenameColumn.trim()) {
+                    records = records.map(rec => ({
+                        ...rec,
+                        [config.filenameColumn!]: file.name
+                    }));
                 }
 
                 if (!newState.processedFiles) newState.processedFiles = new Set(processedSet);
@@ -226,16 +234,16 @@ export const executeMappingTaskRecursive = async (
                 if (config.deleteAfterRead) {
                     fs.deleteFile(conn.host!, file.name, conn.path!);
                 }
-             }
+            }
         } else if (conn.type === 'database') {
-             const raw = db.select(conn.tableName || '');
-             const lastTs = state.lastProcessedTimestamp || 0;
-             records = raw.filter(r => r.insertedAt > lastTs).map(r => ({...r.data, insertedAt: r.insertedAt}));
+            const raw = db.select(conn.tableName || '');
+            const lastTs = state.lastProcessedTimestamp || 0;
+            records = raw.filter(r => r.insertedAt > lastTs).map(r => ({ ...r.data, insertedAt: r.insertedAt }));
 
-             if (records.length > 0) {
-                 const maxTs = Math.max(...records.map(r => r.insertedAt));
-                 newState.lastProcessedTimestamp = maxTs;
-             }
+            if (records.length > 0) {
+                const maxTs = Math.max(...records.map(r => r.insertedAt));
+                newState.lastProcessedTimestamp = maxTs;
+            }
         }
 
         stats[sourceNode.id].input = records.length;

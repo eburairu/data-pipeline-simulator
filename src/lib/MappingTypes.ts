@@ -9,6 +9,7 @@ export interface TransformationConfig {
 export interface SourceConfig extends TransformationConfig {
   connectionId: string; // Refers to a ConnectionDefinition
   deleteAfterRead?: boolean;
+  filenameColumn?: string; // If set, adds the source filename as a column with this name (like IDMC CDI)
 }
 
 export interface TargetConfig extends TransformationConfig {
@@ -21,8 +22,8 @@ export interface FilterConfig extends TransformationConfig {
 }
 
 export interface FieldExpression {
-    name: string;
-    expression: string; // e.g. "price * quantity" or just "fieldname"
+  name: string;
+  expression: string; // e.g. "price * quantity" or just "fieldname"
 }
 
 export interface ExpressionConfig extends TransformationConfig {
@@ -30,9 +31,9 @@ export interface ExpressionConfig extends TransformationConfig {
 }
 
 export interface AggregateField {
-    name: string;
-    function: 'sum' | 'count' | 'avg' | 'min' | 'max';
-    field: string;
+  name: string;
+  function: 'sum' | 'count' | 'avg' | 'min' | 'max';
+  field: string;
 }
 
 export interface AggregatorConfig extends TransformationConfig {

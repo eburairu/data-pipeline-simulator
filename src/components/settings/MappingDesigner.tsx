@@ -1,13 +1,19 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
     Background,
     Controls,
+    Panel,
     type Node,
     type Edge,
     type Connection,
     Handle,
     Position,
-    MarkerType
+    MarkerType,
+    type ReactFlowInstance,
+    useNodesState,
+    useEdgesState,
+    type NodeChange,
+    type EdgeChange
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
@@ -22,17 +28,17 @@ import {
     type ExpressionConfig,
     type AggregatorConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3 } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid } from 'lucide-react';
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
     const style = data.isSelected ? { border: '2px solid #2563eb' } : {};
     return (
         <div className={`px-4 py-2 shadow-md rounded-md bg-white border border-gray-200 text-xs w-32 flex flex-col items-center justify-center`} style={style}>
-             <Handle type="target" position={Position.Left} className="w-2 h-2" />
-             <div className="font-bold text-center">{data.label}</div>
-             <div className="text-[10px] text-gray-500 uppercase">{data.type}</div>
-             <Handle type="source" position={Position.Right} className="w-2 h-2" />
+            <Handle type="target" position={Position.Left} className="w-2 h-2" />
+            <div className="font-bold text-center">{data.label}</div>
+            <div className="text-[10px] text-gray-500 uppercase">{data.type}</div>
+            <Handle type="source" position={Position.Right} className="w-2 h-2" />
         </div>
     );
 };
@@ -79,6 +85,8 @@ const MappingDesigner: React.FC = () => {
     const { mappings, addMapping, updateMapping, removeMapping, connections } = useSettings();
     const [editingMapping, setEditingMapping] = useState<Mapping | null>(null);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+    const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+    const [hasAutoAligned, setHasAutoAligned] = useState(false);
 
     const handleCreate = () => {
         const newMapping: Mapping = {
@@ -193,36 +201,175 @@ const MappingDesigner: React.FC = () => {
             setEditingMapping((prev) =>
                 prev
                     ? {
-                          ...prev,
-                          links: [...prev.links, newLink],
-                      }
+                        ...prev,
+                        links: [...prev.links, newLink],
+                    }
                     : null
             );
         },
         [editingMapping]
     );
 
-    // React Flow Nodes/Edges generation
-    const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-        if (!editingMapping) return { nodes: [], edges: [] };
+    // React Flow Nodes/Edges state
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
-        const nodes: Node[] = editingMapping.transformations.map(t => ({
+    // Track structural changes only (not position changes)
+    const transformationIds = editingMapping?.transformations.map(t => t.id).join(',') || '';
+    const transformationNames = editingMapping?.transformations.map(t => t.name).join(',') || '';
+    const linkIds = editingMapping?.links.map(l => l.id).join(',') || '';
+
+    // Sync nodes/edges from editingMapping only on structural changes
+    useEffect(() => {
+        if (!editingMapping) {
+            setNodes([]);
+            setEdges([]);
+            return;
+        }
+
+        const newNodes: Node[] = editingMapping.transformations.map(t => ({
             id: t.id,
             type: 'designer',
             position: t.position || { x: 0, y: 0 },
-            data: { label: t.name, type: t.type, isSelected: selectedNodeId === t.id }
+            data: { label: t.name, type: t.type, isSelected: selectedNodeId === t.id },
+            draggable: true
         }));
 
-        const edges: Edge[] = editingMapping.links.map(l => ({
+        const newEdges: Edge[] = editingMapping.links.map(l => ({
             id: l.id,
             source: l.sourceId,
             target: l.targetId,
             type: 'smoothstep',
-            markerEnd: { type: MarkerType.ArrowClosed }
+            markerEnd: { type: MarkerType.ArrowClosed },
+            style: selectedEdgeId === l.id ? { stroke: '#ef4444', strokeWidth: 3 } : undefined
         }));
 
-        return getLayoutedElements(nodes, edges);
-    }, [editingMapping, selectedNodeId]);
+        const { nodes: layouted } = getLayoutedElements([...newNodes], [...newEdges]);
+
+        // Preserve existing positions if nodes already exist
+        setNodes(prevNodes => {
+            const prevMap = new Map(prevNodes.map(n => [n.id, n]));
+            return layouted.map(n => {
+                const prev = prevMap.get(n.id);
+                if (prev) {
+                    return { ...n, position: prev.position, data: { ...n.data, isSelected: selectedNodeId === n.id } };
+                }
+                return n;
+            });
+        });
+        setEdges(newEdges);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [transformationIds, transformationNames, linkIds, selectedNodeId, selectedEdgeId, setNodes, setEdges]);
+
+    // Handle node position changes (drag) - only update on drag end
+    const handleNodesChange = useCallback((changes: NodeChange[]) => {
+        onNodesChange(changes);
+
+        // Only update editingMapping when drag ends
+        changes.forEach(change => {
+            if (change.type === 'position' && change.dragging === false && change.position) {
+                setEditingMapping(prev => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        transformations: prev.transformations.map(t =>
+                            t.id === change.id ? { ...t, position: change.position! } : t
+                        )
+                    };
+                });
+            }
+        });
+    }, [onNodesChange]);
+
+    // Handle edge deletion via keyboard
+    const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+        changes.forEach(change => {
+            if (change.type === 'remove') {
+                setEditingMapping(prev => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        links: prev.links.filter(l => l.id !== change.id)
+                    };
+                });
+            }
+        });
+        onEdgesChange(changes);
+    }, [onEdgesChange]);
+
+    // Handle edge click to select (highlight for deletion)
+    const handleEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+        setSelectedEdgeId(prev => prev === edge.id ? null : edge.id);
+    }, []);
+
+    // Delete selected edge with button
+    const deleteSelectedEdge = useCallback(() => {
+        if (!selectedEdgeId || !editingMapping) return;
+        setEditingMapping(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                links: prev.links.filter(l => l.id !== selectedEdgeId)
+            };
+        });
+        setSelectedEdgeId(null);
+    }, [selectedEdgeId, editingMapping]);
+
+    // Auto-align on first load
+    useEffect(() => {
+        if (rfInstance && nodes.length > 0 && !hasAutoAligned) {
+            setHasAutoAligned(true);
+            window.requestAnimationFrame(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 500 });
+            });
+        }
+    }, [rfInstance, nodes, hasAutoAligned]);
+
+    // Reset auto-align flag when editing a different mapping
+    useEffect(() => {
+        setHasAutoAligned(false);
+    }, [editingMapping?.id]);
+
+    const onLayout = useCallback(() => {
+        if (!editingMapping || nodes.length === 0) return;
+
+        const dagreGraph = new dagre.graphlib.Graph();
+        dagreGraph.setDefaultEdgeLabel(() => ({}));
+        dagreGraph.setGraph({ rankdir: 'LR' });
+
+        const nodeWidth = 150;
+        const nodeHeight = 50;
+
+        nodes.forEach((node) => {
+            dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+        });
+
+        edges.forEach((edge) => {
+            dagreGraph.setEdge(edge.source, edge.target);
+        });
+
+        dagre.layout(dagreGraph);
+
+        const layoutedNodes = nodes.map((node) => {
+            const nodeWithPosition = dagreGraph.node(node.id);
+            return {
+                ...node,
+                position: {
+                    x: nodeWithPosition.x - nodeWidth / 2,
+                    y: nodeWithPosition.y - nodeHeight / 2,
+                },
+            };
+        });
+
+        setNodes(layoutedNodes);
+
+        if (rfInstance) {
+            window.requestAnimationFrame(() => {
+                rfInstance.fitView({ padding: 0.2, duration: 500 });
+            });
+        }
+    }, [editingMapping, nodes, edges, setNodes, rfInstance]);
 
 
     // --- Render Config Panel ---
@@ -262,16 +409,30 @@ const MappingDesigner: React.FC = () => {
                 </div>
 
                 {node.type === 'source' && (
-                    <div>
-                        <label className="block text-xs text-gray-500">Connection</label>
-                        <select
-                            className="w-full border rounded p-1 text-sm"
-                            value={(node.config as SourceConfig).connectionId}
-                            onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
-                        >
-                            <option value="">Select Connection</option>
-                            {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Connection</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as SourceConfig).connectionId}
+                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                            >
+                                <option value="">Select Connection</option>
+                                {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Filename Column (optional)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm"
+                                placeholder="e.g. source_filename"
+                                value={(node.config as SourceConfig).filenameColumn || ''}
+                                onChange={e => updateTransformationConfig(node.id, { filenameColumn: e.target.value })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">
+                                If set, adds the source filename as a column (like IDMC CDI)
+                            </p>
+                        </div>
                     </div>
                 )}
 
@@ -302,14 +463,70 @@ const MappingDesigner: React.FC = () => {
                     </div>
                 )}
 
-                 {/* Simplified Expression/Aggregator editors can be added here */}
-                 {node.type === 'expression' && (
-                     <div className="text-xs text-gray-500 italic">
-                         Expression editor not fully implemented in this summary view.
-                         <br/>
-                         (Manual JSON edit or simplified view could go here)
-                     </div>
-                 )}
+                {/* Expression Editor */}
+                {node.type === 'expression' && (
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Output Fields</label>
+                            <button
+                                onClick={() => {
+                                    const currentFields = (node.config as ExpressionConfig).fields || [];
+                                    updateTransformationConfig(node.id, {
+                                        fields: [...currentFields, { name: `field_${currentFields.length + 1}`, expression: '' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Field
+                            </button>
+                        </div>
+
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as ExpressionConfig).fields || []).map((field, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Output field name"
+                                            value={field.name}
+                                            onChange={e => {
+                                                const fields = [...(node.config as ExpressionConfig).fields];
+                                                fields[idx] = { ...fields[idx], name: e.target.value };
+                                                updateTransformationConfig(node.id, { fields });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const fields = (node.config as ExpressionConfig).fields.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { fields });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <input
+                                        className="w-full border rounded p-1 text-xs font-mono"
+                                        placeholder="Expression (e.g. price * quantity)"
+                                        value={field.expression}
+                                        onChange={e => {
+                                            const fields = [...(node.config as ExpressionConfig).fields];
+                                            fields[idx] = { ...fields[idx], expression: e.target.value };
+                                            updateTransformationConfig(node.id, { fields });
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                            {((node.config as ExpressionConfig).fields || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No fields defined. Add a field to transform data.</p>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-gray-400">
+                            Expression examples: <code className="bg-gray-100 px-1 rounded">price * 1.1</code>,
+                            <code className="bg-gray-100 px-1 rounded ml-1">firstName + " " + lastName</code>
+                        </p>
+                    </div>
+                )}
             </div>
         );
     };
@@ -321,7 +538,7 @@ const MappingDesigner: React.FC = () => {
                     <input
                         className="font-bold bg-transparent border-none focus:ring-0 text-sm min-w-0 flex-grow"
                         value={editingMapping.name}
-                        onChange={e => setEditingMapping({...editingMapping, name: e.target.value})}
+                        onChange={e => setEditingMapping({ ...editingMapping, name: e.target.value })}
                     />
                     <div className="flex gap-2 shrink-0">
                         <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
@@ -346,15 +563,42 @@ const MappingDesigner: React.FC = () => {
                     {/* Canvas */}
                     <div className="flex-grow relative bg-gray-50">
                         <ReactFlow
-                            nodes={layoutedNodes}
-                            edges={layoutedEdges}
+                            nodes={nodes}
+                            edges={edges}
                             nodeTypes={nodeTypes}
+                            onNodesChange={handleNodesChange}
+                            onEdgesChange={handleEdgesChange}
                             onNodeClick={handleNodeClick}
+                            onEdgeClick={handleEdgeClick}
                             onConnect={onConnect}
+                            onInit={setRfInstance}
                             fitView
+                            deleteKeyCode={['Backspace', 'Delete']}
                         >
                             <Background color="#aaa" gap={16} />
                             <Controls />
+                            <Panel position="top-right">
+                                <div className="flex gap-2">
+                                    {selectedEdgeId && (
+                                        <button
+                                            onClick={deleteSelectedEdge}
+                                            className="flex items-center gap-2 bg-red-500 text-white px-3 py-2 rounded shadow border border-red-600 hover:bg-red-600 text-sm font-medium cursor-pointer"
+                                            title="Delete selected connection"
+                                        >
+                                            <Trash2 size={16} />
+                                            Delete
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={onLayout}
+                                        className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 cursor-pointer"
+                                        title="Auto-align nodes"
+                                    >
+                                        <LayoutGrid size={16} />
+                                        Align
+                                    </button>
+                                </div>
+                            </Panel>
                         </ReactFlow>
                     </div>
 
@@ -369,7 +613,7 @@ const MappingDesigner: React.FC = () => {
 
     return (
         <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
-             <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
                 <Edit3 className="w-5 h-5" /> Mappings
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

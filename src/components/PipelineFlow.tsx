@@ -31,9 +31,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const getCount = useCallback((conn: ConnectionDefinition) => {
     try {
       if (conn.type === 'file') {
-          return listFiles(conn.host!, conn.path!).length;
+        return listFiles(conn.host!, conn.path!).length;
       } else if (conn.type === 'database') {
-          return select(conn.tableName!).length;
+        return select(conn.tableName!).length;
       }
       return 0;
     } catch {
@@ -58,8 +58,8 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     // Helper to generate keys
     const getLegacyKey = (host: string, path: string) => `legacy:${host}:${path}`;
     const getConnectionKey = (conn: ConnectionDefinition) => {
-        if (conn.type === 'file') return `legacy:${conn.host}:${conn.path}`; // Reuse legacy format to merge nodes
-        return `db:${conn.tableName}`;
+      if (conn.type === 'file') return `legacy:${conn.host}:${conn.path}`; // Reuse legacy format to merge nodes
+      return `db:${conn.tableName}`;
     };
 
     const addLegacyStorageNode = (host: string, path: string, colIndex: number, rowIndex: number) => {
@@ -68,9 +68,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
       let label = `${host}:${path}`;
       if (host === 'localhost' && path.startsWith('/topics/')) {
-          const topicId = path.split('/')[2];
-          const topic = topics.find(t => t.id === topicId);
-          if (topic) label = `Topic: ${topic.name}`;
+        const topicId = path.split('/')[2];
+        const topic = topics.find(t => t.id === topicId);
+        if (topic) label = `Topic: ${topic.name}`;
       }
 
       const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
@@ -88,25 +88,25 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     };
 
     const addConnectionStorageNode = (conn: ConnectionDefinition, colIndex: number = 0, rowIndex: number = 0) => {
-        const key = getConnectionKey(conn);
-        if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
+      const key = getConnectionKey(conn);
+      if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
 
-        const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-        const node: Node = {
-            id,
-            type: 'storage',
-            position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
-            data: {
-                label: conn.type === 'database' ? `DB: ${conn.tableName}` : `${conn.host}:${conn.path}`,
-                type: conn.type === 'database' ? 'db' : 'fs',
-                count: getCount(conn)
-            },
-            sourcePosition: Position.Right,
-            targetPosition: Position.Left,
-        };
-        calculatedNodes.push(node);
-        keyNodeMap.set(key, node);
-        return node;
+      const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+      const node: Node = {
+        id,
+        type: 'storage',
+        position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
+        data: {
+          label: conn.type === 'database' ? `DB: ${conn.tableName}` : `${conn.host}:${conn.path}`,
+          type: conn.type === 'database' ? 'db' : 'fs',
+          count: getCount(conn)
+        },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      };
+      calculatedNodes.push(node);
+      keyNodeMap.set(key, node);
+      return node;
     };
 
 
@@ -115,81 +115,81 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     const sourceKeys = Array.from(new Set(dataSource.definitions.map(d => getLegacyKey(d.host, d.path))));
     sourceKeys.forEach((key, i) => {
-        const parts = key.split(':');
-        addLegacyStorageNode(parts[1], parts[2], 1, i);
+      const parts = key.split(':');
+      addLegacyStorageNode(parts[1], parts[2], 1, i);
     });
 
     // Collection/Delivery targets
     const otherKeys = new Set<string>();
     collection.jobs.forEach(j => {
-        if (j.targetType === 'topic' && j.targetTopicId) otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
-        else otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
+      if (j.targetType === 'topic' && j.targetTopicId) otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
+      else otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
     });
     delivery.jobs.forEach(j => {
-        otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
+      otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
     });
 
     let rowIndex = 0;
     otherKeys.forEach(key => {
-        const parts = key.split(':');
-        if (!keyNodeMap.has(key)) {
-            addLegacyStorageNode(parts[1], parts[2], 2, rowIndex++);
-        }
+      const parts = key.split(':');
+      if (!keyNodeMap.has(key)) {
+        addLegacyStorageNode(parts[1], parts[2], 2, rowIndex++);
+      }
     });
 
     // Legacy Process Nodes
     dataSource.jobs.forEach((job) => {
-        if (!job.enabled) return;
-        const def = dataSource.definitions.find(d => d.id === job.dataSourceId);
-        if (!def) return;
-        const targetNode = keyNodeMap.get(getLegacyKey(def.host, def.path));
-        if (!targetNode) return;
+      if (!job.enabled) return;
+      const def = dataSource.definitions.find(d => d.id === job.dataSourceId);
+      if (!def) return;
+      const targetNode = keyNodeMap.get(getLegacyKey(def.host, def.path));
+      if (!targetNode) return;
 
-        const id = `process-gen-${job.id}`;
-        calculatedNodes.push({
-            id, type: 'process',
-            position: { x: targetNode.position.x - 250, y: targetNode.position.y },
-            data: { label: job.name, isProcessing: false },
-        });
-        calculatedEdges.push({ id: `e-${id}-${targetNode.id}`, source: id, target: targetNode.id, animated: true });
+      const id = `process-gen-${job.id}`;
+      calculatedNodes.push({
+        id, type: 'process',
+        position: { x: targetNode.position.x - 250, y: targetNode.position.y },
+        data: { label: job.name, isProcessing: false },
+      });
+      calculatedEdges.push({ id: `e-${id}-${targetNode.id}`, source: id, target: targetNode.id, animated: true });
     });
 
     collection.jobs.forEach((job) => {
-        if (!job.enabled) return;
-        let targetHost = job.targetHost, targetPath = job.targetPath;
-        if (job.targetType === 'topic' && job.targetTopicId) { targetHost = 'localhost'; targetPath = `/topics/${job.targetTopicId}`; }
+      if (!job.enabled) return;
+      let targetHost = job.targetHost, targetPath = job.targetPath;
+      if (job.targetType === 'topic' && job.targetTopicId) { targetHost = 'localhost'; targetPath = `/topics/${job.targetTopicId}`; }
 
-        const srcNode = keyNodeMap.get(getLegacyKey(job.sourceHost, job.sourcePath));
-        const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
-        if (srcNode && tgtNode) {
-             const id = `process-col-${job.id}`;
-             calculatedNodes.push({
-                id, type: 'process',
-                position: { x: (srcNode.position.x + tgtNode.position.x)/2, y: (srcNode.position.y + tgtNode.position.y)/2 },
-                data: { label: job.name, isProcessing: activeSteps.includes(`transfer_1_${job.id}`) }
-            });
-            calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-            calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
-        }
+      const srcNode = keyNodeMap.get(getLegacyKey(job.sourceHost, job.sourcePath));
+      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
+      if (srcNode && tgtNode) {
+        const id = `process-col-${job.id}`;
+        calculatedNodes.push({
+          id, type: 'process',
+          position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
+          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_1_${job.id}`) }
+        });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+      }
     });
 
     delivery.jobs.forEach((job) => {
-        if (!job.enabled) return;
-        let sourceHost = job.sourceHost, sourcePath = job.sourcePath;
-        if (job.sourceType === 'topic' && job.sourceTopicId) { sourceHost = 'localhost'; sourcePath = `/topics/${job.sourceTopicId}`; }
+      if (!job.enabled) return;
+      let sourceHost = job.sourceHost, sourcePath = job.sourcePath;
+      if (job.sourceType === 'topic' && job.sourceTopicId) { sourceHost = 'localhost'; sourcePath = `/topics/${job.sourceTopicId}`; }
 
-        const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
-        const tgtNode = keyNodeMap.get(getLegacyKey(job.targetHost, job.targetPath));
-        if (srcNode && tgtNode) {
-             const id = `process-del-${job.id}`;
-             calculatedNodes.push({
-                id, type: 'process',
-                position: { x: (srcNode.position.x + tgtNode.position.x)/2, y: (srcNode.position.y + tgtNode.position.y)/2 },
-                data: { label: job.name, isProcessing: activeSteps.includes(`transfer_2_${job.id}`) }
-            });
-            calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-            calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
-        }
+      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
+      const tgtNode = keyNodeMap.get(getLegacyKey(job.targetHost, job.targetPath));
+      if (srcNode && tgtNode) {
+        const id = `process-del-${job.id}`;
+        calculatedNodes.push({
+          id, type: 'process',
+          position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
+          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_2_${job.id}`) }
+        });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+      }
     });
 
 
@@ -200,66 +200,66 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     const TASK_START_X = 600; // Start placing mapping stuff further right?
 
     mappingTasks.forEach(task => {
-        if (!task.enabled) return;
-        const mapping = mappings.find(m => m.id === task.mappingId);
-        if (!mapping) return;
+      if (!task.enabled) return;
+      const mapping = mappings.find(m => m.id === task.mappingId);
+      if (!mapping) return;
 
-        const taskId = `process-task-${task.id}`;
+      const taskId = `process-task-${task.id}`;
 
-        // Find Connections
-        const sources = mapping.transformations.filter(t => t.type === 'source');
-        const targets = mapping.transformations.filter(t => t.type === 'target');
+      // Find Connections
+      const sources = mapping.transformations.filter(t => t.type === 'source');
+      const targets = mapping.transformations.filter(t => t.type === 'target');
 
-        const sourceNodes: Node[] = [];
-        const targetNodes: Node[] = [];
+      const sourceNodes: Node[] = [];
+      const targetNodes: Node[] = [];
 
-        sources.forEach(src => {
-            const conf = src.config as SourceConfig;
-            const conn = connections.find(c => c.id === conf.connectionId);
-            if (conn) {
-                // Determine layout hint: if it's a file connection that might already exist from legacy, it will be reused.
-                // If it's a DB, it's new.
-                const node = addConnectionStorageNode(conn, 3, taskRowIndex);
-                sourceNodes.push(node);
-            }
-        });
-
-        targets.forEach(tgt => {
-             const conf = tgt.config as TargetConfig;
-             const conn = connections.find(c => c.id === conf.connectionId);
-             if (conn) {
-                 const node = addConnectionStorageNode(conn, 5, taskRowIndex);
-                 targetNodes.push(node);
-             }
-        });
-
-        // Place Task Node
-        // Average Y of inputs and outputs
-        const allConnectedNodes = [...sourceNodes, ...targetNodes];
-        let avgY = 0;
-        if (allConnectedNodes.length > 0) {
-            avgY = allConnectedNodes.reduce((sum, n) => sum + n.position.y, 0) / allConnectedNodes.length;
-        } else {
-            avgY = 50 + taskRowIndex * 150;
+      sources.forEach(src => {
+        const conf = src.config as SourceConfig;
+        const conn = connections.find(c => c.id === conf.connectionId);
+        if (conn) {
+          // Determine layout hint: if it's a file connection that might already exist from legacy, it will be reused.
+          // If it's a DB, it's new.
+          const node = addConnectionStorageNode(conn, 3, taskRowIndex);
+          sourceNodes.push(node);
         }
+      });
 
-        // If we reused nodes, avgY might be weird. Let's just create the task node and let Dagre fix layout.
-        calculatedNodes.push({
-            id: taskId,
-            type: 'process',
-            position: { x: TASK_START_X + 200, y: avgY },
-            data: { label: task.name, isProcessing: activeSteps.includes(`mapping_task_${task.id}`) }
-        });
+      targets.forEach(tgt => {
+        const conf = tgt.config as TargetConfig;
+        const conn = connections.find(c => c.id === conf.connectionId);
+        if (conn) {
+          const node = addConnectionStorageNode(conn, 5, taskRowIndex);
+          targetNodes.push(node);
+        }
+      });
 
-        // Edges
-        sourceNodes.forEach(src => {
-             calculatedEdges.push({ id: `e-${src.id}-${taskId}`, source: src.id, target: taskId, animated: true });
-        });
-        targetNodes.forEach(tgt => {
-             calculatedEdges.push({ id: `e-${taskId}-${tgt.id}`, source: taskId, target: tgt.id, animated: true });
-        });
+      // Place Task Node
+      // Average Y of inputs and outputs
+      const allConnectedNodes = [...sourceNodes, ...targetNodes];
+      let avgY = 0;
+      if (allConnectedNodes.length > 0) {
+        avgY = allConnectedNodes.reduce((sum, n) => sum + n.position.y, 0) / allConnectedNodes.length;
+      } else {
+        avgY = 50 + taskRowIndex * 150;
+      }
 
-        taskRowIndex++;
+      // If we reused nodes, avgY might be weird. Let's just create the task node and let Dagre fix layout.
+      calculatedNodes.push({
+        id: taskId,
+        type: 'process',
+        position: { x: TASK_START_X + 200, y: avgY },
+        data: { label: task.name, isProcessing: activeSteps.includes(`mapping_task_${task.id}`) }
+      });
+
+      // Edges
+      sourceNodes.forEach(src => {
+        calculatedEdges.push({ id: `e-${src.id}-${taskId}`, source: src.id, target: taskId, animated: true });
+      });
+      targetNodes.forEach(tgt => {
+        calculatedEdges.push({ id: `e-${taskId}-${tgt.id}`, source: taskId, target: tgt.id, animated: true });
+      });
+
+      taskRowIndex++;
     });
 
 
@@ -269,26 +269,70 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     // Preserve positions of existing nodes to prevent jitter
     setNodes((prevNodes) => {
-       const prevNodeMap = new Map(prevNodes.map(n => [n.id, n]));
-       return calculatedNodes.map(n => {
-         const prev = prevNodeMap.get(n.id);
-         if (prev) {
-             return {
-                 ...n,
-                 position: prev.position,
-                 width: prev.width,
-                 height: prev.height,
-                 selected: prev.selected,
-                 dragging: prev.dragging,
-             };
-         }
-         return n;
-       });
+      const prevNodeMap = new Map(prevNodes.map(n => [n.id, n]));
+      return calculatedNodes.map(n => {
+        const prev = prevNodeMap.get(n.id);
+        if (prev) {
+          return {
+            ...n,
+            position: prev.position,
+            width: prev.width,
+            height: prev.height,
+            selected: prev.selected,
+            dragging: prev.dragging,
+          };
+        }
+        return n;
+      });
     });
 
     setEdges(calculatedEdges);
 
   }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
+
+  // Auto-align nodes when the flow is initialized
+  const [hasAutoAligned, setHasAutoAligned] = useState(false);
+  useEffect(() => {
+    if (rfInstance && nodes.length > 0 && edges.length > 0 && !hasAutoAligned) {
+      setHasAutoAligned(true);
+      // Delay to ensure nodes are rendered
+      window.requestAnimationFrame(() => {
+        const dagreGraph = new dagre.graphlib.Graph();
+        dagreGraph.setDefaultEdgeLabel(() => ({}));
+        dagreGraph.setGraph({ rankdir: 'LR' });
+
+        const getWidth = (node: Node) => (node.type === 'storage' ? 220 : 180);
+        const getHeight = (node: Node) => (node.type === 'storage' ? 120 : 80);
+
+        nodes.forEach((node) => {
+          dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
+        });
+        edges.forEach((edge) => {
+          dagreGraph.setEdge(edge.source, edge.target);
+        });
+
+        dagre.layout(dagreGraph);
+
+        const layoutedNodes = nodes.map((node) => {
+          const nodeWithPosition = dagreGraph.node(node.id);
+          return {
+            ...node,
+            targetPosition: Position.Left,
+            sourcePosition: Position.Right,
+            width: getWidth(node),
+            height: getHeight(node),
+            position: {
+              x: nodeWithPosition.x - getWidth(node) / 2,
+              y: nodeWithPosition.y - getHeight(node) / 2,
+            },
+          };
+        });
+
+        setNodes(layoutedNodes);
+        rfInstance.fitView({ padding: 0.2, duration: 800 });
+      });
+    }
+  }, [rfInstance, nodes, edges, hasAutoAligned, setNodes]);
 
   const onLayout = useCallback(() => {
     const dagreGraph = new dagre.graphlib.Graph();
