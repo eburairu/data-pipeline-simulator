@@ -167,7 +167,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         name: 'Default Source Generator',
         dataSourceId: 'ds_def_1',
         fileNamePattern: '${host}_data_${timestamp}.csv',
-        fileContent: 'sample,data,123',
+        fileContent: 'col1,col2,col3\nsample,data,123',
         executionInterval: 1000,
         enabled: true,
       }
