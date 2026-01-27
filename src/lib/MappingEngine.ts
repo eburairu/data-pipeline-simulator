@@ -194,14 +194,21 @@ export const executeMappingTaskRecursive = async (
              if (file) {
                 let content = fs.readFile(conn.host!, conn.path!, file.name);
                 if (file.name.endsWith('.csv')) {
-                   const lines = content.split('\n');
-                   const headers = lines[0].split(',');
-                   records = lines.slice(1).filter(l => l.trim()).map(line => {
-                       const vals = line.split(',');
-                       const rec: any = {};
-                       headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
-                       return rec;
-                   });
+                   try {
+                       const lines = content.split(/\r?\n/);
+                       const headers = lines[0].split(',');
+                       records = lines.slice(1).filter(l => l.trim()).map(line => {
+                           const vals = line.split(',');
+                           const rec: any = {};
+                           headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
+                           return rec;
+                       });
+                       if (records.length === 0) {
+                           console.warn(`[MappingEngine] No records parsed from CSV file: ${file.name}`);
+                       }
+                   } catch (e) {
+                       console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
+                   }
                 } else {
                    try {
                         // Try JSON

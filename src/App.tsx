@@ -372,7 +372,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
 
     return () => timers.forEach(clearInterval);
-  }, [mappingTasks, mappings, connections, toggleStep, insert, writeFile, deleteFile, moveFile]);
+  }, [mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile, moveFile]);
 
   const handleCreateSourceFile = () => {
     dataSource.jobs.forEach(job => {
