@@ -204,9 +204,14 @@ const MappingDesigner: React.FC = () => {
             <div className="p-4 space-y-4">
                 <div className="font-bold text-sm border-b pb-2 mb-2 flex justify-between items-center">
                     {node.type.toUpperCase()} Properties
-                    <button onClick={() => removeTransformation(node.id)} className="text-red-500 hover:text-red-700">
-                        <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => removeTransformation(node.id)} className="text-red-500 hover:text-red-700">
+                            <Trash2 size={16} />
+                        </button>
+                        <button onClick={() => setSelectedNodeId(null)} className="md:hidden text-gray-500 hover:text-gray-700">
+                            <X size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 <div>
@@ -280,25 +285,25 @@ const MappingDesigner: React.FC = () => {
     if (editingMapping) {
         return (
             <div className="h-[600px] flex flex-col border rounded bg-white shadow-sm">
-                <div className="p-2 border-b flex justify-between items-center bg-gray-50">
+                <div className="p-2 border-b flex flex-wrap justify-between items-center bg-gray-50 gap-2">
                     <input
-                        className="font-bold bg-transparent border-none focus:ring-0 text-sm"
+                        className="font-bold bg-transparent border-none focus:ring-0 text-sm min-w-0 flex-grow"
                         value={editingMapping.name}
                         onChange={e => setEditingMapping({...editingMapping, name: e.target.value})}
                     />
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                         <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-                            <Save size={14} /> Save
+                            <Save size={14} /> <span className="hidden sm:inline">Save</span>
                         </button>
                         <button onClick={() => setEditingMapping(null)} className="flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300">
-                            <X size={14} /> Cancel
+                            <X size={14} /> <span className="hidden sm:inline">Cancel</span>
                         </button>
                     </div>
                 </div>
 
-                <div className="flex-grow flex overflow-hidden">
+                <div className="flex-grow flex flex-col md:flex-row overflow-hidden relative">
                     {/* Toolbar */}
-                    <div className="w-12 bg-gray-100 border-r flex flex-col items-center py-4 gap-4">
+                    <div className="w-full md:w-12 h-auto md:h-full bg-gray-100 border-t md:border-t-0 md:border-r flex flex-row md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-4 order-last md:order-first shrink-0">
                         <button title="Add Source" onClick={() => addTransformation('source')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-green-100 border-green-500 border rounded flex items-center justify-center text-[10px]">SRC</div></button>
                         <button title="Add Filter" onClick={() => addTransformation('filter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-yellow-100 border-yellow-500 border rounded flex items-center justify-center text-[10px]">FLT</div></button>
                         <button title="Add Expression" onClick={() => addTransformation('expression')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-purple-100 border-purple-500 border rounded flex items-center justify-center text-[10px]">EXP</div></button>
@@ -321,7 +326,7 @@ const MappingDesigner: React.FC = () => {
                     </div>
 
                     {/* Properties */}
-                    <div className="w-64 border-l bg-white overflow-y-auto">
+                    <div className={`bg-white overflow-y-auto absolute inset-0 z-20 md:static md:w-64 md:border-l ${selectedNodeId ? 'block' : 'hidden md:block'}`}>
                         {renderConfigPanel()}
                     </div>
                 </div>
