@@ -8,7 +8,7 @@ import {
     type ExpressionConfig,
     type AggregatorConfig
 } from './MappingTypes';
-import { type ConnectionDefinition } from './SettingsContext';
+import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 
 // Interfaces for dependencies to decouple from Hooks
 export interface FileSystemOps {
@@ -56,6 +56,7 @@ const traverse = (
     batch: any[],
     mapping: Mapping,
     connections: ConnectionDefinition[],
+    tables: TableDefinition[],
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats
@@ -115,8 +116,22 @@ const traverse = (
                     const targetConn = connections.find(c => c.id === conf.connectionId);
                     if (targetConn) {
                         if (targetConn.type === 'database') {
+                            const tableName = targetConn.tableName || 'output';
+                            const tableDef = tables.find(t => t.name === tableName);
+
                             batch.forEach(row => {
-                                db.insert(targetConn.tableName || 'output', row);
+                                let recordToInsert = row;
+                                if (tableDef) {
+                                    // Auto Field Mapping: only insert fields that match column definitions
+                                    const filteredRow: any = {};
+                                    tableDef.columns.forEach(col => {
+                                        if (Object.prototype.hasOwnProperty.call(row, col.name)) {
+                                            filteredRow[col.name] = row[col.name];
+                                        }
+                                    });
+                                    recordToInsert = filteredRow;
+                                }
+                                db.insert(tableName, recordToInsert);
                             });
                         } else if (targetConn.type === 'file') {
                             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -138,7 +153,7 @@ const traverse = (
 
         stats[nextNode.id].output += processedBatch.length;
         if (processedBatch.length > 0) {
-            traverse(nextNode, processedBatch, mapping, connections, fs, db, stats);
+            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats);
         }
     }
 };
@@ -148,6 +163,7 @@ export const executeMappingTaskRecursive = async (
     task: MappingTask,
     mapping: Mapping,
     connections: ConnectionDefinition[],
+    tables: TableDefinition[],
     fs: FileSystemOps,
     db: DbOps,
     state: ExecutionState
@@ -218,7 +234,7 @@ export const executeMappingTaskRecursive = async (
         stats[sourceNode.id].output = records.length;
 
         if (records.length > 0) {
-            traverse(sourceNode, records, mapping, connections, fs, db, stats);
+            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats);
         }
     }
     return { stats, newState };

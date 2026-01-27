@@ -89,6 +89,17 @@ export interface Host {
   directories: string[];
 }
 
+export interface ColumnDefinition {
+  name: string;
+  type: string; // 'string', 'number', 'boolean', etc.
+}
+
+export interface TableDefinition {
+  id: string;
+  name: string;
+  columns: ColumnDefinition[];
+}
+
 // --- IDMC Features ---
 
 export type ConnectionType = 'file' | 'database';
@@ -129,6 +140,12 @@ interface SettingsContextType {
   addTopic: (name: string, retentionPeriod: number) => void;
   removeTopic: (id: string) => void;
   updateTopic: (id: string, name: string, retentionPeriod: number) => void;
+
+  tables: TableDefinition[];
+  addTable: (name: string) => void;
+  removeTable: (id: string) => void;
+  addColumn: (tableId: string, columnName: string, type: string) => void;
+  removeColumn: (tableId: string, columnName: string) => void;
 
   // IDMC Features
   connections: ConnectionDefinition[];
@@ -230,6 +247,28 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const [topics, setTopics] = useState<Topic[]>([
     { id: 'topic_1', name: 'SalesData', retentionPeriod: 60000 } // Default 1 min
+  ]);
+
+  const [tables, setTables] = useState<TableDefinition[]>([
+    {
+      id: 'tbl_raw',
+      name: 'raw_data',
+      columns: [
+        { name: 'col1', type: 'string' },
+        { name: 'col2', type: 'string' },
+        { name: 'col3', type: 'string' }
+      ]
+    },
+    {
+      id: 'tbl_summary',
+      name: 'summary_data',
+      columns: [
+        { name: 'count', type: 'number' },
+        { name: 'lastProcessedTimestamp', type: 'number' },
+        { name: 'summary', type: 'string' },
+        { name: 'timestamp', type: 'number' }
+      ]
+    }
   ]);
 
   const [connections, setConnections] = useState<ConnectionDefinition[]>([
@@ -355,6 +394,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (parsed.etl) setEtl(parsed.etl);
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
+        if (parsed.tables) setTables(parsed.tables);
         if (parsed.connections) setConnections(parsed.connections);
         if (parsed.mappings) setMappings(parsed.mappings);
         if (parsed.mappingTasks) setMappingTasks(parsed.mappingTasks);
@@ -378,6 +418,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       etl,
       hosts,
       topics,
+      tables,
       connections,
       mappings,
       mappingTasks
@@ -430,6 +471,30 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const updateTopic = useCallback((id: string, name: string, retentionPeriod: number) => {
       setTopics(prev => prev.map(t => t.id === id ? { ...t, name, retentionPeriod } : t));
+  }, []);
+
+  // Table CRUD
+  const addTable = useCallback((name: string) => {
+    setTables(prev => [...prev, { id: `tbl_${Date.now()}`, name, columns: [] }]);
+  }, []);
+
+  const removeTable = useCallback((id: string) => {
+    setTables(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const addColumn = useCallback((tableId: string, columnName: string, type: string) => {
+    setTables(prev => prev.map(t => {
+      if (t.id !== tableId) return t;
+      if (t.columns.some(c => c.name === columnName)) return t;
+      return { ...t, columns: [...t.columns, { name: columnName, type }] };
+    }));
+  }, []);
+
+  const removeColumn = useCallback((tableId: string, columnName: string) => {
+    setTables(prev => prev.map(t => {
+      if (t.id !== tableId) return t;
+      return { ...t, columns: t.columns.filter(c => c.name !== columnName) };
+    }));
   }, []);
 
   // Connection CRUD
@@ -523,6 +588,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         addTopic,
         removeTopic,
         updateTopic,
+        tables,
+        addTable,
+        removeTable,
+        addColumn,
+        removeColumn,
         connections,
         addConnection,
         removeConnection,
