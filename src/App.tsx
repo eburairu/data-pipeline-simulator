@@ -3,13 +3,9 @@ import { FileSystemProvider, useFileSystem, type VFile } from './lib/VirtualFile
 import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import { SettingsProvider, useSettings } from './lib/SettingsContext';
 import PipelineFlow from './components/PipelineFlow';
-import DataSourceSettings from './components/settings/DataSourceSettings';
-import CollectionSettings from './components/settings/CollectionSettings';
-import DeliverySettings from './components/settings/DeliverySettings';
-import TopicSettings from './components/settings/TopicSettings';
-import EtlSettings from './components/settings/EtlSettings';
-import InfrastructureSettings from './components/settings/InfrastructureSettings';
+import SettingsPanel from './components/settings/SettingsPanel';
 import { processTemplate } from './lib/templateUtils';
+import { executeMappingTaskRecursive, type ExecutionState } from './lib/MappingEngine';
 import 'reactflow/dist/style.css';
 import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle } from 'lucide-react';
 
@@ -45,11 +41,7 @@ const StorageView = React.memo(({ name, host, path, type, files }: { name?: stri
 });
 
 const calculateProcessingTime = (content: string, bandwidth: number, latency: number) => {
-  // 帯域幅: 1秒あたりの文字数
-  // コンテンツ長: 文字数
-  //転送時間 = (長さ / 帯域幅) * 1000 ms
-  // 合計時間 = 転送時間 + レイテンシ
-  const safeBandwidth = Math.max(0.1, bandwidth); // ゼロ除算を防止
+  const safeBandwidth = Math.max(0.1, bandwidth);
   const transferTime = (content.length / safeBandwidth) * 1000;
   return transferTime + latency;
 };
@@ -59,9 +51,8 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
   const [errors, setErrors] = useState<string[]>([]);
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl, topics } = useSettings();
+  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections } = useSettings();
 
-  // interval内で現在の状態にアクセスするためのRef
   const listFilesRef = useRef(listFiles);
   const selectRef = useRef(select);
 
@@ -73,13 +64,10 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     selectRef.current = select;
   }, [select]);
 
-  // ロック
   const collectionLocks = useRef<Record<string, boolean>>({});
   const deliveryLocks = useRef<Record<string, boolean>>({});
-  const etlLock = useRef(false);
-  const transformLock = useRef(false);
-
-  // ファイルロック (排他制御用)
+  const mappingStates = useRef<Record<string, ExecutionState>>({});
+  const mappingLocks = useRef<Record<string, boolean>>({});
   const fileLocks = useRef<Set<string>>(new Set());
 
   const getFileLockKey = useCallback((host: string, path: string, fileName: string) => {
@@ -98,7 +86,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     fileLocks.current.delete(getFileLockKey(host, path, fileName));
   }, [getFileLockKey]);
 
-  // ステップのアクティブ状態を切り替えるヘルパー
   const toggleStep = useCallback((step: string, active: boolean) => {
     setActiveSteps(prev => {
       if (active) {
@@ -109,12 +96,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
   }, [setActiveSteps]);
 
-  // 遅延用のヘルパー
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-  // --- 自動実行のエフェクト ---
-
-  // 1. ソース生成
+  // 1. Data Source Generation
   useEffect(() => {
     if (!isRunning) return;
     const timers: ReturnType<typeof setInterval>[] = [];
@@ -137,7 +121,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     return () => timers.forEach(clearInterval);
   }, [isRunning, dataSource.jobs, dataSource.definitions, writeFile]);
 
-  // 2. 収集 (Source -> Incoming OR Topic)
+  // 2. Collection
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -145,7 +129,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        // ジョブの再入防止
         if (collectionLocks.current[job.id]) return;
 
         try {
@@ -163,7 +146,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
              return;
           }
 
-          // ロックされていないファイルを探す
           const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(job.sourceHost, job.sourcePath, f.name));
           if (!file) return;
 
@@ -176,12 +158,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
             const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
             await delay(processingTime);
 
-            // Determine target
             let targetHost = job.targetHost;
             let targetPath = job.targetPath;
 
             if (job.targetType === 'topic' && job.targetTopicId) {
-                 targetHost = 'localhost'; // Hub host
+                 targetHost = 'localhost';
                  targetPath = `/topics/${job.targetTopicId}`;
             }
 
@@ -209,7 +190,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
             collectionLocks.current[job.id] = false;
           }
         } catch (e) {
-           // 読み取りエラー（空のパスなど）を無視
            if (collectionLocks.current[job.id]) {
              collectionLocks.current[job.id] = false;
            }
@@ -222,7 +202,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     return () => timers.forEach(clearInterval);
   }, [collection.jobs, collection.processingTime, moveFile, toggleStep]);
 
-  // 3. 配信 (Incoming OR Topic -> Internal)
+  // 3. Delivery
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -230,7 +210,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       if (!job.enabled) return;
 
       const timer = setInterval(async () => {
-        // ジョブの再入防止
         if (deliveryLocks.current[job.id]) return;
 
         try {
@@ -245,7 +224,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
           let currentFiles = listFilesRef.current(sourceHost, sourcePath);
           if (currentFiles.length === 0) return;
 
-          // Topicの場合は処理済みを除外
           if (job.sourceType === 'topic') {
              currentFiles = currentFiles.filter(f => !processedFilesRef.current.has(`${job.id}:${f.name}`));
           }
@@ -263,7 +241,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
              return;
           }
 
-          // ロックされていないファイルを探す
           const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(sourceHost, sourcePath, f.name));
           if (!file) return;
 
@@ -278,7 +255,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
             try {
               if (job.sourceType === 'topic') {
-                 // Copy logic
                  writeFile(job.targetHost, job.targetPath, file.name, file.content);
                  processedFilesRef.current.add(`${job.id}:${file.name}`);
               } else {
@@ -308,82 +284,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     return () => timers.forEach(clearInterval);
   }, [delivery.jobs, moveFile, writeFile, toggleStep]);
 
-  // 4. ETL & ロード (Delivery Target -> DB)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (etlLock.current) return;
-
-      try {
-        const currentFiles = listFilesRef.current(etl.sourceHost, etl.sourcePath);
-        if (currentFiles.length === 0) return;
-
-        // ロックされていないファイルを探す
-        const file = currentFiles.find(f => !isFileLocked(etl.sourceHost, etl.sourcePath, f.name));
-        if (!file) return;
-
-        etlLock.current = true;
-        lockFile(etl.sourceHost, etl.sourcePath, file.name);
-
-        toggleStep('process_etl', true);
-
-        try {
-          // 以前のシミュレーション速度 (len * 10ms) に合わせるため、ETLのデフォルト帯域幅を 100文字/秒と仮定
-          const processingTime = calculateProcessingTime(file.content, 100, etl.processingTime);
-          await delay(processingTime);
-
-          insert(etl.rawTableName, { file: file.name, content: file.content });
-          deleteFile(etl.sourceHost, file.name, etl.sourcePath);
-        } finally {
-          unlockFile(etl.sourceHost, etl.sourcePath, file.name);
-          toggleStep('process_etl', false);
-          etlLock.current = false;
-        }
-      } catch (e) {
-        if (etlLock.current) {
-          etlLock.current = false;
-        }
-      }
-    }, etl.executionInterval);
-    return () => clearInterval(interval);
-  }, [etl, insert, deleteFile, toggleStep]);
-
-  // 5. 変換 (Raw DB -> Summary DB)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (transformLock.current) return;
-
-      const summaryRecords = selectRef.current(etl.summaryTableName);
-      const rawRecords = selectRef.current(etl.rawTableName);
-
-      const lastProcessedTime = Math.max(0, ...summaryRecords.map(r => (r.data['lastProcessedTimestamp'] as number) || 0));
-      const newRawRecords = rawRecords.filter(r => r.insertedAt > lastProcessedTime);
-
-      if (newRawRecords.length === 0) return;
-
-      transformLock.current = true;
-      toggleStep('process_transform', true);
-
-      const combinedContent = newRawRecords.map(r => r.data['content'] as string || '').join('');
-      // 変換用にデフォルト帯域幅を 100文字/秒と仮定
-      const processingTime = calculateProcessingTime(combinedContent, 100, etl.processingTime);
-      await delay(processingTime);
-
-      const currentMaxTime = Math.max(...newRawRecords.map(r => r.insertedAt));
-
-      insert(etl.summaryTableName, {
-        summary: 'processed_batch',
-        count: newRawRecords.length,
-        timestamp: Date.now(),
-        lastProcessedTimestamp: currentMaxTime
-      });
-
-      toggleStep('process_transform', false);
-      transformLock.current = false;
-    }, etl.executionInterval);
-    return () => clearInterval(interval);
-  }, [etl, insert, toggleStep]);
-
-  // 6. Retention Policy (Topic Cleanup)
+  // 6. Topic Retention
   useEffect(() => {
       if (!isRunning) return;
 
@@ -402,9 +303,76 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       return () => clearInterval(interval);
   }, [isRunning, topics, deleteFile]);
 
+  // 7. Mapping Tasks Execution
+  useEffect(() => {
+    const timers: ReturnType<typeof setInterval>[] = [];
+
+    mappingTasks.forEach(task => {
+        if (!task.enabled) return;
+
+        const timer = setInterval(async () => {
+            if (mappingLocks.current[task.id]) return;
+
+            const mapping = mappings.find(m => m.id === task.mappingId);
+            if (!mapping) return;
+
+            mappingLocks.current[task.id] = true;
+            toggleStep(`mapping_task_${task.id}`, true);
+
+            try {
+                if (!mappingStates.current[task.id]) {
+                    mappingStates.current[task.id] = {};
+                }
+
+                const { stats, newState } = await executeMappingTaskRecursive(
+                    task,
+                    mapping,
+                    connections,
+                    {
+                        listFiles: listFilesRef.current,
+                        readFile: (h, p, f) => {
+                             const files = listFilesRef.current(h, p);
+                             const file = files.find(fi => fi.name === f);
+                             return file ? file.content : '';
+                        },
+                        deleteFile: deleteFile,
+                        writeFile: writeFile
+                    },
+                    {
+                        select: selectRef.current,
+                        insert: insert
+                    },
+                    mappingStates.current[task.id]
+                );
+
+                mappingStates.current[task.id] = newState;
+
+                const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
+                if (totalErrors > 0) {
+                     setErrors(prev => {
+                        const msg = `Task ${task.name}: ${totalErrors} errors`;
+                        return prev.includes(msg) ? prev : [...prev, msg];
+                     });
+                } else {
+                     setErrors(prev => prev.filter(e => !e.includes(`Task ${task.name}`)));
+                }
+
+            } catch (e) {
+                console.error(`Task ${task.name} failed`, e);
+            } finally {
+                // Short delay to show the active state
+                await new Promise(res => setTimeout(res, 500));
+                toggleStep(`mapping_task_${task.id}`, false);
+                mappingLocks.current[task.id] = false;
+            }
+        }, task.executionInterval);
+        timers.push(timer);
+    });
+
+    return () => timers.forEach(clearInterval);
+  }, [mappingTasks, mappings, connections, toggleStep, insert, writeFile, deleteFile, moveFile]);
 
   const handleCreateSourceFile = () => {
-    // すべての有効なデータソースジョブに対してファイルを生成
     dataSource.jobs.forEach(job => {
         if (job.enabled) {
             const definition = dataSource.definitions.find(d => d.id === job.dataSourceId);
@@ -586,21 +554,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-
-const SettingsPanel = () => {
-  return (
-    <div className="space-y-6">
-      <InfrastructureSettings />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DataSourceSettings />
-        <CollectionSettings />
-        <TopicSettings />
-        <DeliverySettings />
-        <EtlSettings />
       </div>
     </div>
   );
