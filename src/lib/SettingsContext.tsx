@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
 import { validateAllSettings, type ValidationError } from './validation';
+import { type Mapping, type MappingTask } from './MappingTypes';
 
 export interface DataSourceDefinition {
   id: string;
@@ -88,6 +89,24 @@ export interface Host {
   directories: string[];
 }
 
+// --- IDMC Features ---
+
+export type ConnectionType = 'file' | 'database';
+
+export interface ConnectionDefinition {
+  id: string;
+  name: string;
+  type: ConnectionType;
+  // File specific
+  host?: string;
+  path?: string;
+  // Database specific
+  databaseName?: string; // Logical DB name (currently unused, mostly for display)
+  tableName?: string;    // Default table
+}
+
+// ---------------------
+
 interface SettingsContextType {
   dataSource: DataSourceSettings;
   setDataSource: (settings: DataSourceSettings) => void;
@@ -110,6 +129,22 @@ interface SettingsContextType {
   addTopic: (name: string, retentionPeriod: number) => void;
   removeTopic: (id: string) => void;
   updateTopic: (id: string, name: string, retentionPeriod: number) => void;
+
+  // IDMC Features
+  connections: ConnectionDefinition[];
+  addConnection: (conn: Omit<ConnectionDefinition, 'id'>) => void;
+  removeConnection: (id: string) => void;
+  updateConnection: (id: string, updates: Partial<ConnectionDefinition>) => void;
+
+  mappings: Mapping[];
+  addMapping: (mapping: Mapping) => void;
+  removeMapping: (id: string) => void;
+  updateMapping: (id: string, mapping: Mapping) => void;
+
+  mappingTasks: MappingTask[];
+  addMappingTask: (task: MappingTask) => void;
+  removeMappingTask: (id: string) => void;
+  updateMappingTask: (id: string, updates: Partial<MappingTask>) => void;
 
   saveSettings: () => { success: boolean; errors?: ValidationError[] };
 }
@@ -197,6 +232,73 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     { id: 'topic_1', name: 'SalesData', retentionPeriod: 60000 } // Default 1 min
   ]);
 
+  const [connections, setConnections] = useState<ConnectionDefinition[]>([
+    {
+      id: 'conn_raw',
+      name: 'Raw Data Source (File)',
+      type: 'file',
+      host: 'localhost',
+      path: '/internal'
+    },
+    {
+      id: 'conn_raw_db',
+      name: 'Raw Database',
+      type: 'database',
+      tableName: 'raw_data'
+    },
+    {
+      id: 'conn_summary_db',
+      name: 'Summary Database',
+      type: 'database',
+      tableName: 'summary_data'
+    }
+  ]);
+
+  const [mappings, setMappings] = useState<Mapping[]>([
+    {
+        id: 'm_load_raw',
+        name: 'Load Raw Data',
+        transformations: [
+            { id: 't_src_raw', type: 'source', name: 'Read File', position: { x: 0, y: 0 }, config: { connectionId: 'conn_raw', deleteAfterRead: true } },
+            { id: 't_tgt_raw', type: 'target', name: 'Write DB', position: { x: 300, y: 0 }, config: { connectionId: 'conn_raw_db' } }
+        ],
+        links: [
+            { id: 'l_1', sourceId: 't_src_raw', targetId: 't_tgt_raw' }
+        ]
+    },
+    {
+        id: 'm_agg_summary',
+        name: 'Aggregate Summary',
+        transformations: [
+            { id: 't_src_db', type: 'source', name: 'Read Raw', position: { x: 0, y: 0 }, config: { connectionId: 'conn_raw_db' } },
+            { id: 't_agg', type: 'aggregator', name: 'Count & Max', position: { x: 200, y: 0 }, config: {
+                groupBy: [],
+                aggregates: [
+                    { name: 'count', function: 'count', field: 'id' },
+                    { name: 'lastProcessedTimestamp', function: 'max', field: 'insertedAt' }
+                ]
+            }},
+            { id: 't_exp', type: 'expression', name: 'Add Meta', position: { x: 400, y: 0 }, config: {
+                fields: [
+                    { name: 'summary', expression: "'processed_batch'" },
+                    { name: 'timestamp', expression: "Date.now()" }
+                ]
+            }},
+            { id: 't_tgt_sum', type: 'target', name: 'Write Summary', position: { x: 600, y: 0 }, config: { connectionId: 'conn_summary_db' } }
+        ],
+        links: [
+            { id: 'l_2', sourceId: 't_src_db', targetId: 't_agg' },
+            { id: 'l_3', sourceId: 't_agg', targetId: 't_exp' },
+            { id: 'l_4', sourceId: 't_exp', targetId: 't_tgt_sum' }
+        ]
+    }
+  ]);
+
+  const [mappingTasks, setMappingTasks] = useState<MappingTask[]>([
+      { id: 'mt_raw', name: 'Run Raw Load', mappingId: 'm_load_raw', executionInterval: 2000, enabled: true },
+      { id: 'mt_agg', name: 'Run Aggregation', mappingId: 'm_agg_summary', executionInterval: 5000, enabled: true }
+  ]);
+
   // Load settings from local storage on mount
   useEffect(() => {
     const saved = localStorage.getItem('pipeline-simulator-settings');
@@ -253,6 +355,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (parsed.etl) setEtl(parsed.etl);
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
+        if (parsed.connections) setConnections(parsed.connections);
+        if (parsed.mappings) setMappings(parsed.mappings);
+        if (parsed.mappingTasks) setMappingTasks(parsed.mappingTasks);
       } catch (e) {
         console.error('Failed to parse settings', e);
       }
@@ -260,7 +365,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   const saveSettings = useCallback(() => {
-    // Note: We need to update validation logic for Topics
+    // Note: We need to update validation logic for Topics and Connections
     const errors = validateAllSettings(dataSource, collection, delivery, etl, topics);
     if (errors.length > 0) {
       return { success: false, errors };
@@ -272,7 +377,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       delivery,
       etl,
       hosts,
-      topics
+      topics,
+      connections,
+      mappings,
+      mappingTasks
     };
     try {
       localStorage.setItem('pipeline-simulator-settings', JSON.stringify(settingsToSave));
@@ -281,7 +389,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error("Failed to save settings", e);
       return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
     }
-  }, [dataSource, collection, delivery, etl, hosts, topics]);
+  }, [dataSource, collection, delivery, etl, hosts, topics, connections, mappings, mappingTasks]);
 
   const addHost = useCallback((name: string) => {
     setHosts(prev => {
@@ -324,6 +432,45 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       setTopics(prev => prev.map(t => t.id === id ? { ...t, name, retentionPeriod } : t));
   }, []);
 
+  // Connection CRUD
+  const addConnection = useCallback((conn: Omit<ConnectionDefinition, 'id'>) => {
+    setConnections(prev => [...prev, { ...conn, id: `conn_${Date.now()}` }]);
+  }, []);
+
+  const removeConnection = useCallback((id: string) => {
+    setConnections(prev => prev.filter(c => c.id !== id));
+  }, []);
+
+  const updateConnection = useCallback((id: string, updates: Partial<ConnectionDefinition>) => {
+    setConnections(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  }, []);
+
+  // Mapping CRUD
+  const addMapping = useCallback((mapping: Mapping) => {
+    setMappings(prev => [...prev, mapping]);
+  }, []);
+
+  const removeMapping = useCallback((id: string) => {
+    setMappings(prev => prev.filter(m => m.id !== id));
+  }, []);
+
+  const updateMapping = useCallback((id: string, mapping: Mapping) => {
+    setMappings(prev => prev.map(m => m.id === id ? mapping : m));
+  }, []);
+
+  // Mapping Task CRUD
+  const addMappingTask = useCallback((task: MappingTask) => {
+    setMappingTasks(prev => [...prev, task]);
+  }, []);
+
+  const removeMappingTask = useCallback((id: string) => {
+    setMappingTasks(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const updateMappingTask = useCallback((id: string, updates: Partial<MappingTask>) => {
+    setMappingTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  }, []);
+
   const isHostInUse = useCallback((hostName: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName);
     const inCollection = collection.jobs.some(j =>
@@ -333,9 +480,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         (j.sourceType === 'host' && j.sourceHost === hostName) || j.targetHost === hostName
     );
     const inEtl = etl.sourceHost === hostName;
+    const inConnections = connections.some(c => c.type === 'file' && c.host === hostName);
 
-    return inDataSource || inCollection || inDelivery || inEtl;
-  }, [dataSource, collection, delivery, etl]);
+    return inDataSource || inCollection || inDelivery || inEtl || inConnections;
+  }, [dataSource, collection, delivery, etl, connections]);
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
@@ -348,9 +496,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       (j.targetHost === hostName && j.targetPath === path)
     );
     const inEtl = etl.sourceHost === hostName && etl.sourcePath === path;
+    const inConnections = connections.some(c => c.type === 'file' && c.host === hostName && c.path === path);
 
-    return inDataSource || inCollection || inDelivery || inEtl;
-  }, [dataSource, collection, delivery, etl]);
+    return inDataSource || inCollection || inDelivery || inEtl || inConnections;
+  }, [dataSource, collection, delivery, etl, connections]);
 
   return (
     <SettingsContext.Provider
@@ -374,6 +523,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         addTopic,
         removeTopic,
         updateTopic,
+        connections,
+        addConnection,
+        removeConnection,
+        updateConnection,
+        mappings,
+        addMapping,
+        removeMapping,
+        updateMapping,
+        mappingTasks,
+        addMappingTask,
+        removeMappingTask,
+        updateMappingTask,
         saveSettings,
       }}
     >
