@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import ReactFlow, {
     Background,
     Controls,
     type Node,
     type Edge,
+    type Connection,
     Handle,
     Position,
     MarkerType
@@ -170,6 +171,37 @@ const MappingDesigner: React.FC = () => {
         setSelectedNodeId(node.id);
     };
 
+    const onConnect = useCallback(
+        (params: Connection) => {
+            if (!editingMapping || !params.source || !params.target) return;
+
+            // Prevent duplicates
+            const linkExists = editingMapping.links.some(
+                (l) => l.sourceId === params.source && l.targetId === params.target
+            );
+            if (linkExists) return;
+
+            // Prevent self-loops if needed (though ReactFlow handles basic self-loops, logical validation is good)
+            if (params.source === params.target) return;
+
+            const newLink = {
+                id: `l_${Date.now()}`,
+                sourceId: params.source,
+                targetId: params.target,
+            };
+
+            setEditingMapping((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          links: [...prev.links, newLink],
+                      }
+                    : null
+            );
+        },
+        [editingMapping]
+    );
+
     // React Flow Nodes/Edges generation
     const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
         if (!editingMapping) return { nodes: [], edges: [] };
@@ -318,6 +350,7 @@ const MappingDesigner: React.FC = () => {
                             edges={layoutedEdges}
                             nodeTypes={nodeTypes}
                             onNodeClick={handleNodeClick}
+                            onConnect={onConnect}
                             fitView
                         >
                             <Background color="#aaa" gap={16} />
