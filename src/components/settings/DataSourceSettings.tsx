@@ -222,11 +222,11 @@ const DataSourceSettings: React.FC = () => {
                 </div>
                 <div>
                      <label className="block text-xs font-medium text-gray-500">File Content Template</label>
-                     <input
-                        type="text"
+                     <textarea
                         value={job.fileContent}
                         onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
-                        className="w-full border rounded p-1 text-sm"
+                        className="w-full border rounded p-1 text-sm font-mono h-24"
+                        placeholder="col1,col2,col3&#10;data1,data2,data3"
                      />
                 </div>
              </div>
