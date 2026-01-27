@@ -114,12 +114,13 @@ const traverse = (
                 case 'target': {
                     const conf = nextNode.config as TargetConfig;
                     const targetConn = connections.find(c => c.id === conf.connectionId);
+                    processedBatch = batch; // Copy batch to processedBatch for target processing
                     if (targetConn) {
                         if (targetConn.type === 'database') {
                             const tableName = targetConn.tableName || 'output';
                             const tableDef = tables.find(t => t.name === tableName);
 
-                            batch.forEach(row => {
+                            processedBatch.forEach(row => {
                                 let recordToInsert = row;
                                 if (tableDef) {
                                     // Auto Field Mapping: only insert fields that match column definitions
