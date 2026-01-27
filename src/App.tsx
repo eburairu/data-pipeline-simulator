@@ -7,7 +7,7 @@ import SettingsPanel from './components/settings/SettingsPanel';
 import { processTemplate } from './lib/templateUtils';
 import { executeMappingTaskRecursive, type ExecutionState } from './lib/MappingEngine';
 import 'reactflow/dist/style.css';
-import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle } from 'lucide-react';
+import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3 } from 'lucide-react';
 
 interface SimulationControlProps {
   activeSteps: string[];
@@ -49,9 +49,10 @@ const calculateProcessingTime = (content: string, bandwidth: number, latency: nu
 const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, processedFilesRef }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [dbViewMode, setDbViewMode] = useState<'text' | 'table'>('text');
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections } = useSettings();
+  const { dataSource, collection, delivery, topics, mappings, mappingTasks, connections, tables } = useSettings();
 
   const listFilesRef = useRef(listFiles);
   const selectRef = useRef(select);
@@ -328,6 +329,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
                     task,
                     mapping,
                     connections,
+                    tables,
                     {
                         listFiles: listFilesRef.current,
                         readFile: (h, p, f) => {
@@ -428,9 +430,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       internalStorages.push({ host: job.targetHost, path: job.targetPath, type: 'internal' });
     }
   });
-
-  const dbRaw = select(etl.rawTableName);
-  const dbSummary = select(etl.summaryTableName);
 
   return (
     <div className="p-4 bg-white rounded shadow space-y-4">
@@ -533,25 +532,90 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
         {/* Database Status */}
         <div className="border p-3 rounded bg-gray-50">
-           <h3 className="font-bold border-b mb-3 text-gray-700 flex items-center gap-2 text-sm">
-            <span className="w-2 h-2 rounded-full bg-gray-600"></span>
-            Database Status
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
-              <h4 className="font-semibold text-gray-700 mb-1 truncate" title={`Raw: ${etl.rawTableName}`}>Raw: {etl.rawTableName}</h4>
-              <ul className="space-y-1 h-32 overflow-y-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow">
-                {dbRaw.length === 0 && <li className="text-gray-400 italic text-[10px]">No records</li>}
-                {dbRaw.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
-              </ul>
+           <div className="flex justify-between items-center mb-3 border-b pb-2">
+            <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm">
+                <span className="w-2 h-2 rounded-full bg-gray-600"></span>
+                Database Status
+            </h3>
+            <div className="flex bg-white rounded border p-0.5">
+                <button
+                    onClick={() => setDbViewMode('text')}
+                    className={`p-1 rounded ${dbViewMode === 'text' ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}
+                    title="Text View"
+                >
+                    <List size={14} />
+                </button>
+                <button
+                    onClick={() => setDbViewMode('table')}
+                    className={`p-1 rounded ${dbViewMode === 'table' ? 'bg-gray-200 text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}
+                    title="Table View"
+                >
+                    <Grid3X3 size={14} />
+                </button>
             </div>
-            <div className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
-              <h4 className="font-semibold text-gray-700 mb-1 truncate" title={`Summary: ${etl.summaryTableName}`}>Summary: {etl.summaryTableName}</h4>
-               <ul className="space-y-1 h-32 overflow-y-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow">
-                {dbSummary.length === 0 && <li className="text-gray-400 italic text-[10px]">No records</li>}
-                {dbSummary.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
-              </ul>
-            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {tables.map(table => {
+                const records = select(table.name);
+                return (
+                    <div key={table.id} className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
+                        <h4 className="font-semibold text-gray-700 mb-1 truncate" title={table.name}>{table.name}</h4>
+                        <div className="h-48 overflow-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow relative">
+                            {dbViewMode === 'text' ? (
+                                records.length === 0 ? (
+                                    <span className="text-gray-400 italic text-[10px]">No records</span>
+                                ) : (
+                                    <ul className="space-y-1">
+                                        {records.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
+                                    </ul>
+                                )
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-gray-100 sticky top-0">
+                                        <tr>
+                                            {table.columns.length > 0 ? (
+                                                table.columns.map(col => (
+                                                    <th key={col.name} className="p-1 border-b border-gray-200 font-medium text-gray-600 whitespace-nowrap">{col.name}</th>
+                                                ))
+                                            ) : (
+                                                Object.keys(records[0]?.data as object || {}).map(key => (
+                                                    <th key={key} className="p-1 border-b border-gray-200 font-medium text-gray-600 whitespace-nowrap">{key}</th>
+                                                ))
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {records.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={table.columns.length || 1} className="p-2 text-center text-gray-400 italic text-xs">No records</td>
+                                            </tr>
+                                        ) : (
+                                            records.map((r, i) => (
+                                            <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                {table.columns.length > 0 ? (
+                                                    table.columns.map(col => (
+                                                        <td key={col.name} className="p-1 border-b border-gray-100 truncate max-w-[150px]" title={String((r.data as any)[col.name] ?? '')}>
+                                                            {String((r.data as any)[col.name] ?? '')}
+                                                        </td>
+                                                    ))
+                                                ) : (
+                                                    Object.keys(records[0]?.data as object || {}).map(key => (
+                                                        <td key={key} className="p-1 border-b border-gray-100 truncate max-w-[150px]" title={String((r.data as any)[key] ?? '')}>
+                                                            {String((r.data as any)[key] ?? '')}
+                                                        </td>
+                                                    ))
+                                                )}
+                                            </tr>
+                                        ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+            {tables.length === 0 && <span className="text-gray-400 italic text-xs">No tables defined</span>}
           </div>
         </div>
       </div>
