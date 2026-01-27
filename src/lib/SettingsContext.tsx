@@ -23,14 +23,24 @@ export interface DataSourceSettings {
   jobs: GenerationJob[];
 }
 
+export interface Topic {
+  id: string;
+  name: string;
+  retentionPeriod: number; // ms
+}
+
 export interface CollectionJob {
   id: string;
   name: string;
   sourceHost: string;
   sourcePath: string;
   filterRegex: string;
-  targetHost: string;
-  targetPath: string;
+
+  targetType?: 'host' | 'topic'; // Default: 'host'
+  targetHost: string; // Used when targetType is 'host'
+  targetPath: string; // Used when targetType is 'host'
+  targetTopicId?: string; // Used when targetType is 'topic'
+
   bandwidth: number; // 帯域幅 (文字数/秒)
   renamePattern: string;
   executionInterval: number;
@@ -45,8 +55,12 @@ export interface CollectionSettings {
 export interface DeliveryJob {
   id: string;
   name: string;
-  sourceHost: string;
-  sourcePath: string;
+
+  sourceType?: 'host' | 'topic'; // Default: 'host'
+  sourceHost: string; // Used when sourceType is 'host'
+  sourcePath: string; // Used when sourceType is 'host'
+  sourceTopicId?: string; // Used when sourceType is 'topic'
+
   targetHost: string;
   targetPath: string;
   filterRegex: string;
@@ -92,6 +106,11 @@ interface SettingsContextType {
   isHostInUse: (hostName: string) => boolean;
   isDirectoryInUse: (hostName: string, path: string) => boolean;
 
+  topics: Topic[];
+  addTopic: (name: string, retentionPeriod: number) => void;
+  removeTopic: (id: string) => void;
+  updateTopic: (id: string, name: string, retentionPeriod: number) => void;
+
   saveSettings: () => { success: boolean; errors?: ValidationError[] };
 }
 
@@ -128,6 +147,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         sourceHost: 'host1',
         sourcePath: '/source',
         filterRegex: '.*',
+        targetType: 'host',
         targetHost: 'localhost',
         targetPath: '/incoming',
         bandwidth: 100,
@@ -144,6 +164,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       {
         id: 'del_job_1',
         name: 'Default Delivery',
+        sourceType: 'host',
         sourceHost: 'localhost',
         sourcePath: '/incoming',
         targetHost: 'localhost',
@@ -172,6 +193,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     { name: 'localhost', directories: ['/incoming', '/internal'] },
   ]);
 
+  const [topics, setTopics] = useState<Topic[]>([
+    { id: 'topic_1', name: 'SalesData', retentionPeriod: 60000 } // Default 1 min
+  ]);
+
   // Load settings from local storage on mount
   useEffect(() => {
     const saved = localStorage.getItem('pipeline-simulator-settings');
@@ -184,15 +209,11 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDataSource(parsed.dataSource);
           } else if (Array.isArray(parsed.dataSource.jobs)) {
              // Basic migration for old structure
-             // Old job: { id, name, host, sourcePath, ... }
-             // We need to split this into definitions and generation jobs
              const newDefinitions: DataSourceDefinition[] = [];
              const newJobs: GenerationJob[] = [];
 
              parsed.dataSource.jobs.forEach((oldJob: any) => {
                 const defId = `ds_def_${oldJob.id}`;
-                // Check if we already have a definition for this host/path?
-                // For simplicity, 1:1 migration
                 newDefinitions.push({
                   id: defId,
                   name: `${oldJob.name} Location`,
@@ -213,10 +234,25 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
              setDataSource({ definitions: newDefinitions, jobs: newJobs });
           }
         }
-        if (parsed.collection) setCollection(parsed.collection);
-        if (parsed.delivery) setDelivery(parsed.delivery);
+        if (parsed.collection) {
+            // Migration for new targetType fields
+            const migratedJobs = parsed.collection.jobs.map((job: any) => ({
+                ...job,
+                targetType: job.targetType || 'host',
+            }));
+            setCollection({ ...parsed.collection, jobs: migratedJobs });
+        }
+        if (parsed.delivery) {
+             // Migration for new sourceType fields
+            const migratedJobs = parsed.delivery.jobs.map((job: any) => ({
+                ...job,
+                sourceType: job.sourceType || 'host',
+            }));
+            setDelivery({ ...parsed.delivery, jobs: migratedJobs });
+        }
         if (parsed.etl) setEtl(parsed.etl);
         if (parsed.hosts) setHosts(parsed.hosts);
+        if (parsed.topics) setTopics(parsed.topics);
       } catch (e) {
         console.error('Failed to parse settings', e);
       }
@@ -224,7 +260,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   const saveSettings = useCallback(() => {
-    const errors = validateAllSettings(dataSource, collection, delivery, etl);
+    // Note: We need to update validation logic for Topics
+    const errors = validateAllSettings(dataSource, collection, delivery, etl, topics);
     if (errors.length > 0) {
       return { success: false, errors };
     }
@@ -234,7 +271,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       collection,
       delivery,
       etl,
-      hosts
+      hosts,
+      topics
     };
     try {
       localStorage.setItem('pipeline-simulator-settings', JSON.stringify(settingsToSave));
@@ -243,7 +281,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error("Failed to save settings", e);
       return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
     }
-  }, [dataSource, collection, delivery, etl, hosts]);
+  }, [dataSource, collection, delivery, etl, hosts, topics]);
 
   const addHost = useCallback((name: string) => {
     setHosts(prev => {
@@ -271,10 +309,29 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }));
   }, []);
 
+  const addTopic = useCallback((name: string, retentionPeriod: number) => {
+      setTopics(prev => [
+          ...prev,
+          { id: `topic_${Date.now()}`, name, retentionPeriod }
+      ]);
+  }, []);
+
+  const removeTopic = useCallback((id: string) => {
+      setTopics(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const updateTopic = useCallback((id: string, name: string, retentionPeriod: number) => {
+      setTopics(prev => prev.map(t => t.id === id ? { ...t, name, retentionPeriod } : t));
+  }, []);
+
   const isHostInUse = useCallback((hostName: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName);
-    const inCollection = collection.jobs.some(j => j.sourceHost === hostName || j.targetHost === hostName);
-    const inDelivery = delivery.jobs.some(j => j.sourceHost === hostName || j.targetHost === hostName);
+    const inCollection = collection.jobs.some(j =>
+        j.sourceHost === hostName || (j.targetType === 'host' && j.targetHost === hostName)
+    );
+    const inDelivery = delivery.jobs.some(j =>
+        (j.sourceType === 'host' && j.sourceHost === hostName) || j.targetHost === hostName
+    );
     const inEtl = etl.sourceHost === hostName;
 
     return inDataSource || inCollection || inDelivery || inEtl;
@@ -284,10 +341,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
     const inCollection = collection.jobs.some(j =>
       (j.sourceHost === hostName && j.sourcePath === path) ||
-      (j.targetHost === hostName && j.targetPath === path)
+      (j.targetType === 'host' && j.targetHost === hostName && j.targetPath === path)
     );
     const inDelivery = delivery.jobs.some(j =>
-      (j.sourceHost === hostName && j.sourcePath === path) ||
+      (j.sourceType === 'host' && j.sourceHost === hostName && j.sourcePath === path) ||
       (j.targetHost === hostName && j.targetPath === path)
     );
     const inEtl = etl.sourceHost === hostName && etl.sourcePath === path;
@@ -313,6 +370,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         removeDirectory,
         isHostInUse,
         isDirectoryInUse,
+        topics,
+        addTopic,
+        removeTopic,
+        updateTopic,
         saveSettings,
       }}
     >

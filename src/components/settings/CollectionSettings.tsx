@@ -4,7 +4,7 @@ import { validateCollectionJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const CollectionSettings: React.FC = () => {
-  const { collection, setCollection, hosts } = useSettings();
+  const { collection, setCollection, hosts, topics } = useSettings();
 
   const handleJobChange = (id: string, field: keyof CollectionJob, value: any) => {
     const newJobs = collection.jobs.map(job =>
@@ -23,6 +23,29 @@ const CollectionSettings: React.FC = () => {
     setCollection({ ...collection, jobs: newJobs });
   };
 
+  const handleTargetTypeChange = (id: string, type: 'host' | 'topic') => {
+      const newJobs = collection.jobs.map(job => {
+          if (job.id !== id) return job;
+
+          if (type === 'host') {
+             const defaultHost = hosts[0];
+             return {
+                 ...job,
+                 targetType: type,
+                 targetHost: job.targetHost || defaultHost?.name || '',
+                 targetPath: job.targetPath || defaultHost?.directories[0] || ''
+             };
+          } else {
+             return {
+                 ...job,
+                 targetType: type,
+                 targetTopicId: job.targetTopicId || (topics.length > 0 ? topics[0].id : '')
+             };
+          }
+      });
+      setCollection({ ...collection, jobs: newJobs });
+  };
+
   const addJob = () => {
     // Default to the first available host and directory
     const defaultHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: [] };
@@ -39,6 +62,7 @@ const CollectionSettings: React.FC = () => {
       sourceHost: defaultHost.name,
       sourcePath: defaultPath,
       filterRegex: '.*',
+      targetType: 'host',
       targetHost: defaultTargetHost.name,
       targetPath: defaultTargetPath,
       bandwidth: 100,
@@ -109,6 +133,8 @@ const CollectionSettings: React.FC = () => {
                      />
                    </div>
                 </div>
+
+                {/* Source Config */}
                 <div className="grid grid-cols-2 gap-3">
                    <div>
                      <label className="block text-xs font-medium text-gray-500">Source Host</label>
@@ -137,34 +163,76 @@ const CollectionSettings: React.FC = () => {
                      </select>
                    </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Target Host</label>
-                     <select
-                        value={job.targetHost}
-                        onChange={(e) => handleHostChange(job.id, 'targetHost', 'targetPath', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetHost') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('targetHost')}
-                     >
-                        {hosts.map(h => (
-                            <option key={h.name} value={h.name}>{h.name}</option>
-                        ))}
-                     </select>
-                   </div>
-                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Target Path</label>
-                     <select
-                        value={job.targetPath}
-                        onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('targetPath')}
-                     >
-                        {hosts.find(h => h.name === job.targetHost)?.directories.map(dir => (
-                            <option key={dir} value={dir}>{dir}</option>
-                        )) || <option value="">Select Host First</option>}
-                     </select>
-                   </div>
+
+                {/* Target Config */}
+                <div className="border-t pt-2 mt-2 bg-gray-100 p-2 rounded">
+                    <label className="block text-xs font-bold text-gray-700 mb-2">Target Destination</label>
+                    <div className="flex gap-4 mb-2">
+                        <label className="flex items-center text-xs cursor-pointer">
+                            <input
+                                type="radio"
+                                checked={job.targetType !== 'topic'}
+                                onChange={() => handleTargetTypeChange(job.id, 'host')}
+                                className="mr-1"
+                            /> Host / Directory
+                        </label>
+                        <label className="flex items-center text-xs cursor-pointer">
+                            <input
+                                type="radio"
+                                checked={job.targetType === 'topic'}
+                                onChange={() => handleTargetTypeChange(job.id, 'topic')}
+                                className="mr-1"
+                            /> Topic (CIH)
+                        </label>
+                    </div>
+
+                    {job.targetType === 'topic' ? (
+                        <div>
+                             <label className="block text-xs font-medium text-gray-500">Target Topic</label>
+                             <select
+                                value={job.targetTopicId || ''}
+                                onChange={(e) => handleJobChange(job.id, 'targetTopicId', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetTopicId') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('targetTopicId')}
+                             >
+                                <option value="">Select Topic</option>
+                                {topics.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                             </select>
+                         </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                             <label className="block text-xs font-medium text-gray-500">Target Host</label>
+                             <select
+                                value={job.targetHost}
+                                onChange={(e) => handleHostChange(job.id, 'targetHost', 'targetPath', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetHost') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('targetHost')}
+                             >
+                                {hosts.map(h => (
+                                    <option key={h.name} value={h.name}>{h.name}</option>
+                                ))}
+                             </select>
+                           </div>
+                            <div>
+                             <label className="block text-xs font-medium text-gray-500">Target Path</label>
+                             <select
+                                value={job.targetPath}
+                                onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('targetPath')}
+                             >
+                                {hosts.find(h => h.name === job.targetHost)?.directories.map(dir => (
+                                    <option key={dir} value={dir}>{dir}</option>
+                                )) || <option value="">Select Host First</option>}
+                             </select>
+                           </div>
+                        </div>
+                    )}
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                    <div>
                      <label className="block text-xs font-medium text-gray-500">Bandwidth (chars/sec)</label>

@@ -6,6 +6,7 @@ import PipelineFlow from './components/PipelineFlow';
 import DataSourceSettings from './components/settings/DataSourceSettings';
 import CollectionSettings from './components/settings/CollectionSettings';
 import DeliverySettings from './components/settings/DeliverySettings';
+import TopicSettings from './components/settings/TopicSettings';
 import EtlSettings from './components/settings/EtlSettings';
 import InfrastructureSettings from './components/settings/InfrastructureSettings';
 import { processTemplate } from './lib/templateUtils';
@@ -32,7 +33,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
   const [errors, setErrors] = useState<string[]>([]);
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl } = useSettings();
+  const { dataSource, collection, delivery, etl, topics } = useSettings();
 
   // interval内で現在の状態にアクセスするためのRef
   const listFilesRef = useRef(listFiles);
@@ -54,6 +55,9 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
   // ファイルロック (排他制御用)
   const fileLocks = useRef<Set<string>>(new Set());
+
+  // Delivery Jobの処理済みファイル記録 (Topic Subscription用)
+  const processedFilesRef = useRef<Set<string>>(new Set());
 
   const getFileLockKey = useCallback((host: string, path: string, fileName: string) => {
     return `${host}:${path}/${fileName}`;
@@ -110,7 +114,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => timers.forEach(clearInterval);
   }, [isRunning, dataSource.jobs, dataSource.definitions, writeFile]);
 
-  // 2. 収集 (Source -> Incoming)
+  // 2. 収集 (Source -> Incoming OR Topic)
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -149,21 +153,30 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
             const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
             await delay(processingTime);
 
+            // Determine target
+            let targetHost = job.targetHost;
+            let targetPath = job.targetPath;
+
+            if (job.targetType === 'topic' && job.targetTopicId) {
+                 targetHost = 'localhost'; // Hub host
+                 targetPath = `/topics/${job.targetTopicId}`;
+            }
+
             try {
                const context = {
                  hostname: job.sourceHost,
                  timestamp: new Date(),
-                 collectionHost: job.targetHost,
+                 collectionHost: targetHost,
                  fileName: file.name
                };
                const renamePattern = job.renamePattern || '${fileName}';
                const newFileName = processTemplate(renamePattern, context);
 
-               moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath, newFileName);
+               moveFile(file.name, job.sourceHost, job.sourcePath, targetHost, targetPath, newFileName);
                setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
             } catch (e) {
                setErrors(prev => {
-                  const msg = `Collection Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
+                  const msg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
                   return prev.includes(msg) ? prev : [...prev, msg];
                });
             }
@@ -186,7 +199,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => timers.forEach(clearInterval);
   }, [collection.jobs, collection.processingTime, moveFile, toggleStep]);
 
-  // 3. 配信 (Incoming -> Internal)
+  // 3. 配信 (Incoming OR Topic -> Internal)
   useEffect(() => {
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -198,7 +211,22 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         if (deliveryLocks.current[job.id]) return;
 
         try {
-          const currentFiles = listFilesRef.current(job.sourceHost, job.sourcePath);
+          let sourceHost = job.sourceHost;
+          let sourcePath = job.sourcePath;
+
+          if (job.sourceType === 'topic' && job.sourceTopicId) {
+              sourceHost = 'localhost';
+              sourcePath = `/topics/${job.sourceTopicId}`;
+          }
+
+          let currentFiles = listFilesRef.current(sourceHost, sourcePath);
+          if (currentFiles.length === 0) return;
+
+          // Topicの場合は処理済みを除外
+          if (job.sourceType === 'topic') {
+             currentFiles = currentFiles.filter(f => !processedFilesRef.current.has(`${job.id}:${f.name}`));
+          }
+
           if (currentFiles.length === 0) return;
 
           let regex: RegExp;
@@ -213,11 +241,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
           }
 
           // ロックされていないファイルを探す
-          const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(job.sourceHost, job.sourcePath, f.name));
+          const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(sourceHost, sourcePath, f.name));
           if (!file) return;
 
           deliveryLocks.current[job.id] = true;
-          lockFile(job.sourceHost, job.sourcePath, file.name);
+          lockFile(sourceHost, sourcePath, file.name);
 
           toggleStep(`transfer_2_${job.id}`, true);
 
@@ -226,16 +254,22 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
             await delay(processingTime);
 
             try {
-              moveFile(file.name, job.sourceHost, job.sourcePath, job.targetHost, job.targetPath);
+              if (job.sourceType === 'topic') {
+                 // Copy logic
+                 writeFile(job.targetHost, job.targetPath, file.name, file.content);
+                 processedFilesRef.current.add(`${job.id}:${file.name}`);
+              } else {
+                 moveFile(file.name, sourceHost, sourcePath, job.targetHost, job.targetPath);
+              }
               setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
             } catch (e) {
               setErrors(prev => {
-                  const msg = `Delivery Job ${job.name}: Failed to move to '${job.targetHost}:${job.targetPath}'`;
+                  const msg = `Delivery Job ${job.name}: Failed to move/copy to '${job.targetHost}:${job.targetPath}'`;
                   return prev.includes(msg) ? prev : [...prev, msg];
                });
             }
           } finally {
-            unlockFile(job.sourceHost, job.sourcePath, file.name);
+            unlockFile(sourceHost, sourcePath, file.name);
             toggleStep(`transfer_2_${job.id}`, false);
             deliveryLocks.current[job.id] = false;
           }
@@ -249,7 +283,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       timers.push(timer);
     });
     return () => timers.forEach(clearInterval);
-  }, [delivery.jobs, moveFile, toggleStep]);
+  }, [delivery.jobs, moveFile, writeFile, toggleStep]);
 
   // 4. ETL & ロード (Delivery Target -> DB)
   useEffect(() => {
@@ -326,6 +360,25 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     return () => clearInterval(interval);
   }, [etl, insert, toggleStep]);
 
+  // 6. Retention Policy (Topic Cleanup)
+  useEffect(() => {
+      if (!isRunning) return;
+
+      const interval = setInterval(() => {
+          topics.forEach(topic => {
+              const files = listFilesRef.current('localhost', `/topics/${topic.id}`);
+              const now = Date.now();
+              files.forEach(f => {
+                  if (now - f.createdAt > topic.retentionPeriod) {
+                      deleteFile('localhost', f.name, `/topics/${topic.id}`);
+                      console.log(`[Retention] Deleted expired file ${f.name} from topic ${topic.name}`);
+                  }
+              });
+          });
+      }, 1000);
+      return () => clearInterval(interval);
+  }, [isRunning, topics, deleteFile]);
+
 
   const handleCreateSourceFile = () => {
     // すべての有効なデータソースジョブに対してファイルを生成
@@ -391,7 +444,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
         {/* ソースファイル (Definitionごとにグループ化) */}
         <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
            <h3 className="font-bold border-b text-gray-700">Sources</h3>
@@ -403,6 +456,22 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
                      <li key={f.name} className="text-green-600 truncate">{f.name}</li>
                    ))}
                    {safeListFiles(def.host, def.path).length === 0 && <span className="text-gray-400 italic">Empty</span>}
+                 </ul>
+              </div>
+           ))}
+        </div>
+
+        {/* Topic Files */}
+        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
+           <h3 className="font-bold border-b text-gray-700">Topics (Hub)</h3>
+           {topics.map(topic => (
+              <div key={topic.id} className="text-xs">
+                 <div className="font-semibold text-gray-600">{topic.name}</div>
+                 <ul className="pl-2">
+                   {safeListFiles('localhost', `/topics/${topic.id}`).map(f => (
+                     <li key={f.name} className="text-purple-600 truncate">{f.name}</li>
+                   ))}
+                   {safeListFiles('localhost', `/topics/${topic.id}`).length === 0 && <span className="text-gray-400 italic">Empty</span>}
                  </ul>
               </div>
            ))}
@@ -468,6 +537,7 @@ const SettingsPanel = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DataSourceSettings />
         <CollectionSettings />
+        <TopicSettings />
         <DeliverySettings />
         <EtlSettings />
       </div>

@@ -21,7 +21,7 @@ interface PipelineFlowProps {
 const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl } = useSettings();
+  const { dataSource, collection, delivery, etl, topics } = useSettings();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -50,14 +50,36 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         };
     };
 
+    const getLabel = (host: string, path: string) => {
+        if (host === 'localhost' && path.startsWith('/topics/')) {
+            const topicId = path.split('/')[2];
+            const topic = topics.find(t => t.id === topicId);
+            return topic ? `Topic: ${topic.name}` : `${host}:${path}`;
+        }
+        return `${host}:${path}`;
+    };
+
     // --- 1. ユニークなパスを特定してストレージノードを作成 ---
 
     // 各「ステージ」のキーを収集
     // ステージ 0: データソースのキー
     const sourceKeys = Array.from(new Set(dataSource.definitions.map(d => getKey(d.host, d.path))));
 
-    // ステージ 1: 受信キー (Collectionのターゲット)
-    const incomingKeys = Array.from(new Set(collection.jobs.map(j => getKey(j.targetHost, j.targetPath))));
+    // ステージ 1: 受信キー (Collectionのターゲット) + Delivery Source Keys (Topics)
+    const incomingKeysRaw = collection.jobs.map(j => {
+        if (j.targetType === 'topic' && j.targetTopicId) {
+            return getKey('localhost', `/topics/${j.targetTopicId}`);
+        }
+        return getKey(j.targetHost, j.targetPath);
+    });
+
+    delivery.jobs.forEach(j => {
+        if (j.sourceType === 'topic' && j.sourceTopicId) {
+            incomingKeysRaw.push(getKey('localhost', `/topics/${j.sourceTopicId}`));
+        }
+    });
+
+    const incomingKeys = Array.from(new Set(incomingKeysRaw));
 
     // ステージ 2: 内部キー (Deliveryのターゲット)
     const internalKeys = Array.from(new Set(delivery.jobs.map(j => getKey(j.targetHost, j.targetPath))));
@@ -72,7 +94,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         type: 'storage',
         // レイアウト: 列に基づいてX、行に基づいてY
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
-        data: { label: key, type: 'fs', count: getCount(host, path) },
+        data: { label: getLabel(host, path), type: 'fs', count: getCount(host, path) },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
@@ -128,8 +150,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         if (!targetNode) return;
 
         const id = `process-gen-${job.id}`;
-        // ターゲットノードの左側に配置
-        // 複数のジョブが同じソースを指す場合の重なりを避けるため、Yを少しずらす
         const sameTargetJobs = dataSource.jobs.filter(j => j.dataSourceId === job.dataSourceId && j.enabled);
         const jobIndex = sameTargetJobs.findIndex(j => j.id === job.id);
         const yOffset = (jobIndex - (sameTargetJobs.length - 1) / 2) * 80;
@@ -154,14 +174,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
         if (!srcNode || !tgtNode) return;
 
-        // 中間位置を計算
-        // srcとtgtが同じ場合、またはtgtがsrcの「後ろ」にある場合、表示がおかしくなる可能性があります。
-        // 基本的に左から右へのフローを想定しています。
         const mx = (srcNode.position.x + tgtNode.position.x) / 2;
-
-        // 重複するジョブラインを分離するためにYを少しずらす
-        // 複数のジョブが同じノード、または近いノードを接続する場合、それらを分離したい。
-        // 単純なヒューリスティック: 平均Y + ジョブインデックスに基づくオフセット。
         const my = (srcNode.position.y + tgtNode.position.y) / 2 + (indexOffset * 40) - 20;
 
         calculatedNodes.push({
@@ -178,26 +191,42 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     // 収集ジョブ
     collection.jobs.forEach((job, i) => {
         if (!job.enabled) return;
+
+        let targetHost = job.targetHost;
+        let targetPath = job.targetPath;
+        if (job.targetType === 'topic' && job.targetTopicId) {
+            targetHost = 'localhost';
+            targetPath = `/topics/${job.targetTopicId}`;
+        }
+
         addProcessNode(
             `process-col-${job.id}`,
             job.name,
             job.sourceHost,
             job.sourcePath,
-            job.targetHost,
-            job.targetPath,
+            targetHost,
+            targetPath,
             activeSteps.includes(`transfer_1_${job.id}`),
-            i % 3 // わずかなジッターサイクル
+            i % 3
         );
     });
 
     // 配信ジョブ
     delivery.jobs.forEach((job, i) => {
         if (!job.enabled) return;
+
+        let sourceHost = job.sourceHost;
+        let sourcePath = job.sourcePath;
+        if (job.sourceType === 'topic' && job.sourceTopicId) {
+            sourceHost = 'localhost';
+            sourcePath = `/topics/${job.sourceTopicId}`;
+        }
+
         addProcessNode(
             `process-del-${job.id}`,
             job.name,
-            job.sourceHost,
-            job.sourcePath,
+            sourceHost,
+            sourcePath,
             job.targetHost,
             job.targetPath,
             activeSteps.includes(`transfer_2_${job.id}`),
@@ -210,7 +239,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     if (etlSourceNode) {
          // ETLプロセスノード
          const etlId = 'process-etl';
-         // ソースノードの右側に配置
          const startX = etlSourceNode.position.x + 300;
          const startY = etlSourceNode.position.y;
 
@@ -277,7 +305,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     setEdges(calculatedEdges);
 
-  }, [dataSource, collection, delivery, etl, listFiles, select, activeSteps, getCount, setNodes, setEdges]);
+  }, [dataSource, collection, delivery, etl, topics, listFiles, select, activeSteps, getCount, setNodes, setEdges]);
 
   const onLayout = useCallback(() => {
     const dagreGraph = new dagre.graphlib.Graph();
