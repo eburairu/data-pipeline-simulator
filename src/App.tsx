@@ -47,7 +47,9 @@ const calculateProcessingTime = (content: string, bandwidth: number, latency: nu
 };
 
 const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, processedFilesRef }) => {
-  const [isRunning, setIsRunning] = useState(false);
+  const [isGeneratorRunning, setIsGeneratorRunning] = useState(false);
+  const [isTransferRunning, setIsTransferRunning] = useState(false);
+  const [isMappingRunning, setIsMappingRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [dbViewMode, setDbViewMode] = useState<'text' | 'table'>('text');
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
@@ -101,7 +103,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
   // 1. Data Source Generation
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isGeneratorRunning) return;
     const timers: ReturnType<typeof setInterval>[] = [];
 
     dataSource.jobs.forEach(job => {
@@ -120,10 +122,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
 
     return () => timers.forEach(clearInterval);
-  }, [isRunning, dataSource.jobs, dataSource.definitions, writeFile]);
+  }, [isGeneratorRunning, dataSource.jobs, dataSource.definitions, writeFile]);
 
   // 2. Collection
   useEffect(() => {
+    if (!isTransferRunning) return; // Only run when simulation is active
+
     const timers: ReturnType<typeof setInterval>[] = [];
 
     collection.jobs.forEach(job => {
@@ -201,10 +205,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
 
     return () => timers.forEach(clearInterval);
-  }, [collection.jobs, collection.processingTime, moveFile, toggleStep]);
+  }, [isTransferRunning, collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile]);
 
   // 3. Delivery
   useEffect(() => {
+    if (!isTransferRunning) return; // Only run when simulation is active
+
     const timers: ReturnType<typeof setInterval>[] = [];
 
     delivery.jobs.forEach(job => {
@@ -283,11 +289,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       timers.push(timer);
     });
     return () => timers.forEach(clearInterval);
-  }, [delivery.jobs, moveFile, writeFile, toggleStep]);
+  }, [isTransferRunning, delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef]);
 
   // 6. Topic Retention
   useEffect(() => {
-    if (!isRunning) return;
+    const anyRunning = isGeneratorRunning || isTransferRunning || isMappingRunning;
+    if (!anyRunning) return;
 
     const interval = setInterval(() => {
       topics.forEach(topic => {
@@ -302,11 +309,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, topics, deleteFile]);
+  }, [isGeneratorRunning, isTransferRunning, isMappingRunning, topics, deleteFile]);
 
   // 7. Mapping Tasks Execution
   useEffect(() => {
-    if (!isRunning) return; // Only run when simulation is active
+    if (!isMappingRunning) return; // Only run when simulation is active
 
     const timers: ReturnType<typeof setInterval>[] = [];
 
@@ -394,7 +401,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
 
     return () => timers.forEach(clearInterval);
-  }, [isRunning, mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile]);
+  }, [isMappingRunning, mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile]);
 
   const handleCreateSourceFile = () => {
     dataSource.jobs.forEach(job => {
@@ -470,20 +477,62 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       )}
 
       <div className="flex gap-2 flex-wrap">
+        {/* All Start/Stop */}
         <button
-          onClick={() => setIsRunning(!isRunning)}
-          className={`flex items-center gap-2 px-4 py-2 rounded transition-colors w-full sm:w-auto ${isRunning
-            ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
-            : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
+          onClick={() => {
+            const allRunning = isGeneratorRunning && isTransferRunning && isMappingRunning;
+            setIsGeneratorRunning(!allRunning);
+            setIsTransferRunning(!allRunning);
+            setIsMappingRunning(!allRunning);
+          }}
+          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-sm ${isGeneratorRunning && isTransferRunning && isMappingRunning
+              ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
+              : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
             }`}
         >
-          {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          {isRunning ? 'Stop Auto-Run' : 'Start Auto-Run'}
+          {isGeneratorRunning && isTransferRunning && isMappingRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+          All
+        </button>
+
+        {/* Generator Toggle */}
+        <button
+          onClick={() => setIsGeneratorRunning(!isGeneratorRunning)}
+          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-sm ${isGeneratorRunning
+              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-200'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+            }`}
+        >
+          {isGeneratorRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          Generate
+        </button>
+
+        {/* Transfer Toggle */}
+        <button
+          onClick={() => setIsTransferRunning(!isTransferRunning)}
+          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-sm ${isTransferRunning
+              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+            }`}
+        >
+          {isTransferRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          Transfer
+        </button>
+
+        {/* Mapping Toggle */}
+        <button
+          onClick={() => setIsMappingRunning(!isMappingRunning)}
+          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-sm ${isMappingRunning
+              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-200'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+            }`}
+        >
+          {isMappingRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          Mapping
         </button>
 
         <button
           onClick={handleCreateSourceFile}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors w-full sm:w-auto"
+          className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
         >
           <FilePlus className="w-4 h-4" />
           Create Source File
@@ -717,8 +766,8 @@ const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
           </div>
           {saveMessage && (
             <div className={`mb-4 p-3 rounded border text-sm ${saveMessage.type === 'success'
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-red-50 border-red-200 text-red-700'
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : 'bg-red-50 border-red-200 text-red-700'
               }`}>
               {saveMessage.text}
             </div>

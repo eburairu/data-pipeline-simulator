@@ -41,7 +41,7 @@ export const processTemplate = (template: string, context: TemplateContext): str
         }
         // Default format if none specified: YYYYMMDDHHmmss
         // This is safe for filenames.
-        return formatDate(context.timestamp, 'YYYYMMDDHHmmss');
+        return formatDate(context.timestamp, 'YYYYMMDDHHmmssSSS');
       default:
         // Return original string if variable not recognized
         return `\${${content}}`;
