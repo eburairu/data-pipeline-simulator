@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FileSystemProvider, useFileSystem } from './lib/VirtualFileSystem';
+import { FileSystemProvider, useFileSystem, type VFile } from './lib/VirtualFileSystem';
 import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import { SettingsProvider, useSettings } from './lib/SettingsContext';
 import PipelineFlow from './components/PipelineFlow';
@@ -16,7 +16,33 @@ import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle } from 'lucide
 interface SimulationControlProps {
   activeSteps: string[];
   setActiveSteps: React.Dispatch<React.SetStateAction<string[]>>;
+  processedFilesRef: React.MutableRefObject<Set<string>>;
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+const StorageView = React.memo(({ name, host, path, type, files }: { name?: string, host: string, path: string, type: string, files: VFile[] }) => {
+  const colorClass = type === 'source' ? 'text-green-600' :
+    type === 'topic' ? 'text-purple-600' :
+      type === 'incoming' ? 'text-orange-600' : 'text-blue-600';
+
+  const displayPath = type === 'topic' ? '(Topic)' : `${host}:${path}`;
+  const title = name ? name : displayPath;
+
+  return (
+    <div className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm h-full flex flex-col">
+      <div className="font-semibold text-gray-700 mb-1 flex justify-between items-center" title={`${host}:${path}`}>
+        <span className="truncate mr-2">{title}</span>
+        {name && <span className="text-gray-400 font-normal text-[10px] truncate max-w-[50%]">{displayPath}</span>}
+      </div>
+      <ul className="space-y-1 h-24 overflow-y-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow">
+        {files.map(f => (
+          <li key={f.name} className={`${colorClass} truncate text-[11px] font-mono`}>{f.name}</li>
+        ))}
+        {files.length === 0 && <span className="text-gray-400 italic text-[10px] pl-1">Empty</span>}
+      </ul>
+    </div>
+  );
+});
 
 const calculateProcessingTime = (content: string, bandwidth: number, latency: number) => {
   // 帯域幅: 1秒あたりの文字数
@@ -28,7 +54,7 @@ const calculateProcessingTime = (content: string, bandwidth: number, latency: nu
   return transferTime + latency;
 };
 
-const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps }) => {
+const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, processedFilesRef }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
@@ -55,9 +81,6 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
 
   // ファイルロック (排他制御用)
   const fileLocks = useRef<Set<string>>(new Set());
-
-  // Delivery Jobの処理済みファイル記録 (Topic Subscription用)
-  const processedFilesRef = useRef<Set<string>>(new Set());
 
   const getFileLockKey = useCallback((host: string, path: string, fileName: string) => {
     return `${host}:${path}/${fileName}`;
@@ -403,6 +426,41 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
     }
   };
 
+  const sourceStorages = dataSource.definitions.map(d => ({
+    name: d.name,
+    host: d.host,
+    path: d.path,
+    type: 'source'
+  }));
+
+  const topicStorages = topics.map(t => ({
+    name: t.name,
+    host: 'localhost',
+    path: `/topics/${t.id}`,
+    type: 'topic'
+  }));
+
+  const incomingPaths = new Set<string>();
+  const incomingStorages: { name?: string, host: string, path: string, type: 'incoming' }[] = [];
+  collection.jobs.forEach(job => {
+    if (job.targetType === 'topic') return;
+    const key = `${job.targetHost}:${job.targetPath}`;
+    if (!incomingPaths.has(key)) {
+      incomingPaths.add(key);
+      incomingStorages.push({ host: job.targetHost, path: job.targetPath, type: 'incoming' });
+    }
+  });
+
+  const internalPaths = new Set<string>();
+  const internalStorages: { name?: string, host: string, path: string, type: 'internal' }[] = [];
+  delivery.jobs.forEach(job => {
+    const key = `${job.targetHost}:${job.targetPath}`;
+    if (!internalPaths.has(key)) {
+      internalPaths.add(key);
+      internalStorages.push({ host: job.targetHost, path: job.targetPath, type: 'internal' });
+    }
+  });
+
   const dbRaw = select(etl.rawTableName);
   const dbSummary = select(etl.summaryTableName);
 
@@ -413,23 +471,22 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
       </h2>
 
       {errors.length > 0 && (
-         <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-sm flex flex-col gap-1">
-            <div className="font-bold flex items-center gap-1"><AlertTriangle size={14}/> Errors Detected:</div>
-            <ul className="list-disc list-inside">
-              {errors.map((e, i) => <li key={i}>{e}</li>)}
-            </ul>
-            <button onClick={() => setErrors([])} className="text-xs text-red-500 hover:underline self-end">Clear</button>
-         </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-sm flex flex-col gap-1">
+          <div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /> Errors Detected:</div>
+          <ul className="list-disc list-inside">
+            {errors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+          <button onClick={() => setErrors([])} className="text-xs text-red-500 hover:underline self-end">Clear</button>
+        </div>
       )}
 
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setIsRunning(!isRunning)}
-          className={`flex items-center gap-2 px-4 py-2 rounded transition-colors w-full sm:w-auto ${
-            isRunning
+          className={`flex items-center gap-2 px-4 py-2 rounded transition-colors w-full sm:w-auto ${isRunning
               ? 'bg-red-100 text-red-700 hover:bg-red-200 border border-red-200'
               : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
-          }`}
+            }`}
         >
           {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           {isRunning ? 'Stop Auto-Run' : 'Start Auto-Run'}
@@ -444,86 +501,90 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps })
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-        {/* ソースファイル (Definitionごとにグループ化) */}
-        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
-           <h3 className="font-bold border-b text-gray-700">Sources</h3>
-           {dataSource.definitions.map(def => (
-              <div key={def.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{def.name} ({def.host}:{def.path})</div>
-                 <ul className="pl-2">
-                   {safeListFiles(def.host, def.path).map(f => (
-                     <li key={f.name} className="text-green-600 truncate">{f.name}</li>
-                   ))}
-                   {safeListFiles(def.host, def.path).length === 0 && <span className="text-gray-400 italic">Empty</span>}
-                 </ul>
-              </div>
-           ))}
-        </div>
-
-        {/* Topic Files */}
-        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
-           <h3 className="font-bold border-b text-gray-700">Topics (Hub)</h3>
-           {topics.map(topic => (
-              <div key={topic.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{topic.name}</div>
-                 <ul className="pl-2">
-                   {safeListFiles('localhost', `/topics/${topic.id}`).map(f => (
-                     <li key={f.name} className="text-purple-600 truncate">{f.name}</li>
-                   ))}
-                   {safeListFiles('localhost', `/topics/${topic.id}`).length === 0 && <span className="text-gray-400 italic">Empty</span>}
-                 </ul>
-              </div>
-           ))}
-        </div>
-
-        {/* 収集/受信ファイル (Collectionジョブごとにグループ化) */}
-        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
-            <h3 className="font-bold border-b text-gray-700">Collection / Incoming</h3>
-            {collection.jobs.map(job => (
-              <div key={job.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{job.name} → {job.targetHost}:{job.targetPath}</div>
-                 <ul className="pl-2">
-                   {safeListFiles(job.targetHost, job.targetPath).map(f => (
-                     <li key={f.name} className="text-orange-600 truncate">{f.name}</li>
-                   ))}
-                   {safeListFiles(job.targetHost, job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
-                 </ul>
-              </div>
+      <div className="space-y-4">
+        {/* Source Storages */}
+        <div className="border p-3 rounded bg-gray-50">
+          <h3 className="font-bold border-b mb-3 text-gray-700 flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            Source Storages
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {sourceStorages.map(s => (
+              <StorageView
+                key={`${s.host}:${s.path}`}
+                {...s}
+                files={safeListFiles(s.host, s.path)}
+              />
             ))}
+            {sourceStorages.length === 0 && <span className="text-gray-400 italic text-xs">No source storages configured</span>}
+          </div>
         </div>
 
-        {/* 配信/内部ファイル (Deliveryジョブごとにグループ化) */}
-        <div className="border p-2 rounded bg-gray-50 flex flex-col gap-2">
-            <h3 className="font-bold border-b text-gray-700">Delivery / Internal</h3>
-            {delivery.jobs.map(job => (
-              <div key={job.id} className="text-xs">
-                 <div className="font-semibold text-gray-600">{job.name} → {job.targetHost}:{job.targetPath}</div>
-                 <ul className="pl-2">
-                   {safeListFiles(job.targetHost, job.targetPath).map(f => (
-                     <li key={f.name} className="text-blue-600 truncate">{f.name}</li>
-                   ))}
-                   {safeListFiles(job.targetHost, job.targetPath).length === 0 && <span className="text-gray-400 italic">Empty</span>}
-                 </ul>
-              </div>
+        {/* Intermediate Storages (Topics & Incoming) */}
+        <div className="border p-3 rounded bg-gray-50">
+          <h3 className="font-bold border-b mb-3 text-gray-700 flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+            Intermediate Storages (Topics & Incoming)
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {topicStorages.map(s => (
+              <StorageView
+                key={`topic-${s.name}`}
+                {...s}
+                files={safeListFiles(s.host, s.path)}
+              />
             ))}
+            {incomingStorages.map(s => (
+              <StorageView
+                key={`${s.host}:${s.path}`}
+                {...s}
+                files={safeListFiles(s.host, s.path)}
+              />
+            ))}
+            {topicStorages.length === 0 && incomingStorages.length === 0 && <span className="text-gray-400 italic text-xs">No intermediate storages</span>}
+          </div>
         </div>
-      </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-4">
-        <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700">DB: {etl.rawTableName} (From: {etl.sourceHost}:{etl.sourcePath})</h3>
-          <ul className="space-y-1 h-32 overflow-y-auto">
-            {dbRaw.length === 0 && <li className="text-gray-400 italic">No records</li>}
-            {dbRaw.map(r => <li key={r.id} className="truncate">{JSON.stringify(r.data)}</li>)}
-          </ul>
+        {/* Internal Storages */}
+        <div className="border p-3 rounded bg-gray-50">
+          <h3 className="font-bold border-b mb-3 text-gray-700 flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            Internal Storages
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            {internalStorages.map(s => (
+              <StorageView
+                key={`${s.host}:${s.path}`}
+                {...s}
+                files={safeListFiles(s.host, s.path)}
+              />
+            ))}
+            {internalStorages.length === 0 && <span className="text-gray-400 italic text-xs">No internal storages</span>}
+          </div>
         </div>
-        <div className="border p-2 rounded bg-gray-50">
-          <h3 className="font-bold border-b mb-2 text-gray-700">DB: {etl.summaryTableName}</h3>
-          <ul className="space-y-1 h-32 overflow-y-auto">
-             {dbSummary.length === 0 && <li className="text-gray-400 italic">No records</li>}
-            {dbSummary.map(r => <li key={r.id} className="truncate">{JSON.stringify(r.data)}</li>)}
-          </ul>
+
+        {/* Database Status */}
+        <div className="border p-3 rounded bg-gray-50">
+           <h3 className="font-bold border-b mb-3 text-gray-700 flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-gray-600"></span>
+            Database Status
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
+              <h4 className="font-semibold text-gray-700 mb-1 truncate" title={`Raw: ${etl.rawTableName}`}>Raw: {etl.rawTableName}</h4>
+              <ul className="space-y-1 h-32 overflow-y-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow">
+                {dbRaw.length === 0 && <li className="text-gray-400 italic text-[10px]">No records</li>}
+                {dbRaw.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
+              </ul>
+            </div>
+            <div className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
+              <h4 className="font-semibold text-gray-700 mb-1 truncate" title={`Summary: ${etl.summaryTableName}`}>Summary: {etl.summaryTableName}</h4>
+               <ul className="space-y-1 h-32 overflow-y-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow">
+                {dbSummary.length === 0 && <li className="text-gray-400 italic text-[10px]">No records</li>}
+                {dbSummary.map(r => <li key={r.id} className="truncate text-[11px] font-mono">{JSON.stringify(r.data)}</li>)}
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -545,7 +606,11 @@ const SettingsPanel = () => {
   );
 };
 
-const Dashboard = () => {
+interface DashboardProps {
+  processedFilesRef: React.MutableRefObject<Set<string>>;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
   const [activeSteps, setActiveSteps] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'simulation' | 'settings'>('simulation');
   const { saveSettings } = useSettings();
@@ -590,7 +655,11 @@ const Dashboard = () => {
       {activeTab === 'simulation' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
           <div className="flex flex-col gap-4">
-            <SimulationControl activeSteps={activeSteps} setActiveSteps={setActiveSteps} />
+            <SimulationControl
+              activeSteps={activeSteps}
+              setActiveSteps={setActiveSteps}
+              processedFilesRef={processedFilesRef}
+            />
           </div>
           <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
              <PipelineFlow activeSteps={activeSteps} />
@@ -626,11 +695,13 @@ const Dashboard = () => {
 };
 
 function App() {
+  const processedFilesRef = useRef<Set<string>>(new Set());
+
   return (
     <SettingsProvider>
       <VirtualDBProvider>
         <FileSystemProvider>
-          <Dashboard />
+          <Dashboard processedFilesRef={processedFilesRef} />
         </FileSystemProvider>
       </VirtualDBProvider>
     </SettingsProvider>
