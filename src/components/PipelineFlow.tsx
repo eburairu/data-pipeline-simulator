@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react';
-import ReactFlow, { type Node, type Edge, Background, Controls, Position } from 'reactflow';
+import React, { useEffect, useCallback, useState } from 'react';
+import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
+import dagre from 'dagre';
+import { LayoutGrid } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
-import { useSettings } from '../lib/SettingsContext';
+import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
+import { type SourceConfig, type TargetConfig } from '../lib/MappingTypes';
 import StorageNode from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
 
@@ -19,222 +22,385 @@ interface PipelineFlowProps {
 const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl } = useSettings();
+  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections } = useSettings();
 
-  // 安全にカウントを取得するヘルパー
-  const getCount = (host: string, path: string) => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+
+  const getCount = useCallback((conn: ConnectionDefinition) => {
+    try {
+      if (conn.type === 'file') {
+        return listFiles(conn.host!, conn.path!).length;
+      } else if (conn.type === 'database') {
+        return select(conn.tableName!).length;
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  }, [listFiles, select]);
+
+  // Legacy helper for host/path based counting
+  const getLegacyCount = useCallback((host: string, path: string) => {
     try {
       return listFiles(host, path).length;
     } catch {
       return 0;
     }
-  };
+  }, [listFiles]);
 
-  const { nodes, edges } = useMemo(() => {
-    const nodes: Node[] = [];
-    const edges: Edge[] = [];
-    const keyNodeMap = new Map<string, Node>(); // キー (host:path) -> Node
+  useEffect(() => {
+    const calculatedNodes: Node[] = [];
+    const calculatedEdges: Edge[] = [];
+    const keyNodeMap = new Map<string, Node>();
 
-    const getKey = (host: string, path: string) => `${host}:${path}`;
-    const parseKey = (key: string) => {
-        const sepIndex = key.indexOf(':');
-        return {
-            host: key.substring(0, sepIndex),
-            path: key.substring(sepIndex + 1)
-        };
+    // Helper to generate keys
+    const getLegacyKey = (host: string, path: string) => `legacy:${host}:${path}`;
+    const getConnectionKey = (conn: ConnectionDefinition) => {
+      if (conn.type === 'file') return `legacy:${conn.host}:${conn.path}`; // Reuse legacy format to merge nodes
+      return `db:${conn.tableName}`;
     };
 
-    // --- 1. ユニークなパスを特定してストレージノードを作成 ---
+    const addLegacyStorageNode = (host: string, path: string, colIndex: number, rowIndex: number) => {
+      const key = getLegacyKey(host, path);
+      if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
 
-    // 各「ステージ」のキーを収集
-    // ステージ 0: データソースのキー
-    const sourceKeys = Array.from(new Set(dataSource.jobs.map(j => getKey(j.host, j.sourcePath))));
+      let label = `${host}:${path}`;
+      if (host === 'localhost' && path.startsWith('/topics/')) {
+        const topicId = path.split('/')[2];
+        const topic = topics.find(t => t.id === topicId);
+        if (topic) label = `Topic: ${topic.name}`;
+      }
 
-    // ステージ 1: 受信キー (Collectionのターゲット)
-    const incomingKeys = Array.from(new Set(collection.jobs.map(j => getKey(j.targetHost, j.targetPath))));
+      const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+      const node: Node = {
+        id,
+        type: 'storage',
+        position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
+        data: { label, type: 'fs', count: getLegacyCount(host, path) },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      };
+      calculatedNodes.push(node);
+      keyNodeMap.set(key, node);
+      return node;
+    };
 
-    // ステージ 2: 内部キー (Deliveryのターゲット)
-    const internalKeys = Array.from(new Set(delivery.jobs.map(j => getKey(j.targetHost, j.targetPath))));
-
-    const addStorageNode = (host: string, path: string, colIndex: number, rowIndex: number) => {
-      const key = getKey(host, path);
+    const addConnectionStorageNode = (conn: ConnectionDefinition, colIndex: number = 0, rowIndex: number = 0) => {
+      const key = getConnectionKey(conn);
       if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
 
       const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
       const node: Node = {
         id,
         type: 'storage',
-        // レイアウト: 列に基づいてX、行に基づいてY
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
-        data: { label: key, type: 'fs', count: getCount(host, path) },
+        data: {
+          label: conn.type === 'database' ? `DB: ${conn.tableName}` : `${conn.host}:${conn.path}`,
+          type: conn.type === 'database' ? 'db' : 'fs',
+          count: getCount(conn)
+        },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
-      nodes.push(node);
+      calculatedNodes.push(node);
       keyNodeMap.set(key, node);
       return node;
     };
 
-    // ノードの配置
-    // 列 0: ソース
+
+    // --- 1. Render Legacy Pipeline (Data Source, Collection, Delivery) ---
+    // (Keeping this for compatibility with existing UI)
+
+    const sourceKeys = Array.from(new Set(dataSource.definitions.map(d => getLegacyKey(d.host, d.path))));
     sourceKeys.forEach((key, i) => {
-        const { host, path } = parseKey(key);
-        addStorageNode(host, path, 0, i);
+      const parts = key.split(':');
+      addLegacyStorageNode(parts[1], parts[2], 1, i);
     });
 
-    // 列 1: 受信
-    let incomingRow = 0;
-    incomingKeys.forEach((key) => {
-        if (!keyNodeMap.has(key)) {
-            const { host, path } = parseKey(key);
-            addStorageNode(host, path, 1, incomingRow++);
+    // Collection/Delivery targets
+    const otherKeys = new Set<string>();
+    collection.jobs.forEach(j => {
+      if (j.targetType === 'topic' && j.targetTopicId) otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
+      else otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
+    });
+    delivery.jobs.forEach(j => {
+      otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
+    });
+
+    let rowIndex = 0;
+    otherKeys.forEach(key => {
+      const parts = key.split(':');
+      if (!keyNodeMap.has(key)) {
+        addLegacyStorageNode(parts[1], parts[2], 2, rowIndex++);
+      }
+    });
+
+    // Legacy Process Nodes
+    dataSource.jobs.forEach((job) => {
+      if (!job.enabled) return;
+      const def = dataSource.definitions.find(d => d.id === job.dataSourceId);
+      if (!def) return;
+      const targetNode = keyNodeMap.get(getLegacyKey(def.host, def.path));
+      if (!targetNode) return;
+
+      const id = `process-gen-${job.id}`;
+      calculatedNodes.push({
+        id, type: 'process',
+        position: { x: targetNode.position.x - 250, y: targetNode.position.y },
+        data: { label: job.name, isProcessing: false },
+      });
+      calculatedEdges.push({ id: `e-${id}-${targetNode.id}`, source: id, target: targetNode.id, animated: true });
+    });
+
+    collection.jobs.forEach((job) => {
+      if (!job.enabled) return;
+      let targetHost = job.targetHost, targetPath = job.targetPath;
+      if (job.targetType === 'topic' && job.targetTopicId) { targetHost = 'localhost'; targetPath = `/topics/${job.targetTopicId}`; }
+
+      const srcNode = keyNodeMap.get(getLegacyKey(job.sourceHost, job.sourcePath));
+      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
+      if (srcNode && tgtNode) {
+        const id = `process-col-${job.id}`;
+        calculatedNodes.push({
+          id, type: 'process',
+          position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
+          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_1_${job.id}`) }
+        });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+      }
+    });
+
+    delivery.jobs.forEach((job) => {
+      if (!job.enabled) return;
+      let sourceHost = job.sourceHost, sourcePath = job.sourcePath;
+      if (job.sourceType === 'topic' && job.sourceTopicId) { sourceHost = 'localhost'; sourcePath = `/topics/${job.sourceTopicId}`; }
+
+      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
+      const tgtNode = keyNodeMap.get(getLegacyKey(job.targetHost, job.targetPath));
+      if (srcNode && tgtNode) {
+        const id = `process-del-${job.id}`;
+        calculatedNodes.push({
+          id, type: 'process',
+          position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
+          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_2_${job.id}`) }
+        });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+      }
+    });
+
+
+    // --- 2. Render Mapping Tasks (IDMC) ---
+
+    // We try to place them to the right of existing nodes if possible, or new rows.
+    let taskRowIndex = 0;
+    const TASK_START_X = 600; // Start placing mapping stuff further right?
+
+    mappingTasks.forEach(task => {
+      if (!task.enabled) return;
+      const mapping = mappings.find(m => m.id === task.mappingId);
+      if (!mapping) return;
+
+      const taskId = `process-task-${task.id}`;
+
+      // Find Connections
+      const sources = mapping.transformations.filter(t => t.type === 'source');
+      const targets = mapping.transformations.filter(t => t.type === 'target');
+
+      const sourceNodes: Node[] = [];
+      const targetNodes: Node[] = [];
+
+      sources.forEach(src => {
+        const conf = src.config as SourceConfig;
+        const conn = connections.find(c => c.id === conf.connectionId);
+        if (conn) {
+          // Determine layout hint: if it's a file connection that might already exist from legacy, it will be reused.
+          // If it's a DB, it's new.
+          const node = addConnectionStorageNode(conn, 3, taskRowIndex);
+          sourceNodes.push(node);
         }
-    });
+      });
 
-    // 列 2: 内部
-    let internalRow = 0;
-    internalKeys.forEach((key) => {
-        if (!keyNodeMap.has(key)) {
-            const { host, path } = parseKey(key);
-            addStorageNode(host, path, 2, internalRow++);
+      targets.forEach(tgt => {
+        const conf = tgt.config as TargetConfig;
+        const conn = connections.find(c => c.id === conf.connectionId);
+        if (conn) {
+          const node = addConnectionStorageNode(conn, 5, taskRowIndex);
+          targetNodes.push(node);
         }
+      });
+
+      // Place Task Node
+      // Average Y of inputs and outputs
+      const allConnectedNodes = [...sourceNodes, ...targetNodes];
+      let avgY = 0;
+      if (allConnectedNodes.length > 0) {
+        avgY = allConnectedNodes.reduce((sum, n) => sum + n.position.y, 0) / allConnectedNodes.length;
+      } else {
+        avgY = 50 + taskRowIndex * 150;
+      }
+
+      // If we reused nodes, avgY might be weird. Let's just create the task node and let Dagre fix layout.
+      calculatedNodes.push({
+        id: taskId,
+        type: 'process',
+        position: { x: TASK_START_X + 200, y: avgY },
+        data: { label: task.name, isProcessing: activeSteps.includes(`mapping_task_${task.id}`) }
+      });
+
+      // Edges
+      sourceNodes.forEach(src => {
+        calculatedEdges.push({ id: `e-${src.id}-${taskId}`, source: src.id, target: taskId, animated: true });
+      });
+      targetNodes.forEach(tgt => {
+        calculatedEdges.push({ id: `e-${taskId}-${tgt.id}`, source: taskId, target: tgt.id, animated: true });
+      });
+
+      taskRowIndex++;
     });
 
-    // ETLソースパスが存在することを確認 (ない場合は列2の下部に配置)
-    const etlKey = getKey(etl.sourceHost, etl.sourcePath);
-    if (!keyNodeMap.has(etlKey)) {
-        addStorageNode(etl.sourceHost, etl.sourcePath, 2, internalRow++);
-    }
+
+    // --- Legacy ETL (Disabled visual) ---
+    // (Old ETL visualization code removed)
 
 
-    // --- 2. プロセスノードとエッジの作成 ---
+    // Preserve positions of existing nodes to prevent jitter
+    setNodes((prevNodes) => {
+      const prevNodeMap = new Map(prevNodes.map(n => [n.id, n]));
+      return calculatedNodes.map(n => {
+        const prev = prevNodeMap.get(n.id);
+        if (prev) {
+          return {
+            ...n,
+            position: prev.position,
+            width: prev.width,
+            height: prev.height,
+            selected: prev.selected,
+            dragging: prev.dragging,
+          };
+        }
+        return n;
+      });
+    });
 
-    // 2つのストレージノード間にプロセスノードを追加するヘルパー
-    const addProcessNode = (id: string, label: string, srcHost: string, srcPath: string, tgtHost: string, tgtPath: string, isProcessing: boolean, indexOffset: number) => {
-        const srcKey = getKey(srcHost, srcPath);
-        const tgtKey = getKey(tgtHost, tgtPath);
+    setEdges(calculatedEdges);
 
-        const srcNode = keyNodeMap.get(srcKey);
-        const tgtNode = keyNodeMap.get(tgtKey);
+  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
 
-        if (!srcNode || !tgtNode) return;
+  // Auto-align nodes when the flow is initialized
+  const [hasAutoAligned, setHasAutoAligned] = useState(false);
+  useEffect(() => {
+    if (rfInstance && nodes.length > 0 && edges.length > 0 && !hasAutoAligned) {
+      setHasAutoAligned(true);
+      // Delay to ensure nodes are rendered
+      window.requestAnimationFrame(() => {
+        const dagreGraph = new dagre.graphlib.Graph();
+        dagreGraph.setDefaultEdgeLabel(() => ({}));
+        dagreGraph.setGraph({ rankdir: 'LR' });
 
-        // 中間位置を計算
-        // srcとtgtが同じ場合、またはtgtがsrcの「後ろ」にある場合、表示がおかしくなる可能性があります。
-        // 基本的に左から右へのフローを想定しています。
-        const mx = (srcNode.position.x + tgtNode.position.x) / 2;
+        const getWidth = (node: Node) => (node.type === 'storage' ? 220 : 180);
+        const getHeight = (node: Node) => (node.type === 'storage' ? 120 : 80);
 
-        // 重複するジョブラインを分離するためにYを少しずらす
-        // 複数のジョブが同じノード、または近いノードを接続する場合、それらを分離したい。
-        // 単純なヒューリスティック: 平均Y + ジョブインデックスに基づくオフセット。
-        const my = (srcNode.position.y + tgtNode.position.y) / 2 + (indexOffset * 40) - 20;
-
-        nodes.push({
-            id,
-            type: 'process',
-            position: { x: mx, y: my },
-            data: { label, isProcessing },
+        nodes.forEach((node) => {
+          dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
+        });
+        edges.forEach((edge) => {
+          dagreGraph.setEdge(edge.source, edge.target);
         });
 
-        edges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-        edges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
-    };
+        dagre.layout(dagreGraph);
 
-    // 収集ジョブ
-    collection.jobs.forEach((job, i) => {
-        if (!job.enabled) return;
-        addProcessNode(
-            `process-col-${job.id}`,
-            job.name,
-            job.sourceHost,
-            job.sourcePath,
-            job.targetHost,
-            job.targetPath,
-            activeSteps.includes(`transfer_1_${job.id}`),
-            i % 3 // わずかなジッターサイクル
-        );
-    });
+        const layoutedNodes = nodes.map((node) => {
+          const nodeWithPosition = dagreGraph.node(node.id);
+          return {
+            ...node,
+            targetPosition: Position.Left,
+            sourcePosition: Position.Right,
+            width: getWidth(node),
+            height: getHeight(node),
+            position: {
+              x: nodeWithPosition.x - getWidth(node) / 2,
+              y: nodeWithPosition.y - getHeight(node) / 2,
+            },
+          };
+        });
 
-    // 配信ジョブ
-    delivery.jobs.forEach((job, i) => {
-        if (!job.enabled) return;
-        addProcessNode(
-            `process-del-${job.id}`,
-            job.name,
-            job.sourceHost,
-            job.sourcePath,
-            job.targetHost,
-            job.targetPath,
-            activeSteps.includes(`transfer_2_${job.id}`),
-            i % 3
-        );
-    });
-
-    // --- 3. ETLチェーン ---
-    const etlSourceNode = keyNodeMap.get(etlKey);
-    if (etlSourceNode) {
-         // ETLプロセスノード
-         const etlId = 'process-etl';
-         // ソースノードの右側に配置
-         const startX = etlSourceNode.position.x + 300;
-         const startY = etlSourceNode.position.y;
-
-         nodes.push({
-             id: etlId,
-             type: 'process',
-             position: { x: startX, y: startY },
-             data: { label: 'ETL', isProcessing: activeSteps.includes('process_etl') }
-         });
-         edges.push({ id: `e-${etlSourceNode.id}-${etlId}`, source: etlSourceNode.id, target: etlId, animated: true });
-
-         // Raw DB
-         const rawDbId = 'db-raw';
-         nodes.push({
-             id: rawDbId,
-             type: 'storage',
-             position: { x: startX + 200, y: startY },
-             data: { label: etl.rawTableName, type: 'db', count: select(etl.rawTableName).length },
-             sourcePosition: Position.Right,
-             targetPosition: Position.Left
-         });
-         edges.push({ id: `e-${etlId}-${rawDbId}`, source: etlId, target: rawDbId, animated: true });
-
-         // 変換プロセス
-         const transformId = 'process-transform';
-         nodes.push({
-             id: transformId,
-             type: 'process',
-             position: { x: startX + 400, y: startY },
-             data: { label: 'Transform', isProcessing: activeSteps.includes('process_transform') }
-         });
-         edges.push({ id: `e-${rawDbId}-${transformId}`, source: rawDbId, target: transformId, animated: true });
-
-         // Summary DB
-         const summaryDbId = 'db-summary';
-         nodes.push({
-             id: summaryDbId,
-             type: 'storage',
-             position: { x: startX + 600, y: startY },
-             data: { label: etl.summaryTableName, type: 'db', count: select(etl.summaryTableName).length },
-             targetPosition: Position.Left
-         });
-         edges.push({ id: `e-${transformId}-${summaryDbId}`, source: transformId, target: summaryDbId, animated: true });
+        setNodes(layoutedNodes);
+        rfInstance.fitView({ padding: 0.2, duration: 800 });
+      });
     }
+  }, [rfInstance, nodes, edges, hasAutoAligned, setNodes]);
 
-    return { nodes, edges };
-  }, [dataSource, collection, delivery, etl, listFiles, select, activeSteps]);
+  const onLayout = useCallback(() => {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+    const getWidth = (node: Node) => (node.type === 'storage' ? 220 : 180);
+    const getHeight = (node: Node) => (node.type === 'storage' ? 120 : 80);
+
+    dagreGraph.setGraph({ rankdir: 'LR' });
+
+    nodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
+    });
+
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      return {
+        ...node,
+        targetPosition: Position.Left,
+        sourcePosition: Position.Right,
+        width: getWidth(node),
+        height: getHeight(node),
+        position: {
+          x: nodeWithPosition.x - getWidth(node) / 2,
+          y: nodeWithPosition.y - getHeight(node) / 2,
+        },
+      };
+    });
+
+    setNodes(layoutedNodes);
+
+    if (rfInstance) {
+      window.requestAnimationFrame(() => {
+        rfInstance.fitView({ padding: 0.2, duration: 800 });
+      });
+    }
+  }, [nodes, edges, setNodes, rfInstance]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
+        onInit={setRfInstance}
         fitView
         attributionPosition="bottom-right"
       >
         <Background />
         <Controls />
+        <Panel position="top-right">
+          <button
+            onClick={onLayout}
+            className="flex items-center gap-2 bg-white px-3 py-2 rounded shadow border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 cursor-pointer"
+            title="Auto-align nodes"
+          >
+            <LayoutGrid size={16} />
+            Align Layout
+          </button>
+        </Panel>
       </ReactFlow>
     </div>
   );
