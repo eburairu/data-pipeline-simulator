@@ -40,6 +40,12 @@
 - ジョブ種別ごとの独立制御（生成/収集配信/マッピング）
 - 個別および一括開始・停止
 
+### FR7: 運用監視 (Job Monitoring)
+- 全ジョブ（Collection, Delivery, Mapping）の実行履歴を記録
+- ステータス（Success/Failed/Running）、処理時間、処理件数の可視化
+- エラー発生時の詳細メッセージ表示
+- ジョブ履歴のフィルタリングと閲覧機能
+
 ---
 
 ## User Scenarios
@@ -57,6 +63,12 @@
 3. マッピング設定を編集
 4. 「Mapping」を再開して処理確認
 
+### US3: 運用状況のモニタリング
+1. ユーザーが「Monitor」タブを開く
+2. 最近実行されたジョブの一覧とステータスを確認
+3. エラーになったジョブ（赤色表示）をクリックして詳細を確認
+4. 問題を特定し、設定を修正して再実行
+
 ---
 
 ## Success Criteria
@@ -65,6 +77,7 @@
 - ファイル処理状況がリアルタイムでUI反映
 - 各ジョブタイプを独立して制御可能
 - コンソールログで処理統計を確認可能
+- 実行履歴がUI上で確認でき、エラー特定が容易であること
 
 ---
 
@@ -85,6 +98,13 @@
 ### MappingTask
 - mappingId, executionInterval
 - enabled flag
+
+### JobExecutionLog
+- jobId, jobName, jobType
+- status (Success/Failed)
+- startTime, endTime
+- recordCount (input/output)
+- errorMessage
 
 ---
 
