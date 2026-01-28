@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileSystemProvider, useFileSystem, type VFile } from './lib/VirtualFileSystem';
 import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import { SettingsProvider, useSettings } from './lib/SettingsContext';
+import { JobMonitorProvider, useJobMonitor } from './lib/JobMonitorContext';
 import PipelineFlow from './components/PipelineFlow';
 import SettingsPanel from './components/settings/SettingsPanel';
+import JobMonitor from './components/JobMonitor';
 import { processTemplate } from './lib/templateUtils';
 import { executeMappingTaskRecursive, type ExecutionState } from './lib/MappingEngine';
 import 'reactflow/dist/style.css';
-import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3 } from 'lucide-react';
+import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3, MonitorPlay } from 'lucide-react';
 
 interface SimulationControlProps {
   activeSteps: string[];
@@ -55,6 +57,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select } = useVirtualDB();
   const { dataSource, collection, delivery, topics, mappings, mappingTasks, connections, tables } = useSettings();
+  const { addLog } = useJobMonitor();
 
   const listFilesRef = useRef(listFiles);
   const selectRef = useRef(select);
@@ -158,6 +161,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
           lockFile(job.sourceHost, job.sourcePath, file.name);
 
           toggleStep(`transfer_1_${job.id}`, true);
+          const startTime = Date.now();
 
           try {
             const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
@@ -183,10 +187,38 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
               moveFile(file.name, job.sourceHost, job.sourcePath, targetHost, targetPath, newFileName);
               setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
+
+              // Log Success
+              addLog({
+                jobId: job.id,
+                jobName: job.name,
+                jobType: 'collection',
+                status: 'success',
+                startTime: startTime,
+                endTime: Date.now(),
+                recordsInput: 1,
+                recordsOutput: 1,
+                details: `Moved ${file.name} to ${targetHost}:${targetPath}`
+              });
+
             } catch (e) {
+              const errMsg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
               setErrors(prev => {
-                const msg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
-                return prev.includes(msg) ? prev : [...prev, msg];
+                return prev.includes(errMsg) ? prev : [...prev, errMsg];
+              });
+
+              // Log Error
+              addLog({
+                jobId: job.id,
+                jobName: job.name,
+                jobType: 'collection',
+                status: 'failed',
+                startTime: startTime,
+                endTime: Date.now(),
+                recordsInput: 1,
+                recordsOutput: 0,
+                errorMessage: errMsg,
+                details: `File: ${file.name}`
               });
             }
           } finally {
@@ -205,7 +237,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
 
     return () => timers.forEach(clearInterval);
-  }, [isTransferRunning, collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile]);
+  }, [isTransferRunning, collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile, addLog]);
 
   // 3. Delivery
   useEffect(() => {
@@ -255,6 +287,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
           lockFile(sourceHost, sourcePath, file.name);
 
           toggleStep(`transfer_2_${job.id}`, true);
+          const startTime = Date.now();
 
           try {
             const processingTime = calculateProcessingTime(file.content, job.bandwidth, job.processingTime);
@@ -268,10 +301,38 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
                 moveFile(file.name, sourceHost, sourcePath, job.targetHost, job.targetPath);
               }
               setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
+
+              // Log Success
+              addLog({
+                jobId: job.id,
+                jobName: job.name,
+                jobType: 'delivery',
+                status: 'success',
+                startTime: startTime,
+                endTime: Date.now(),
+                recordsInput: 1,
+                recordsOutput: 1,
+                details: `Delivered ${file.name} to ${job.targetHost}:${job.targetPath}`
+              });
+
             } catch (e) {
+              const errMsg = `Delivery Job ${job.name}: Failed to move/copy to '${job.targetHost}:${job.targetPath}'`;
               setErrors(prev => {
-                const msg = `Delivery Job ${job.name}: Failed to move/copy to '${job.targetHost}:${job.targetPath}'`;
-                return prev.includes(msg) ? prev : [...prev, msg];
+                return prev.includes(errMsg) ? prev : [...prev, errMsg];
+              });
+
+              // Log Error
+              addLog({
+                jobId: job.id,
+                jobName: job.name,
+                jobType: 'delivery',
+                status: 'failed',
+                startTime: startTime,
+                endTime: Date.now(),
+                recordsInput: 1,
+                recordsOutput: 0,
+                errorMessage: errMsg,
+                details: `File: ${file.name}`
               });
             }
           } finally {
@@ -289,7 +350,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
       timers.push(timer);
     });
     return () => timers.forEach(clearInterval);
-  }, [isTransferRunning, delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef]);
+  }, [isTransferRunning, delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog]);
 
   // 6. Topic Retention
   useEffect(() => {
@@ -338,6 +399,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
         mappingLocks.current[task.id] = true;
         toggleStep(`mapping_task_${task.id}`, true);
+        const startTime = Date.now();
 
         try {
           if (!mappingStates.current[task.id]) {
@@ -371,14 +433,29 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
           mappingStates.current[task.id] = newState;
 
-          // Log execution stats for debugging
           const totalInput = Object.values(stats).reduce((acc, s) => acc + s.input, 0);
           const totalOutput = Object.values(stats).reduce((acc, s) => acc + s.output, 0);
+          const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
+
           if (totalInput > 0 || totalOutput > 0) {
             console.log(`[MappingTask] ${task.name}: input=${totalInput}, output=${totalOutput}`);
+
+            // Log Success
+            // We only log if something was actually processed to avoid spamming empty logs
+            addLog({
+              jobId: task.id,
+              jobName: task.name,
+              jobType: 'mapping',
+              status: totalErrors > 0 ? 'failed' : 'success',
+              startTime: startTime,
+              endTime: Date.now(),
+              recordsInput: totalInput, // This is sum of all node inputs, might want to refine to just source inputs
+              recordsOutput: totalOutput, // Similarly, this is sum of all outputs
+              details: `Processed via mapping ${mapping.name}`,
+              errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : undefined
+            });
           }
 
-          const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
           if (totalErrors > 0) {
             setErrors(prev => {
               const msg = `Task ${task.name}: ${totalErrors} errors`;
@@ -390,6 +467,20 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
 
         } catch (e) {
           console.error(`Task ${task.name} failed`, e);
+          const errMsg = e instanceof Error ? e.message : 'Unknown error';
+          addLog({
+            jobId: task.id,
+            jobName: task.name,
+            jobType: 'mapping',
+            status: 'failed',
+            startTime: startTime,
+            endTime: Date.now(),
+            recordsInput: 0,
+            recordsOutput: 0,
+            errorMessage: errMsg,
+            details: `Fatal error in mapping execution`
+          });
+
         } finally {
           // Short delay to show the active state
           await new Promise(res => setTimeout(res, 500));
@@ -401,7 +492,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ setActiveSteps, p
     });
 
     return () => timers.forEach(clearInterval);
-  }, [isMappingRunning, mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile]);
+  }, [isMappingRunning, mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile, addLog]);
 
   const handleCreateSourceFile = () => {
     dataSource.jobs.forEach(job => {
@@ -700,7 +791,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
   const [activeSteps, setActiveSteps] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'simulation' | 'settings'>('simulation');
+  const [activeTab, setActiveTab] = useState<'simulation' | 'settings' | 'monitor'>('simulation');
   const { saveSettings } = useSettings();
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -729,6 +820,13 @@ const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
             <Activity className="w-4 h-4" /> Simulation
           </button>
           <button
+            onClick={() => setActiveTab('monitor')}
+            className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${activeTab === 'monitor' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+          >
+            <MonitorPlay className="w-4 h-4" /> Monitor
+          </button>
+          <button
             onClick={() => setActiveTab('settings')}
             className={`px-4 py-2 rounded-md transition-colors flex items-center gap-2 ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
               }`}
@@ -738,20 +836,27 @@ const Dashboard: React.FC<DashboardProps> = ({ processedFilesRef }) => {
         </div>
       </div>
 
-      {activeTab === 'simulation' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-          <div className="flex flex-col gap-4">
-            <SimulationControl
-              activeSteps={activeSteps}
-              setActiveSteps={setActiveSteps}
-              processedFilesRef={processedFilesRef}
-            />
-          </div>
-          <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
-            <PipelineFlow activeSteps={activeSteps} />
-          </div>
+      {/* Simulation View - Always rendered to keep simulation running, hidden when not active */}
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 h-full ${activeTab === 'simulation' ? '' : 'hidden'}`}>
+        <div className="flex flex-col gap-4">
+          <SimulationControl
+            activeSteps={activeSteps}
+            setActiveSteps={setActiveSteps}
+            processedFilesRef={processedFilesRef}
+          />
         </div>
-      ) : (
+        <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
+          <PipelineFlow activeSteps={activeSteps} />
+        </div>
+      </div>
+
+      {activeTab === 'monitor' && (
+        <div className="h-[calc(100vh-140px)]">
+          <JobMonitor />
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
         <div className="bg-white rounded shadow p-6 border border-gray-200">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -786,7 +891,9 @@ function App() {
     <SettingsProvider>
       <VirtualDBProvider>
         <FileSystemProvider>
-          <Dashboard processedFilesRef={processedFilesRef} />
+          <JobMonitorProvider>
+            <Dashboard processedFilesRef={processedFilesRef} />
+          </JobMonitorProvider>
         </FileSystemProvider>
       </VirtualDBProvider>
     </SettingsProvider>
