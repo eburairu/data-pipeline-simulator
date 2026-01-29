@@ -491,16 +491,39 @@ const MappingDesigner: React.FC = () => {
                 )}
 
                 {node.type === 'target' && (
-                    <div>
-                        <label className="block text-xs text-gray-500">Connection</label>
-                        <select
-                            className="w-full border rounded p-1 text-sm"
-                            value={(node.config as TargetConfig).connectionId}
-                            onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
-                        >
-                            <option value="">Select Connection</option>
-                            {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Connection</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as TargetConfig).connectionId}
+                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                            >
+                                <option value="">Select Connection</option>
+                                {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Update Columns (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id, key_col"
+                                value={(node.config as TargetConfig).updateColumns?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    updateColumns: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Required for Update/Delete strategies</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id={`truncate-${node.id}`}
+                                checked={(node.config as TargetConfig).truncate || false}
+                                onChange={e => updateTransformationConfig(node.id, { truncate: e.target.checked })}
+                            />
+                            <label htmlFor={`truncate-${node.id}`} className="text-xs text-gray-700">Truncate Table before load</label>
+                        </div>
                     </div>
                 )}
 

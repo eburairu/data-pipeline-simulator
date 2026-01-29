@@ -23,6 +23,7 @@ import {
     type SqlConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
+import { ExpressionFunctions } from './ExpressionFunctions';
 
 // Interfaces for dependencies to decouple from Hooks
 export interface FileSystemOps {
@@ -35,11 +36,12 @@ export interface FileSystemOps {
 export interface DbOps {
     select: (tableName: string) => any[];
     insert: (tableName: string, record: any) => void;
-    delete?: (tableName: string, id: string) => void;
+    update: (tableName: string, id: string, record: any) => void;
+    delete: (tableName: string, id: string) => void;
 }
 
 export interface ExecutionStats {
-    [transformationId: string]: { input: number; output: number; errors: number };
+    [transformationId: string]: { input: number; output: number; errors: number; rejects: number };
 }
 
 export interface ExecutionState {
@@ -49,19 +51,35 @@ export interface ExecutionState {
 }
 
 // Helper to evaluate conditions/expressions safely-ish
-const evaluateExpression = (record: any, expression: string): any => {
+const evaluateExpression = (record: any, expression: string, parameters: Record<string, string> = {}): any => {
     try {
         // Allow accessing record fields like "amount" or "record.amount"
-        // This is a naive implementation for simulation purposes
-        const keys = Object.keys(record);
-        const values = Object.values(record);
+        // Also allow accessing parameters like "PARAM_1"
+        // And standard functions like "IIF", "ISNULL", etc.
+
+        const recordKeys = Object.keys(record);
+        const recordValues = Object.values(record);
+
+        const paramKeys = Object.keys(parameters);
+        const paramValues = Object.values(parameters);
+
+        const funcKeys = Object.keys(ExpressionFunctions);
+        const funcValues = Object.values(ExpressionFunctions);
+
         // Create a function with keys as arguments
-        const func = new Function(...keys, `return ${expression};`);
-        return func(...values);
+        // Order: Record Fields, Parameters, Functions
+        const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
+        return func(...recordValues, ...paramValues, ...funcValues);
     } catch (e) {
         // console.warn(`Expression evaluation failed: ${expression}`, e);
         return null;
     }
+};
+
+// Helper to substitute parameters in string config values
+const substituteParams = (str: string, params: Record<string, string>): string => {
+    if (!str || typeof str !== 'string') return str;
+    return str.replace(/\$\{(\w+)\}/g, (_, key) => params[key] || '');
 };
 
 // Re-implementing traverse properly
@@ -73,7 +91,8 @@ const traverse = (
     tables: TableDefinition[],
     fs: FileSystemOps,
     db: DbOps,
-    stats: ExecutionStats
+    stats: ExecutionStats,
+    parameters: Record<string, string> = {}
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
@@ -87,7 +106,7 @@ const traverse = (
             switch (nextNode.type) {
                 case 'filter': {
                     const conf = nextNode.config as FilterConfig;
-                    processedBatch = batch.filter(row => evaluateExpression(row, conf.condition));
+                    processedBatch = batch.filter(row => evaluateExpression(row, conf.condition, parameters));
                     break;
                 }
                 case 'expression': {
@@ -95,7 +114,7 @@ const traverse = (
                     processedBatch = batch.map(row => {
                         const newRow = { ...row };
                         conf.fields.forEach(f => {
-                            newRow[f.name] = evaluateExpression(row, f.expression);
+                            newRow[f.name] = evaluateExpression(row, f.expression, parameters);
                         });
                         return newRow;
                     });
@@ -181,34 +200,85 @@ const traverse = (
                 case 'target': {
                     const conf = nextNode.config as TargetConfig;
                     const targetConn = connections.find(c => c.id === conf.connectionId);
-                    processedBatch = batch; // Copy batch to processedBatch for target processing
+                    processedBatch = []; // Re-build processedBatch based on strategy
+
                     if (targetConn) {
                         if (targetConn.type === 'database') {
                             const tableName = targetConn.tableName || 'output';
                             const tableDef = tables.find(t => t.name === tableName);
+                            const updateCols = conf.updateColumns || [];
 
-                            processedBatch.forEach(row => {
-                                let recordToInsert = row;
+                            batch.forEach(row => {
+                                const strategy = row['_strategy'] || 'insert'; // Default to insert
+                                const rowToProcess = { ...row };
+                                delete rowToProcess['_strategy']; // Remove internal flag
+
+                                if (strategy === 'reject') {
+                                    stats[nextNode.id].rejects++;
+                                    return; // Skip downstream
+                                }
+
+                                // Apply field mapping (simple: match names)
+                                let recordToDb = rowToProcess;
                                 if (tableDef) {
-                                    // Auto Field Mapping: only insert fields that match column definitions
-                                    const filteredRow: any = {};
+                                    const filtered: any = {};
                                     tableDef.columns.forEach(col => {
-                                        if (Object.prototype.hasOwnProperty.call(row, col.name)) {
-                                            filteredRow[col.name] = row[col.name];
+                                        if (Object.prototype.hasOwnProperty.call(rowToProcess, col.name)) {
+                                            filtered[col.name] = rowToProcess[col.name];
                                         }
                                     });
-                                    recordToInsert = filteredRow;
+                                    recordToDb = filtered;
                                 }
-                                db.insert(tableName, recordToInsert);
+
+                                if (strategy === 'insert') {
+                                    db.insert(tableName, recordToDb);
+                                    processedBatch.push(row);
+                                } else if (strategy === 'update' || strategy === 'delete') {
+                                    if (updateCols.length === 0) {
+                                        console.warn(`[MappingEngine] ${strategy} requested but no updateColumns defined for ${nextNode.name}`);
+                                        // Fallback to insert? No, risky. log error
+                                        stats[nextNode.id].errors++;
+                                        return;
+                                    }
+
+                                    // Find record to update/delete (Inefficient scan for simulation)
+                                    // In real DB this would be a WHERE clause
+                                    const allRecords = db.select(tableName);
+                                    const match = allRecords.find((r: any) => {
+                                        const data = r.data || r;
+                                        return updateCols.every(col => String(data[col]) === String(row[col]));
+                                    });
+
+                                    if (match) {
+                                        if (strategy === 'update') {
+                                            db.update(tableName, match.id, recordToDb);
+                                            processedBatch.push(row);
+                                        } else if (strategy === 'delete') {
+                                            db.delete(tableName, match.id);
+                                            processedBatch.push(row);
+                                        }
+                                    } else {
+                                        console.warn(`[MappingEngine] Record not found for ${strategy} in ${nextNode.name}`);
+                                        // stats[nextNode.id].errors++; // Optional: treat as error or ignore?
+                                    }
+                                }
                             });
                         } else if (targetConn.type === 'file') {
+                            // File targets typically only support append (insert) in this sim
                             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                             const filename = `output_${timestamp}.json`;
-                            const content = JSON.stringify(batch, null, 2);
+                            const cleanBatch = batch.map(r => {
+                                const c = { ...r };
+                                delete c['_strategy'];
+                                return c;
+                            });
+                            const content = JSON.stringify(cleanBatch, null, 2);
                             fs.writeFile(targetConn.host!, targetConn.path!, filename, content);
+                            processedBatch = cleanBatch;
                         }
+                    } else {
+                        processedBatch = batch;
                     }
-                    processedBatch = batch;
                     break;
                 }
                 case 'joiner': {
@@ -351,7 +421,7 @@ const traverse = (
                         let routed = false;
                         for (const route of routes) {
                             try {
-                                if (evaluateExpression(row, route.condition)) {
+                                if (evaluateExpression(row, route.condition, parameters)) {
                                     routedGroups[route.groupName].push(row);
                                     routed = true;
                                     break; // 最初にマッチしたルートに振り分け
@@ -542,7 +612,7 @@ const traverse = (
                         let strategy = defaultStrategy;
                         for (const cond of conditions) {
                             try {
-                                if (evaluateExpression(row, cond.condition)) {
+                                if (evaluateExpression(row, cond.condition, parameters)) {
                                     strategy = cond.strategy;
                                     break;
                                 }
@@ -682,10 +752,33 @@ const traverse = (
                     break;
                 }
                 case 'sql': {
-                    // SQL: 簡易シミュレーション（パススルー）
                     const conf = nextNode.config as SqlConfig;
-                    // 実際にはSQLは実行せず、ログに出力してデータを通過させる
-                    console.log(`[MappingEngine] SQL ${nextNode.name}: Query "${conf.sqlQuery}" executed for ${batch.length} rows (simulation)`);
+                    const sqlQuery = substituteParams(conf.sqlQuery, parameters);
+                    console.log(`[MappingEngine] SQL ${nextNode.name}: Executing "${sqlQuery}"`);
+
+                    // Simple regex simulation for DELETE/UPDATE statements on VirtualDB
+                    // Supported: "DELETE FROM table WHERE field = 'value'"
+                    // Supported: "UPDATE table SET field = 'value' WHERE field = 'value'" (very basic)
+
+                    if (conf.mode === 'script' || conf.mode === 'query') {
+                        const sql = sqlQuery.trim();
+                        const deleteMatch = sql.match(/DELETE\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*=\s*['"]?([^'"]+)['"]?/i);
+
+                        if (deleteMatch) {
+                            const [, tableName, field, value] = deleteMatch;
+                            const records = db.select(tableName);
+                            let deletedCount = 0;
+                            records.forEach((r: any) => {
+                                const data = r.data || r;
+                                if (String(data[field]) === String(value)) {
+                                    db.delete(tableName, r.id);
+                                    deletedCount++;
+                                }
+                            });
+                            console.log(`[MappingEngine] SQL Executed: Deleted ${deletedCount} rows from ${tableName}`);
+                        }
+                    }
+
                     processedBatch = batch.map(row => ({ ...row, _sql_status: 'success' }));
                     break;
                 }
@@ -699,7 +792,7 @@ const traverse = (
 
         stats[nextNode.id].output += processedBatch.length;
         if (processedBatch.length > 0) {
-            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats);
+            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, parameters);
         }
     }
 };
@@ -718,8 +811,15 @@ export const executeMappingTaskRecursive = async (
     const stats: ExecutionStats = {};
     const newState = { ...state };
 
+    // Resolve Parameters
+    // Priority: Task Parameters > Mapping Parameters > Defaults
+    const parameters = {
+        ...(mapping.parameters || {}),
+        ...(task.parameters || {})
+    };
+
     mapping.transformations.forEach(t => {
-        stats[t.id] = { input: 0, output: 0, errors: 0 };
+        stats[t.id] = { input: 0, output: 0, errors: 0, rejects: 0 };
     });
 
     const sources = mapping.transformations.filter(t => t.type === 'source');
@@ -795,7 +895,7 @@ export const executeMappingTaskRecursive = async (
         stats[sourceNode.id].output = records.length;
 
         if (records.length > 0) {
-            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats);
+            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, parameters);
         }
     }
     return { stats, newState };

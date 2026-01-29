@@ -11,6 +11,8 @@ interface VirtualDBContextType {
   records: DBRecord[];
   insert: (table: string, data: Record<string, unknown>) => void;
   select: (table: string) => DBRecord[];
+  update: (table: string, id: string, data: Record<string, unknown>) => void;
+  remove: (table: string, id: string) => void;
 }
 
 const VirtualDBContext = createContext<VirtualDBContextType | undefined>(undefined);
@@ -29,12 +31,27 @@ export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children 
     console.log(`[DB] Inserted into ${table}:`, data);
   }, []);
 
-  const select = (table: string) => {
+  const select = useCallback((table: string) => {
     return records.filter((r) => r.table === table);
-  };
+  }, [records]);
+
+  const update = useCallback((table: string, id: string, data: Record<string, unknown>) => {
+    setRecords((prev) => prev.map(r => {
+      if (r.table === table && r.id === id) {
+        return { ...r, data: { ...r.data, ...data } }; // Merge updates
+      }
+      return r;
+    }));
+    console.log(`[DB] Updated record ${id} in ${table}:`, data);
+  }, []);
+
+  const remove = useCallback((table: string, id: string) => {
+    setRecords((prev) => prev.filter(r => !(r.table === table && r.id === id)));
+    console.log(`[DB] Deleted record ${id} from ${table}`);
+  }, []);
 
   return (
-    <VirtualDBContext.Provider value={{ records, insert, select }}>
+    <VirtualDBContext.Provider value={{ records, insert, select, update, remove }}>
       {children}
     </VirtualDBContext.Provider>
   );

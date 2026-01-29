@@ -15,6 +15,7 @@ export interface SourceConfig extends TransformationConfig {
 export interface TargetConfig extends TransformationConfig {
   connectionId: string;
   truncate?: boolean;
+  updateColumns?: string[]; // Columns to use as keys for update/delete operations
 }
 
 export interface FilterConfig extends TransformationConfig {
@@ -185,6 +186,7 @@ export interface Mapping {
   name: string;
   transformations: Transformation[];
   links: MappingLink[];
+  parameters?: Record<string, string>; // Default values for parameters
 }
 
 export interface MappingTask {
@@ -193,4 +195,6 @@ export interface MappingTask {
   mappingId: string;
   executionInterval: number; // ms
   enabled: boolean;
+  dependencies?: string[]; // Task IDs that this task depends on
+  parameters?: Record<string, string>; // Override parameters for execution
 }
