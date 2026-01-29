@@ -1,6 +1,6 @@
 ---
 name: pipeline-enhance
-description: データパイプラインシミュレーターに新しい変換タイプを追加するための実装ワークフロー
+description: パイプライン全体に不足している機能や改善すべき機能がないか確認し、修正提案と実装を行うスキル
 ---
 
 ## User Input
@@ -13,18 +13,28 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **コンテキスト収集**: 以下のファイルを読み込んで現状を把握:
-   - `src/lib/MappingTypes.ts` - 現在の変換タイプ定義（`TransformationType`を確認）
-   - `src/lib/MappingEngine.ts` - ETL変換ロジック（traverse関数内のswitch文）
-   - `src/components/settings/MappingDesigner.tsx` - UI（ツールバーボタン、設定パネル）
+1. **コンテキスト収集**: 以下のファイルを読み込んでパイプライン全体の現状を把握:
+   - `src/lib/MappingTypes.ts` - 変換タイプ定義
+   - `src/lib/MappingEngine.ts` - ETL変換ロジック
+   - `src/components/settings/MappingDesigner.tsx` - マッピングUI
+   - `src/lib/validation.ts` - バリデーションルール
+   - `src/lib/VirtualFileSystem.tsx` - ファイルシステムシミュレーション
+   - `src/lib/VirtualDB.tsx` - データベースシミュレーション
 
-2. **現状分析**: `TransformationType`から現在実装済みのタイプ一覧を抽出し、ユーザーに報告
+2. **現状分析 & 改善点特定**:
+   - `TransformationType` と IDMC CDI参照リスト（後述）を比較し、未実装の変換を特定
+   - バリデーションルールや型定義の不足を確認
+   - 既存実装のリファクタリングや最適化の余地を検討
+   - ユーザー入力がある場合は、その要求に対する現状とのギャップを特定
 
-3. **実装対象の決定**:
-   - ユーザー入力が空の場合: IDMC CDI参照リストから未実装候補を提示し、どれを実装するか確認
-   - ユーザー入力に機能名がある場合: その機能を実装
+3. **提案と決定**:
+   - 特定された改善点（未実装機能、バグ修正、リファクタリングなど）をリストアップ
+   - 実装の優先順位と方針を提案し、ユーザーに進め方を確認（ユーザー入力で指定済みの場合は即決定）
 
-4. **変換タイプ実装** (対象が決まった場合、以下の順序で実装):
+4. **実装** (決定した内容に応じて以下のいずれかのパスを実行):
+
+   ### Option A: 新しい変換タイプの実装
+   (対象: 新しい `TransformationType` の追加)
 
    **Step 1: 型定義の追加** (`src/lib/MappingTypes.ts`):
    - `TransformationType` に新しいタイプを追加
@@ -34,15 +44,21 @@ You **MUST** consider the user input before proceeding (if not empty).
    **Step 2: エンジンロジックの実装** (`src/lib/MappingEngine.ts`):
    - import に新しい Config 型を追加
    - `traverse` 関数内の switch 文に新しい case を追加
-   - バッチ処理ロジックを実装
-   - 処理結果を `processedBatch` に代入
-   - console.log で処理状況を出力
+   - バッチ処理ロジックを実装し、`processedBatch` に結果を格納
 
    **Step 3: UIコンポーネントの追加** (`src/components/settings/MappingDesigner.tsx`):
    - import に新しい Config 型とアイコン (lucide-react) を追加
    - `addTransformation` 関数内にデフォルト設定を追加
    - ツールバーに新しいボタンを追加（適切なアイコンと色を選択）
    - `renderConfigPanel` 内に設定パネルを追加
+
+   ### Option B: バリデーション/ルールの強化
+   (対象: `src/lib/validation.ts` 等のロジック強化)
+   - 新しいバリデーション関数を追加
+   - 既存のロジックにエッジケース対応を追加
+
+   ### Option C: その他の機能改善・修正
+   - 対象ファイルの修正・機能追加を実行
 
 5. **検証**:
    - `npm run build` を実行してTypeScriptコンパイルを確認
@@ -55,7 +71,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## IDMC CDI 変換タイプ参照リスト
 
-以下はInformatica IDMC CDIに存在する代表的な変換タイプです。コンテキスト収集時に現在の`TransformationType`と比較して未実装のものを特定してください：
+以下はInformatica IDMC CDIに存在する代表的な変換タイプです。実装判断の参考にしてください：
 
 | カテゴリ | 変換タイプ | 説明 |
 |---------|-----------|------|
@@ -82,7 +98,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ---
 
-## 実装パターンテンプレート
+## 実装パターンテンプレート (変換タイプ追加用)
 
 ### MappingTypes.ts
 ```typescript
@@ -149,27 +165,10 @@ if (type === 'newtype') newTrans.config = { fieldName: '', options: [] } as NewT
 )}
 ```
 
----
-
 ## 色とアイコンの選択ガイド
 
 **使用可能な色** (TailwindCSS):
-- `green` - ソース系
-- `red` - ターゲット系
-- `yellow` - フィルター/条件系
-- `purple` - 計算/変換系
-- `orange` - 集計系
-- `pink` - 検証系
-- `blue` - 結合系
-- `cyan` - 参照系
-- `lime` - 分岐系
-- `amber` - ソート系
-- `indigo` - 統合系
-- `violet` - 正規化系
-- `rose` - ランキング系
-- `sky` - 連番系
-- `slate` - 戦略系
-- `teal` - クレンジング系
+`green` (Source), `red` (Target), `yellow` (Filter), `purple` (Expression), `orange` (Aggregator), `pink` (Validator), `blue` (Joiner), `cyan` (Lookup), `lime` (Router), `amber` (Sorter), `indigo` (Union), `violet` (Normalizer), `rose` (Rank), `sky` (Sequence), `slate` (Strategy), `teal` (Cleansing)
 
 **lucide-reactアイコン例**:
 `Search`, `GitFork`, `ArrowUpDown`, `Merge`, `Repeat`, `Award`, `Hash`, `Flag`, `Sparkles`, `Filter`, `Database`, `Table`, `Columns`, `Rows`, `Copy`, `Trash2`, `Plus`, `CheckSquare`
