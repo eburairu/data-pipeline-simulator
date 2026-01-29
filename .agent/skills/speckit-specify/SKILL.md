@@ -1,105 +1,115 @@
 ---
 name: speckit-specify
-description: Create or update the feature specification from a natural language feature description.
+description: 自然言語の機能説明から、機能仕様書（Feature Specification）を作成または更新します。
 ---
 
-## User Input
+## ユーザー入力
 
 ```text
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+ユーザー入力がある場合、処理を進める前に**必ず**考慮してください。
 
-## Outline
+## 概要
 
-The text the user typed after `/speckit.specify` in the triggering message **is** the feature description. Assume you always have it available in this conversation even if `$ARGUMENTS` appears literally below. Do not ask the user to repeat it unless they provided an empty command.
+トリガーメッセージ内の `/speckit.specify` の後にユーザーが入力したテキストが、機能説明（Feature Description）となります。`$ARGUMENTS` が以下にリテラルとして表示されても、常に会話内でその説明が利用可能であると仮定してください。空のコマンドでない限り、ユーザーに繰り返しを求めないでください。
 
-Given that feature description, do this:
+その機能説明に基づいて、以下を実行します：
 
-1. **Generate a concise short name** (2-4 words) for the branch:
-   - Analyze the feature description and extract the most meaningful keywords
-   - Create a 2-4 word short name that captures the essence of the feature
-   - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
-   - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
-   - Keep it concise but descriptive enough to understand the feature at a glance
+### 1. 簡潔なショートネームの生成
 
-2. **Check for existing branches before creating new one**:
+ブランチ用に2〜4語のショートネームを生成します：
+- 機能説明を分析し、最も意味のあるキーワードを抽出
+- 機能の本質を捉えた2〜4語のショートネームを作成
+- 可能な限り「動詞-名詞」形式を使用（例：`add-user-auth`, `fix-payment-bug`）
+- 技術用語や頭字語（OAuth2, API, JWTなど）は保持
+- 機能を一目で理解できる程度に簡潔かつ説明的にする
 
-   a. First, fetch all remote branches to ensure we have the latest information:
+### 2. 新しいブランチを作成する前の既存チェック
 
-      ```bash
-      git fetch --all --prune
-      ```
+a. まず、最新情報を確実にするためにすべてのリモートブランチをフェッチします：
 
-   b. Find the highest feature number across all sources for the short-name:
-      - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
-      - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
-      - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
+   ```bash
+   git fetch --all --prune
+   ```
 
-   c. Determine the next available number:
-      - Extract all numbers from all three sources
-      - Find the highest number N
-      - Use N+1 for the new branch number
+b. ショートネームに対応する最大の機能番号をすべてのソースから検索します：
+   - リモートブランチ: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
+   - ローカルブランチ: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
+   - Specsディレクトリ: `specs/[0-9]+-<short-name>` に一致するディレクトリを確認
 
-   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name:
-      - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
+c. 次に利用可能な番号を決定します：
+   - 3つのソースすべてから番号を抽出
+   - 最大の番号 N を見つける
+   - 新しいブランチ番号には N+1 を使用
 
-   **IMPORTANT**:
-   - Check all three sources (remote branches, local branches, specs directories) to find the highest number
-   - Only match branches/directories with the exact short-name pattern
-   - If no existing branches/directories found with this short-name, start with number 1
-   - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
+d. 計算された番号とショートネームを使用してスクリプト `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` を実行します：
+   - `--number N+1` と `--short-name "your-short-name"` を機能説明とともに渡す
 
-3. Load `.specify/templates/spec-template.md` to understand required sections.
+**重要**:
+- 3つのソース（リモートブランチ、ローカルブランチ、specsディレクトリ）すべてを確認して最大の番号を見つけてください
+- 正確なショートネームパターンを持つブランチ/ディレクトリのみを一致させてください
+- このショートネームを持つ既存のブランチ/ディレクトリが見つからない場合は、番号 1 から開始してください
+- JSON出力には `BRANCH_NAME` と `SPEC_FILE` パスが含まれます
+- 引数内のシングルクォートについては、エスケープ構文を使用してください
 
-4. Follow this execution flow:
+### 3. スペックテンプレートの読み込み
 
-    1. Parse user description from Input
-       If empty: ERROR "No feature description provided"
-    2. Extract key concepts from description
-       Identify: actors, actions, data, constraints
-    3. For unclear aspects:
-       - Make informed guesses based on context and industry standards
-       - Only mark with [NEEDS CLARIFICATION: specific question] if:
-         - The choice significantly impacts feature scope or user experience
-         - Multiple reasonable interpretations exist with different implications
-         - No reasonable default exists
-       - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
-    4. Fill User Scenarios & Testing section
-       If no clear user flow: ERROR "Cannot determine user scenarios"
-    5. Generate Functional Requirements
-       Each requirement must be testable
-    6. Define Success Criteria
-       Create measurable, technology-agnostic outcomes
-    7. Identify Key Entities (if data involved)
-    8. Return: SUCCESS (spec ready for planning)
+必要なセクションを理解するために `.specify/templates/spec-template.md` を読み込みます。
 
-5. Write the specification to SPEC_FILE using the template structure.
+### 4. 実行フロー
 
-6. **Specification Quality Validation**: After writing, validate against quality criteria.
+1. **入力からのユーザー説明の解析**
+   空の場合: エラー "機能説明が提供されていません"
+2. **説明からの主要概念の抽出**
+   特定: アクター、アクション、データ、制約
+3. **不明確な側面について**:
+   - コンテキストと業界標準に基づいて情報に基づいた推測を行う
+   - 以下の条件の場合のみ `[NEEDS CLARIFICATION: 具体的な質問]` でマークする：
+     - 選択が機能スコープやユーザーエクスペリエンスに大きく影響する場合
+     - 異なる意味を持つ複数の妥当な解釈が存在する場合
+     - 合理的なデフォルトが存在しない場合
+   - **制限: 合計で最大3つの [NEEDS CLARIFICATION] マーカーまで**
+4. **ユーザーシナリオとテストセクションの記入**
+   明確なユーザーフローがない場合: エラー "ユーザーシナリオを決定できません"
+5. **機能要件の生成**
+   各要件はテスト可能である必要があります
+6. **成功基準の定義**
+   測定可能で、技術に依存しない成果を作成
+7. **主要エンティティの特定** (データが関与する場合)
+8. **戻り値**: SUCCESS (計画の準備完了)
 
-7. Report completion with branch name, spec file path, checklist results.
+### 5. スペックの書き込み
 
-## General Guidelines
+テンプレート構造を使用して `SPEC_FILE` に仕様を書き込みます。
 
-- Focus on **WHAT** users need and **WHY**.
-- Avoid HOW to implement (no tech stack, APIs, code structure).
-- Written for business stakeholders, not developers.
-- DO NOT create any checklists that are embedded in the spec.
+### 6. 仕様品質検証
 
-### Section Requirements
+書き込み後、品質基準に対して検証します。
 
-- **Mandatory sections**: Must be completed for every feature
-- **Optional sections**: Include only when relevant to the feature
-- When a section doesn't apply, remove it entirely (don't leave as "N/A")
+### 7. 完了報告
 
-### Success Criteria Guidelines
+ブランチ名、スペックファイルパス、チェックリスト結果を報告します。
 
-Success criteria must be:
+## 一般ガイドライン
 
-1. **Measurable**: Include specific metrics (time, percentage, count, rate)
-2. **Technology-agnostic**: No mention of frameworks, languages, databases, or tools
-3. **User-focused**: Describe outcomes from user/business perspective
-4. **Verifiable**: Can be tested/validated without knowing implementation details
+- **WHAT**（ユーザーが何を必要としているか）と **WHY**（なぜ必要か）に焦点を当ててください。
+- HOW（実装方法、技術スタック、API、コード構造）は避けてください。
+- 開発者ではなく、ビジネスステークホルダー向けに記述してください。
+- スペック内に埋め込まれたチェックリストは作成しないでください。
+
+### セクション要件
+
+- **必須セクション**: すべての機能で完了する必要があります
+- **オプションセクション**: 機能に関連する場合のみ含めます
+- セクションが適用されない場合は、完全に削除してください（"N/A" として残さないでください）
+
+### 成功基準ガイドライン
+
+成功基準は以下である必要があります：
+
+1. **測定可能 (Measurability)**: 具体的な指標（時間、パーセンテージ、数、率）を含める
+2. **技術非依存 (Technology-agnostic)**: フレームワーク、言語、データベース、ツールの言及なし
+3. **ユーザー重視 (User-focused)**: ユーザー/ビジネスの視点から成果を記述
+4. **検証可能 (Verifiable)**: 実装の詳細を知らなくてもテスト/検証可能であること

@@ -1,295 +1,209 @@
 ---
 name: speckit-checklist
-description: Generate a custom checklist for the current feature based on user requirements.
+description: ユーザー要件に基づいて、現在の機能のカスタムチェックリストを生成します。
 ---
 
-## Checklist Purpose: "Unit Tests for English"
+## チェックリストの目的：「英語（要件）のユニットテスト」
 
-**CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** - they validate the quality, clarity, and completeness of requirements in a given domain.
+**重要な概念**: チェックリストは**要件記述のためのユニットテスト**です。特定のドメインにおける要件の品質、明確さ、完全性を検証します。
 
-**NOT for verification/testing**:
+**検証/テスト用ではありません（実装のテストではない）**:
 
-- ❌ NOT "Verify the button clicks correctly"
-- ❌ NOT "Test error handling works"
-- ❌ NOT "Confirm the API returns 200"
-- ❌ NOT checking if code/implementation matches the spec
+- ❌ 「ボタンが正しくクリックできるか確認する」ではありません
+- ❌ 「エラー処理が機能するかテストする」ではありません
+- ❌ 「APIが200を返すか確認する」ではありません
+- ❌ コード/実装が仕様と一致するかを確認するものではありません
 
-**FOR requirements quality validation**:
+**要件品質の検証用です**:
 
-- ✅ "Are visual hierarchy requirements defined for all card types?" (completeness)
-- ✅ "Is 'prominent display' quantified with specific sizing/positioning?" (clarity)
-- ✅ "Are hover state requirements consistent across all interactive elements?" (consistency)
-- ✅ "Are accessibility requirements defined for keyboard navigation?" (coverage)
-- ✅ "Does the spec define what happens when logo image fails to load?" (edge cases)
+- ✅ 「すべてのカードタイプについて、視覚的な階層要件が定義されているか？」（完全性）
+- ✅ 「『目立つ表示』は具体的なサイズ/配置で定量化されているか？」（明確性）
+- ✅ 「ホバー状態の要件は、すべてのインタラクティブ要素で一貫しているか？」（一貫性）
+- ✅ 「キーボード操作のアクセシビリティ要件が定義されているか？」（網羅性）
+- ✅ 「ロゴ画像の読み込みに失敗した場合の挙動を仕様で定義しているか？」（エッジケース）
 
-**Metaphor**: If your spec is code written in English, the checklist is its unit test suite. You're testing whether the requirements are well-written, complete, unambiguous, and ready for implementation - NOT whether the implementation works.
+**メタファー**: もし仕様書が日本語（自然言語）で書かれたコードだとしたら、チェックリストはそのユニットテストスイートです。実装が機能するかどうかではなく、要件が適切に記述され、完全で、曖昧さがなく、実装の準備ができているかどうかをテストします。
 
-## User Input
+## ユーザー入力
 
 ```text
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+ユーザー入力がある場合、処理を進める前に**必ず**考慮してください。
 
-## Execution Steps
+## 実行手順
 
-1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list.
-   - All file paths must be absolute.
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+### 1. セットアップ
 
-2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
-   - Be generated from the user's phrasing + extracted signals from spec/plan/tasks
-   - Only ask about information that materially changes checklist content
-   - Be skipped individually if already unambiguous in `$ARGUMENTS`
-   - Prefer precision over breadth
+リポジトリルートから `.specify/scripts/bash/check-prerequisites.sh --json` を実行し、JSONを解析して `FEATURE_DIR` と `AVAILABLE_DOCS` リストを取得します。
+- すべてのファイルパスは絶対パスである必要があります。
+- "I'm Groot" のような引数内のシングルクォートについては、エスケープ構文を使用してください。
 
-   Generation algorithm:
-   1. Extract signals: feature domain keywords (e.g., auth, latency, UX, API), risk indicators ("critical", "must", "compliance"), stakeholder hints ("QA", "review", "security team"), and explicit deliverables ("a11y", "rollback", "contracts").
-   2. Cluster signals into candidate focus areas (max 4) ranked by relevance.
-   3. Identify probable audience & timing (author, reviewer, QA, release) if not explicit.
-   4. Detect missing dimensions: scope breadth, depth/rigor, risk emphasis, exclusion boundaries, measurable acceptance criteria.
-   5. Formulate questions chosen from these archetypes:
-      - Scope refinement (e.g., "Should this include integration touchpoints with X and Y or stay limited to local module correctness?")
-      - Risk prioritization (e.g., "Which of these potential risk areas should receive mandatory gating checks?")
-      - Depth calibration (e.g., "Is this a lightweight pre-commit sanity list or a formal release gate?")
-      - Audience framing (e.g., "Will this be used by the author only or peers during PR review?")
-      - Boundary exclusion (e.g., "Should we explicitly exclude performance tuning items this round?")
-      - Scenario class gap (e.g., "No recovery flows detected—are rollback / partial failure paths in scope?")
+### 2. 意図の明確化 (動的)
 
-   Question formatting rules:
-   - If presenting options, generate a compact table with columns: Option | Candidate | Why It Matters
-   - Limit to A–E options maximum; omit table if a free-form answer is clearer
-   - Never ask the user to restate what they already said
-   - Avoid speculative categories (no hallucination). If uncertain, ask explicitly: "Confirm whether X belongs in scope."
+最大3つの初期コンテキスト確認質問を導出します（事前に用意されたカタログではありません）。これらは以下の条件を満たす必要があります：
 
-   Defaults when interaction impossible:
-   - Depth: Standard
-   - Audience: Reviewer (PR) if code-related; Author otherwise
-   - Focus: Top 2 relevance clusters
+- ユーザーの言い回し + spec/plan/tasks から抽出されたシグナルから生成される
+- チェックリストの内容を実質的に変更する情報についてのみ質問する
+- `$ARGUMENTS` で既に明確な場合はスキップする
+- 広範さよりも正確さを優先する
 
-   Output the questions (label Q1/Q2/Q3). After answers: if ≥2 scenario classes (Alternate / Exception / Recovery / Non-Functional domain) remain unclear, you MAY ask up to TWO more targeted follow‑ups (Q4/Q5) with a one-line justification each (e.g., "Unresolved recovery path risk"). Do not exceed five total questions. Skip escalation if user explicitly declines more.
+**生成アルゴリズム**:
+1. シグナル抽出：機能ドメインのキーワード（auth, latency, UX, APIなど）、リスク指標（"critical", "must", "compliance"）、ステークホルダーのヒント（"QA", "review", security team"）、明示的な成果物（"a11y", "rollback", "contracts"）。
+2. シグナルを候補となるフォーカス領域（最大4つ）にクラスタリングし、関連性でランク付けする。
+3. 明示的でない場合、想定されるオーディエンスとタイミング（作成者、レビュアー、QA、リリース）を特定する。
+4. 欠落している次元を検出する：スコープの広さ、深さ/厳格さ、リスクの強調、除外境界、測定可能な受け入れ基準。
+5. 以下のアーキタイプから質問を作成する：
+    - スコープの調整（例：「これはXとYとの統合タッチポイントを含めるべきか、それともローカルモジュールの正当性に限定すべきか？」）
+    - リスクの優先順位付け（例：「これらの潜在的なリスク領域のうち、どれを必須のゲートチェックとするべきか？」）
+    - 深さの調整（例：「これは軽量なコミット前サニティリストなのか、正式なリリースゲートなのか？」）
+    - オーディエンスの枠組み（例：「これは作成者のみが使用するのか、PRレビュー中にピアが使用するのか？」）
+    - 境界の除外（例：「今回はパフォーマンスチューニングの項目を明示的に除外すべきか？」）
+    - シナリオクラスのギャップ（例：「リカバリフローが検出されませんでした。ロールバック/部分的な失敗パスはスコープ内ですか？」）
 
-3. **Understand user request**: Combine `$ARGUMENTS` + clarifying answers:
-   - Derive checklist theme (e.g., security, review, deploy, ux)
-   - Consolidate explicit must-have items mentioned by user
-   - Map focus selections to category scaffolding
-   - Infer any missing context from spec/plan/tasks (do NOT hallucinate)
+**質問のフォーマットルール**:
+- 選択肢を提示する場合は、カラムを持つコンパクトなテーブルを作成します：Option | Candidate | Why It Matters
+- 最大A〜Eのオプションに制限します。自由形式の回答の方が明確な場合はテーブルを省略します。
+- ユーザーがすでに言ったことを再確認させないでください。
+- 推測的なカテゴリを避けてください（幻覚を見ないこと）。不確かな場合は、「Xがスコープに含まれるか確認してください」と明示的に尋ねます。
 
-4. **Load feature context**: Read from FEATURE_DIR:
-   - spec.md: Feature requirements and scope
-   - plan.md (if exists): Technical details, dependencies
-   - tasks.md (if exists): Implementation tasks
+**対話不可能な場合のデフォルト**:
+- 深さ: 標準
+- オーディエンス: コード関連ならレビュアー(PR)、そうでなければ作成者
+- フォーカス: 上位2つの関連クラスター
 
-   **Context Loading Strategy**:
-   - Load only necessary portions relevant to active focus areas (avoid full-file dumping)
-   - Prefer summarizing long sections into concise scenario/requirement bullets
-   - Use progressive disclosure: add follow-on retrieval only if gaps detected
-   - If source docs are large, generate interim summary items instead of embedding raw text
+質問を出力します（Q1/Q2/Q3とラベル付け）。回答後、もし2つ以上のシナリオクラス（代替/例外/リカバリ/非機能ドメイン）が不明確なままであれば、最大2つのターゲットを絞ったフォローアップ質問（Q4/Q5）を1行の正当化とともに尋ねてもよいです。合計5つの質問を超えないでください。ユーザーがそれ以上を拒否した場合はエスカレーションをスキップします。
 
-5. **Generate checklist** - Create "Unit Tests for Requirements":
-   - Create `FEATURE_DIR/checklists/` directory if it doesn't exist
-   - Generate unique checklist filename:
-     - Use short, descriptive name based on domain (e.g., `ux.md`, `api.md`, `security.md`)
-     - Format: `[domain].md`
-     - If file exists, append to existing file
-   - Number items sequentially starting from CHK001
-   - Each `/speckit.checklist` run creates a NEW file (never overwrites existing checklists)
+### 3. ユーザーリクエストの理解
 
-   **CORE PRINCIPLE - Test the Requirements, Not the Implementation**:
-   Every checklist item MUST evaluate the REQUIREMENTS THEMSELVES for:
-   - **Completeness**: Are all necessary requirements present?
-   - **Clarity**: Are requirements unambiguous and specific?
-   - **Consistency**: Do requirements align with each other?
-   - **Measurability**: Can requirements be objectively verified?
-   - **Coverage**: Are all scenarios/edge cases addressed?
+`$ARGUMENTS` + 明確化への回答を組み合わせます：
+- チェックリストのテーマを導出（例：セキュリティ、レビュー、デプロイ、UX）
+- ユーザーが言及した明示的な必須項目を統合
+- フォーカス選択をカテゴリの足場にマッピング
+- spec/plan/tasks から欠落しているコンテキストを推測（幻覚を見ないこと）
 
-   **Category Structure** - Group items by requirement quality dimensions:
-   - **Requirement Completeness** (Are all necessary requirements documented?)
-   - **Requirement Clarity** (Are requirements specific and unambiguous?)
-   - **Requirement Consistency** (Do requirements align without conflicts?)
-   - **Acceptance Criteria Quality** (Are success criteria measurable?)
-   - **Scenario Coverage** (Are all flows/cases addressed?)
-   - **Edge Case Coverage** (Are boundary conditions defined?)
-   - **Non-Functional Requirements** (Performance, Security, Accessibility, etc. - are they specified?)
-   - **Dependencies & Assumptions** (Are they documented and validated?)
-   - **Ambiguities & Conflicts** (What needs clarification?)
+### 4. 機能コンテキストの読み込み
 
-   **HOW TO WRITE CHECKLIST ITEMS - "Unit Tests for English"**:
+`FEATURE_DIR` から読み込みます：
+- spec.md: 機能要件とスコープ
+- plan.md (存在する場合): 技術詳細、依存関係
+- tasks.md (存在する場合): 実装タスク
 
-   ❌ **WRONG** (Testing implementation):
-   - "Verify landing page displays 3 episode cards"
-   - "Test hover states work on desktop"
-   - "Confirm logo click navigates home"
+**コンテキスト読み込み戦略**:
+- アクティブなフォーカス領域に関連する必要な部分のみを読み込む（ファイル全体のダンプを避ける）
+- 長いセクションは簡潔なシナリオ/要件の箇条書きに要約することを優先する
+- 段階的開示を使用：ギャップが検出された場合にのみ追加の取得を行う
+- ソースドキュメントが大きい場合は、生のテキストを埋め込むのではなく、中間サマリー項目を生成する
 
-   ✅ **CORRECT** (Testing requirements quality):
-   - "Are the exact number and layout of featured episodes specified?" [Completeness]
-   - "Is 'prominent display' quantified with specific sizing/positioning?" [Clarity]
-   - "Are hover state requirements consistent across all interactive elements?" [Consistency]
-   - "Are keyboard navigation requirements defined for all interactive UI?" [Coverage]
-   - "Is the fallback behavior specified when logo image fails to load?" [Edge Cases]
-   - "Are loading states defined for asynchronous episode data?" [Completeness]
-   - "Does the spec define visual hierarchy for competing UI elements?" [Clarity]
+### 5. チェックリストの生成 - 「要件のユニットテスト」を作成
 
-   **ITEM STRUCTURE**:
-   Each item should follow this pattern:
-   - Question format asking about requirement quality
-   - Focus on what's WRITTEN (or not written) in the spec/plan
-   - Include quality dimension in brackets [Completeness/Clarity/Consistency/etc.]
-   - Reference spec section `[Spec §X.Y]` when checking existing requirements
-   - Use `[Gap]` marker when checking for missing requirements
+- まだ存在しない場合は `FEATURE_DIR/checklists/` ディレクトリを作成する
+- ユニークなチェックリストファイル名を生成する：
+    - ドメインに基づいた短く説明的な名前を使用（例：`ux.md`, `api.md`, `security.md`）
+    - フォーマット: `[domain].md`
+    - ファイルが存在する場合は、既存のファイルに追加する
+- CHK001から順に項目に番号を付ける
+- `/speckit.checklist` を実行するたびに新しいファイルを作成する（既存のチェックリストを上書きしない）
 
-   **EXAMPLES BY QUALITY DIMENSION**:
+**コア原則 - 実装ではなく要件をテストする**:
+すべてのチェックリスト項目は、以下の点について**要件そのもの**を評価しなければなりません：
+- **完全性 (Completeness)**: 必要な要件はすべて存在するか？
+- **明確性 (Clarity)**: 要件は曖昧さがなく具体的か？
+- **一貫性 (Consistency)**: 要件同士が整合しているか？
+- **測定可能性 (Measurability)**: 要件は客観的に検証可能か？
+- **網羅性 (Coverage)**: すべてのシナリオ/エッジケースが扱われているか？
 
-   Completeness:
-   - "Are error handling requirements defined for all API failure modes? [Gap]"
-   - "Are accessibility requirements specified for all interactive elements? [Completeness]"
-   - "Are mobile breakpoint requirements defined for responsive layouts? [Gap]"
+**カテゴリ構造** - 要件品質の次元で項目をグループ化：
+- **要件の完全性**（必要な要件はすべて文書化されているか？）
+- **要件の明確性**（要件は具体的で曖昧さがないか？）
+- **要件の一貫性**（要件に矛盾はないか？）
+- **受け入れ基準の品質**（成功基準は測定可能か？）
+- **シナリオ網羅性**（すべてのフロー/ケースが扱われているか？）
+- **エッジケース網羅性**（境界条件は定義されているか？）
+- **非機能要件**（パフォーマンス、セキュリティ、アクセシビリティなどは指定されているか？）
+- **依存関係と前提**（それらは文書化され検証されているか？）
+- **曖昧さと競合**（何を明確にする必要があるか？）
 
-   Clarity:
-   - "Is 'fast loading' quantified with specific timing thresholds? [Clarity, Spec §NFR-2]"
-   - "Are 'related episodes' selection criteria explicitly defined? [Clarity, Spec §FR-5]"
-   - "Is 'prominent' defined with measurable visual properties? [Ambiguity, Spec §FR-4]"
+**チェックリスト項目の書き方 - 「日本語（要件）のユニットテスト」**:
 
-   Consistency:
-   - "Do navigation requirements align across all pages? [Consistency, Spec §FR-10]"
-   - "Are card component requirements consistent between landing and detail pages? [Consistency]"
+❌ **間違い**（実装のテスト）:
+- 「ランディングページに3つのエピソードカードが表示されることを確認する」
+- 「デスクトップでホバー状態が機能することをテストする」
+- 「ロゴをクリックするとホームに遷移することを確認する」
 
-   Coverage:
-   - "Are requirements defined for zero-state scenarios (no episodes)? [Coverage, Edge Case]"
-   - "Are concurrent user interaction scenarios addressed? [Coverage, Gap]"
-   - "Are requirements specified for partial data loading failures? [Coverage, Exception Flow]"
+✅ **正解**（要件品質のテスト）:
+- 「特集エピソードの正確な数とレイアウトは指定されているか？ [完全性]」
+- 「『目立つ表示』は具体的なサイズ/配置で定量化されているか？ [明確性]」
+- 「ホバー状態の要件は、すべてのインタラクティブ要素で一貫しているか？ [一貫性]」
+- 「キーボード操作の要件はすべてのインタラクティブUIに対して定義されているか？ [網羅性]」
+- 「ロゴ画像の読み込みに失敗したときのフォールバック動作は指定されているか？ [エッジケース]」
+- 「非同期エピソードデータのロード状態は定義されているか？ [完全性]」
+- 「競合するUI要素の視覚的階層を仕様で定義しているか？ [明確性]」
 
-   Measurability:
-   - "Are visual hierarchy requirements measurable/testable? [Acceptance Criteria, Spec §FR-1]"
-   - "Can 'balanced visual weight' be objectively verified? [Measurability, Spec §FR-2]"
+**項目構造**:
+各項目は以下のパターンに従うべきです：
+- 要件品質について尋ねる質問形式
+- spec/plan に**書かれていること**（または書かれていないこと）に焦点を当てる
+- ブラケット内に品質次元を含める [Completeness/Clarity/Consistency/etc.]
+- 既存の要件を確認する場合は spec のセクション `[Spec §X.Y]` を参照する
+- 欠落している要件を確認する場合は `[Gap]` マーカーを使用する
 
-   **Scenario Classification & Coverage** (Requirements Quality Focus):
-   - Check if requirements exist for: Primary, Alternate, Exception/Error, Recovery, Non-Functional scenarios
-   - For each scenario class, ask: "Are [scenario type] requirements complete, clear, and consistent?"
-   - If scenario class missing: "Are [scenario type] requirements intentionally excluded or missing? [Gap]"
-   - Include resilience/rollback when state mutation occurs: "Are rollback requirements defined for migration failures? [Gap]"
+**品質次元別の例**:
 
-   **Traceability Requirements**:
-   - MINIMUM: ≥80% of items MUST include at least one traceability reference
-   - Each item should reference: spec section `[Spec §X.Y]`, or use markers: `[Gap]`, `[Ambiguity]`, `[Conflict]`, `[Assumption]`
-   - If no ID system exists: "Is a requirement & acceptance criteria ID scheme established? [Traceability]"
+**Completeness (完全性)**:
+- 「すべてのAPI失敗モードについてエラー処理要件が定義されているか？ [Gap]」
+- 「すべてのインタラクティブ要素についてアクセシビリティ要件が指定されているか？ [Completeness]」
 
-   **Surface & Resolve Issues** (Requirements Quality Problems):
-   Ask questions about the requirements themselves:
-   - Ambiguities: "Is the term 'fast' quantified with specific metrics? [Ambiguity, Spec §NFR-1]"
-   - Conflicts: "Do navigation requirements conflict between §FR-10 and §FR-10a? [Conflict]"
-   - Assumptions: "Is the assumption of 'always available podcast API' validated? [Assumption]"
-   - Dependencies: "Are external podcast API requirements documented? [Dependency, Gap]"
-   - Missing definitions: "Is 'visual hierarchy' defined with measurable criteria? [Gap]"
+**Clarity (明確性)**:
+- 「『高速読み込み』は具体的なタイミング閾値で定量化されているか？ [Clarity, Spec §NFR-2]」
+- 「『関連エピソード』の選択基準は明示的に定義されているか？ [Clarity, Spec §FR-5]」
 
-   **Content Consolidation**:
-   - Soft cap: If raw candidate items > 40, prioritize by risk/impact
-   - Merge near-duplicates checking the same requirement aspect
-   - If >5 low-impact edge cases, create one item: "Are edge cases X, Y, Z addressed in requirements? [Coverage]"
+**Consistency (一貫性)**:
+- 「ナビゲーション要件はすべてのページで整合しているか？ [Consistency, Spec §FR-10]」
 
-   **🚫 ABSOLUTELY PROHIBITED** - These make it an implementation test, not a requirements test:
-   - ❌ Any item starting with "Verify", "Test", "Confirm", "Check" + implementation behavior
-   - ❌ References to code execution, user actions, system behavior
-   - ❌ "Displays correctly", "works properly", "functions as expected"
-   - ❌ "Click", "navigate", "render", "load", "execute"
-   - ❌ Test cases, test plans, QA procedures
-   - ❌ Implementation details (frameworks, APIs, algorithms)
+**Coverage (網羅性)**:
+- 「ゼロ状態のシナリオ（エピソードなし）の要件は定義されているか？ [Coverage, Edge Case]」
+- 「同時ユーザーインタラクションのシナリオは扱われているか？ [Coverage, Gap]」
 
-   **✅ REQUIRED PATTERNS** - These test requirements quality:
-   - ✅ "Are [requirement type] defined/specified/documented for [scenario]?"
-   - ✅ "Is [vague term] quantified/clarified with specific criteria?"
-   - ✅ "Are requirements consistent between [section A] and [section B]?"
-   - ✅ "Can [requirement] be objectively measured/verified?"
-   - ✅ "Are [edge cases/scenarios] addressed in requirements?"
-   - ✅ "Does the spec define [missing aspect]?"
+**Measurability (測定可能性)**:
+- 「視覚的階層の要件は測定/テスト可能か？ [Acceptance Criteria, Spec §FR-1]」
 
-6. **Structure Reference**: Generate the checklist following the canonical template in `.specify/templates/checklist-template.md` for title, meta section, category headings, and ID formatting. If template is unavailable, use: H1 title, purpose/created meta lines, `##` category sections containing `- [ ] CHK### <requirement item>` lines with globally incrementing IDs starting at CHK001.
+**トレーサビリティ要件**:
+- 最低限：項目の80%以上に少なくとも1つのトレーサビリティ参照を含めること
+- 各項目は次を参照すること：specセクション `[Spec §X.Y]`、またはマーカー `[Gap]`, `[Ambiguity]`, `[Conflict]`, `[Assumption]`
 
-7. **Report**: Output full path to created checklist, item count, and remind user that each run creates a new file. Summarize:
-   - Focus areas selected
-   - Depth level
-   - Actor/timing
-   - Any explicit user-specified must-have items incorporated
+**🚫 絶対に禁止** - これらは要件テストではなく実装テストになります：
+- ❌ 「検証する」「テストする」「確認する」「チェックする」+ 実装の動作で始まる項目
+- ❌ コード実行、ユーザーアクション、システム動作への言及
+- ❌ 「正しく表示される」「適切に機能する」「期待通りに動作する」
+- ❌ 「クリック」「ナビゲート」「レンダリング」「ロード」「実行」
+- ❌ テストケース、テスト計画、QA手順
+- ❌ 実装の詳細（フレームワーク、API、アルゴリズム）
 
-**Important**: Each `/speckit.checklist` command invocation creates a checklist file using short, descriptive names unless file already exists. This allows:
+**✅ 必須パターン** - これらは要件品質をテストします：
+- ✅ 「[シナリオ]について[要件タイプ]は定義/指定/文書化されているか？」
+- ✅ 「[曖昧な用語]は具体的な基準で定量化/明確化されているか？」
+- ✅ 「要件は[セクションA]と[セクションB]の間で一貫しているか？」
+- ✅ 「[要件]は客観的に測定/検証可能か？」
 
-- Multiple checklists of different types (e.g., `ux.md`, `test.md`, `security.md`)
-- Simple, memorable filenames that indicate checklist purpose
-- Easy identification and navigation in the `checklists/` folder
+### 6. 構造参照
 
-To avoid clutter, use descriptive types and clean up obsolete checklists when done.
+タイトル、メタセクション、カテゴリ見出し、IDフォーマットについては、`.specify/templates/checklist-template.md` 内の標準テンプレートに従ってチェックリストを生成します。テンプレートが利用できない場合は、次を使用します：H1タイトル、目的/作成メタ行、`##` カテゴリセクション（`- [ ] CHK### <要件項目>` という行を含み、CHK001からグローバルに増分するIDを持つ）。
 
-## Example Checklist Types & Sample Items
+### 7. レポート
 
-**UX Requirements Quality:** `ux.md`
+作成されたチェックリストへのフルパス、項目数を出力し、実行ごとに新しいファイルが作成されることをユーザーに通知します。以下を要約します：
+- 選択されたフォーカス領域
+- 深さレベル
+- アクター/タイミング
+- 組み込まれたユーザー指定の必須項目
 
-Sample items (testing the requirements, NOT the implementation):
+**重要**: 各 `/speckit.checklist` コマンド呼び出しは、ファイルが既に存在しない限り、短く説明的な名前を使用して新しいチェックリストファイルを作成します。これにより以下が可能になります：
+- 異なるタイプの複数のチェックリスト（例：`ux.md`, `test.md`, `security.md`）
+- チェックリストの目的を示すシンプルで覚えやすいファイル名
+- `checklists/` フォルダ内での容易な識別とナビゲーション
 
-- "Are visual hierarchy requirements defined with measurable criteria? [Clarity, Spec §FR-1]"
-- "Is the number and positioning of UI elements explicitly specified? [Completeness, Spec §FR-1]"
-- "Are interaction state requirements (hover, focus, active) consistently defined? [Consistency]"
-- "Are accessibility requirements specified for all interactive elements? [Coverage, Gap]"
-- "Is fallback behavior defined when images fail to load? [Edge Case, Gap]"
-- "Can 'prominent display' be objectively measured? [Measurability, Spec §FR-4]"
-
-**API Requirements Quality:** `api.md`
-
-Sample items:
-
-- "Are error response formats specified for all failure scenarios? [Completeness]"
-- "Are rate limiting requirements quantified with specific thresholds? [Clarity]"
-- "Are authentication requirements consistent across all endpoints? [Consistency]"
-- "Are retry/timeout requirements defined for external dependencies? [Coverage, Gap]"
-- "Is versioning strategy documented in requirements? [Gap]"
-
-**Performance Requirements Quality:** `performance.md`
-
-Sample items:
-
-- "Are performance requirements quantified with specific metrics? [Clarity]"
-- "Are performance targets defined for all critical user journeys? [Coverage]"
-- "Are performance requirements under different load conditions specified? [Completeness]"
-- "Can performance requirements be objectively measured? [Measurability]"
-- "Are degradation requirements defined for high-load scenarios? [Edge Case, Gap]"
-
-**Security Requirements Quality:** `security.md`
-
-Sample items:
-
-- "Are authentication requirements specified for all protected resources? [Coverage]"
-- "Are data protection requirements defined for sensitive information? [Completeness]"
-- "Is the threat model documented and requirements aligned to it? [Traceability]"
-- "Are security requirements consistent with compliance obligations? [Consistency]"
-- "Are security failure/breach response requirements defined? [Gap, Exception Flow]"
-
-## Anti-Examples: What NOT To Do
-
-**❌ WRONG - These test implementation, not requirements:**
-
-```markdown
-- [ ] CHK001 - Verify landing page displays 3 episode cards [Spec §FR-001]
-- [ ] CHK002 - Test hover states work correctly on desktop [Spec §FR-003]
-- [ ] CHK003 - Confirm logo click navigates to home page [Spec §FR-010]
-- [ ] CHK004 - Check that related episodes section shows 3-5 items [Spec §FR-005]
-```
-
-**✅ CORRECT - These test requirements quality:**
-
-```markdown
-- [ ] CHK001 - Are the number and layout of featured episodes explicitly specified? [Completeness, Spec §FR-001]
-- [ ] CHK002 - Are hover state requirements consistently defined for all interactive elements? [Consistency, Spec §FR-003]
-- [ ] CHK003 - Are navigation requirements clear for all clickable brand elements? [Clarity, Spec §FR-010]
-- [ ] CHK004 - Is the selection criteria for related episodes documented? [Gap, Spec §FR-005]
-- [ ] CHK005 - Are loading state requirements defined for asynchronous episode data? [Gap]
-- [ ] CHK006 - Can "visual hierarchy" requirements be objectively measured? [Measurability, Spec §FR-001]
-```
-
-**Key Differences:**
-
-- Wrong: Tests if the system works correctly
-- Correct: Tests if the requirements are written correctly
-- Wrong: Verification of behavior
-- Correct: Validation of requirement quality
-- Wrong: "Does it do X?"
-- Correct: "Is X clearly specified?"
+**禁止事項**:
+- ❌ 実装テストの記述（Anti-Examplesを参照）
+- ❌ コードやシステム動作への言及

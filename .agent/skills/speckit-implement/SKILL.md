@@ -1,136 +1,137 @@
 ---
 name: speckit-implement
-description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
+description: tasks.md で定義されたすべてのタスクを処理し実行することで、実装計画を実行します。
 ---
 
-## User Input
+## ユーザー入力
 
 ```text
 $ARGUMENTS
 ```
 
-You **MUST** consider the user input before proceeding (if not empty).
+ユーザー入力がある場合、処理を進める前に**必ず**考慮してください。
 
-## Outline
+## 概要
 
-1. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+### 1. 前提条件チェック
 
-2. **Check checklists status** (if FEATURE_DIR/checklists/ exists):
-   - Scan all checklist files in the checklists/ directory
-   - For each checklist, count:
-     - Total items: All lines matching `- [ ]` or `- [X]` or `- [x]`
-     - Completed items: Lines matching `- [X]` or `- [x]`
-     - Incomplete items: Lines matching `- [ ]`
-   - Create a status table:
+リポジトリルートから `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` を実行し、`FEATURE_DIR` と `AVAILABLE_DOCS` リストを解析します。すべてのパスは絶対パスである必要があります。引数内のシングルクォートについては、エスケープ構文を使用してください。
 
-     ```text
-     | Checklist | Total | Completed | Incomplete | Status |
-     |-----------|-------|-----------|------------|--------|
-     | ux.md     | 12    | 12        | 0          | ✓ PASS |
-     | test.md   | 8     | 5         | 3          | ✗ FAIL |
-     | security.md | 6   | 6         | 0          | ✓ PASS |
-     ```
+### 2. チェックリストステータスの確認
 
-   - Calculate overall status:
-     - **PASS**: All checklists have 0 incomplete items
-     - **FAIL**: One or more checklists have incomplete items
+（`FEATURE_DIR/checklists/` が存在する場合）：
+- `checklists/` ディレクトリ内のすべてのチェックリストファイルをスキャンします
+- 各チェックリストについて、以下をカウントします：
+    - 合計項目数: `- [ ]`, `- [X]`, `- [x]` に一致するすべての行
+    - 完了項目数: `- [X]` または `- [x]` に一致する行
+    - 未完了項目数: `- [ ]` に一致する行
+- ステータステーブルを作成します：
 
-   - **If any checklist is incomplete**:
-     - Display the table with incomplete item counts
-     - **STOP** and ask: "Some checklists are incomplete. Do you want to proceed with implementation anyway? (yes/no)"
-     - Wait for user response before continuing
-     - If user says "no" or "wait" or "stop", halt execution
-     - If user says "yes" or "proceed" or "continue", proceed to step 3
+  ```text
+  | Checklist | Total | Completed | Incomplete | Status |
+  |-----------|-------|-----------|------------|--------|
+  | ux.md     | 12    | 12        | 0          | ✓ PASS |
+  | test.md   | 8     | 5         | 3          | ✗ FAIL |
+  ```
 
-   - **If all checklists are complete**:
-     - Display the table showing all checklists passed
-     - Automatically proceed to step 3
+- 全体のステータスを計算します：
+    - **PASS**: すべてのチェックリストの未完了項目が 0
+    - **FAIL**: 1つ以上のチェックリストに未完了項目がある
 
-3. Load and analyze the implementation context:
-   - **REQUIRED**: Read tasks.md for the complete task list and execution plan
-   - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
-   - **IF EXISTS**: Read data-model.md for entities and relationships
-   - **IF EXISTS**: Read contracts/ for API specifications and test requirements
-   - **IF EXISTS**: Read research.md for technical decisions and constraints
-   - **IF EXISTS**: Read quickstart.md for integration scenarios
+- **いずれかが未完了の場合**:
+    - テーブルを表示し、ユーザーに確認します：「一部のチェックリストが未完了です。実装を続行しますか？ (yes/no)」
+    - ユーザーの応答を待ちます。"no", "wait", "stop" の場合は停止。"yes", "proceed", "continue" の場合はステップ3へ進みます。
+- **すべて完了の場合**:
+    - 自動的にステップ3へ進みます。
 
-4. **Project Setup Verification**:
-   - **REQUIRED**: Create/verify ignore files based on actual project setup:
+### 3. 実装コンテキストの読み込みと分析
 
-   **Detection & Creation Logic**:
-   - Check if the following command succeeds to determine if the repository is a git repo (create/verify .gitignore if so):
+- **必須**: `tasks.md` を読み、完全なタスクリストと実行計画を取得します。
+- **必須**: `plan.md` を読み、技術スタック、アーキテクチャ、ファイル構造を取得します。
+- **存在する場合**: `data-model.md` を読み、エンティティとリレーションシップを取得します。
+- **存在する場合**: `contracts/` を読み、API仕様とテスト要件を取得します。
+- **存在する場合**: `research.md` を読み、技術的な決定と制約を取得します。
+- **存在する場合**: `quickstart.md` を読み、統合シナリオを取得します。
 
-     ```sh
-     git rev-parse --git-dir 2>/dev/null
-     ```
+### 4. プロジェクトセットアップ検証
 
-   - Check if Dockerfile* exists or Docker in plan.md → create/verify .dockerignore
-   - Check if .eslintrc* exists → create/verify .eslintignore
-   - Check if eslint.config.* exists → ensure the config's `ignores` entries cover required patterns
-   - Check if .prettierrc* exists → create/verify .prettierignore
-   - Check if .npmrc or package.json exists → create/verify .npmignore (if publishing)
-   - Check if terraform files (*.tf) exist → create/verify .terraformignore
-   - Check if .helmignore needed (helm charts present) → create/verify .helmignore
+- **必須**: 実際のプロジェクト設定に基づいて ignore ファイルを作成/検証します：
 
-   **If ignore file already exists**: Verify it contains essential patterns, append missing critical patterns only
-   **If ignore file missing**: Create with full pattern set for detected technology
+**検出と作成ロジック**:
+- Gitリポジトリか確認し、そうであれば `.gitignore` を作成/検証します。
+- Dockerfile* または plan.md に Docker がある → `.dockerignore` を作成/検証
+- .eslintrc* がある → `.eslintignore` を作成/検証
+- eslint.config.* がある → configの `ignores` エントリが必要なパターンをカバーしているか確認
+- .prettierrc* がある → `.prettierignore` を作成/検証
+- .npmrc または package.json がある → `.npmignore` を作成/検証（公開する場合）
+- terraform ファイル (*.tf) がある → `.terraformignore` を作成/検証
+- .helmignore が必要（helmチャートあり） → `.helmignore` を作成/検証
 
-   **Common Patterns by Technology** (from plan.md tech stack):
-   - **Node.js/JavaScript/TypeScript**: `node_modules/`, `dist/`, `build/`, `*.log`, `.env*`
-   - **Python**: `__pycache__/`, `*.pyc`, `.venv/`, `venv/`, `dist/`, `*.egg-info/`
-   - **Java**: `target/`, `*.class`, `*.jar`, `.gradle/`, `build/`
-   - **C#/.NET**: `bin/`, `obj/`, `*.user`, `*.suo`, `packages/`
-   - **Go**: `*.exe`, `*.test`, `vendor/`, `*.out`
-   - **Ruby**: `.bundle/`, `log/`, `tmp/`, `*.gem`, `vendor/bundle/`
-   - **PHP**: `vendor/`, `*.log`, `*.cache`, `*.env`
-   - **Rust**: `target/`, `debug/`, `release/`, `*.rs.bk`, `*.rlib`, `*.prof*`, `.idea/`, `*.log`, `.env*`
-   - **Kotlin**: `build/`, `out/`, `.gradle/`, `.idea/`, `*.class`, `*.jar`, `*.iml`, `*.log`, `.env*`
-   - **C++**: `build/`, `bin/`, `obj/`, `out/`, `*.o`, `*.so`, `*.a`, `*.exe`, `*.dll`, `.idea/`, `*.log`, `.env*`
-   - **C**: `build/`, `bin/`, `obj/`, `out/`, `*.o`, `*.a`, `*.so`, `*.exe`, `Makefile`, `config.log`, `.idea/`, `*.log`, `.env*`
-   - **Swift**: `.build/`, `DerivedData/`, `*.swiftpm/`, `Packages/`
-   - **R**: `.Rproj.user/`, `.Rhistory`, `.RData`, `.Ruserdata`, `*.Rproj`, `packrat/`, `renv/`
-   - **Universal**: `.DS_Store`, `Thumbs.db`, `*.tmp`, `*.swp`, `.vscode/`, `.idea/`
+**ignoreファイルが既に存在する場合**: 必須パターンが含まれているか確認し、欠落している重要なパターンのみを追加します。
+**ignoreファイルがない場合**: 検出された技術用の完全なパターンセットで作成します。
 
-   **Tool-Specific Patterns**:
-   - **Docker**: `node_modules/`, `.git/`, `Dockerfile*`, `.dockerignore`, `*.log*`, `.env*`, `coverage/`
-   - **ESLint**: `node_modules/`, `dist/`, `build/`, `coverage/`, `*.min.js`
-   - **Prettier**: `node_modules/`, `dist/`, `build/`, `coverage/`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`
-   - **Terraform**: `.terraform/`, `*.tfstate*`, `*.tfvars`, `.terraform.lock.hcl`
-   - **Kubernetes/k8s**: `*.secret.yaml`, `secrets/`, `.kube/`, `kubeconfig*`, `*.key`, `*.crt`
+**技術別の一般的なパターン** (plan.md の技術スタックから):
+- **Node.js/JavaScript/TypeScript**: `node_modules/`, `dist/`, `build/`, `*.log`, `.env*`
+- **Python**: `__pycache__/`, `*.pyc`, `.venv/`, `venv/`, `dist/`, `*.egg-info/`
+- **Java**: `target/`, `*.class`, `*.jar`, `.gradle/`, `build/`
+- **C#/.NET**: `bin/`, `obj/`, `*.user`, `*.suo`, `packages/`
+- **Go**: `*.exe`, `*.test`, `vendor/`, `*.out`
+- **Ruby**: `.bundle/`, `log/`, `tmp/`, `*.gem`, `vendor/bundle/`
+- **PHP**: `vendor/`, `*.log`, `*.cache`, `*.env`
+- **Rust**: `target/`, `debug/`, `release/`, `*.rs.bk`, `*.rlib`, `*.prof*`, `.idea/`, `*.log`, `.env*`
+- **Kotlin**: `build/`, `out/`, `.gradle/`, `.idea/`, `*.class`, `*.jar`, `*.iml`, `*.log`, `.env*`
+- **C++**: `build/`, `bin/`, `obj/`, `out/`, `*.o`, `*.so`, `*.a`, `*.exe`, `*.dll`, `.idea/`, `*.log`, `.env*`
+- **C**: `build/`, `bin/`, `obj/`, `out/`, `*.o`, `*.a`, `*.so`, `*.exe`, `Makefile`, `config.log`, `.idea/`, `*.log`, `.env*`
+- **Swift**: `.build/`, `DerivedData/`, `*.swiftpm/`, `Packages/`
+- **R**: `.Rproj.user/`, `.Rhistory`, `.RData`, `.Ruserdata`, `*.Rproj`, `packrat/`, `renv/`
+- **Universal**: `.DS_Store`, `Thumbs.db`, `*.tmp`, `*.swp`, `.vscode/`, `.idea/`
 
-5. Parse tasks.md structure and extract:
-   - **Task phases**: Setup, Tests, Core, Integration, Polish
-   - **Task dependencies**: Sequential vs parallel execution rules
-   - **Task details**: ID, description, file paths, parallel markers [P]
-   - **Execution flow**: Order and dependency requirements
+**ツール固有のパターン**:
+- **Docker**: `node_modules/`, `.git/`, `Dockerfile*`, `.dockerignore`, `*.log*`, `.env*`, `coverage/`
+- **ESLint**: `node_modules/`, `dist/`, `build/`, `coverage/`, `*.min.js`
+- **Prettier**: `node_modules/`, `dist/`, `build/`, `coverage/`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`
+- **Terraform**: `.terraform/`, `*.tfstate*`, `*.tfvars`, `.terraform.lock.hcl`
+- **Kubernetes/k8s**: `*.secret.yaml`, `secrets/`, `.kube/`, `kubeconfig*`, `*.key`, `*.crt`
 
-6. Execute implementation following the task plan:
-   - **Phase-by-phase execution**: Complete each phase before moving to the next
-   - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together  
-   - **Follow TDD approach**: Execute test tasks before their corresponding implementation tasks
-   - **File-based coordination**: Tasks affecting the same files must run sequentially
-   - **Validation checkpoints**: Verify each phase completion before proceeding
+### 5. tasks.md の解析
 
-7. Implementation execution rules:
-   - **Setup first**: Initialize project structure, dependencies, configuration
-   - **Tests before code**: If you need to write tests for contracts, entities, and integration scenarios
-   - **Core development**: Implement models, services, CLI commands, endpoints
-   - **Integration work**: Database connections, middleware, logging, external services
-   - **Polish and validation**: Unit tests, performance optimization, documentation
+以下を抽出します：
+- **タスクフェーズ**: Setup, Tests, Core, Integration, Polish
+- **タスク依存関係**: 順次実行 vs 並行実行ルール
+- **タスク詳細**: ID, 説明, ファイルパス, 並行マーカー [P]
+- **実行フロー**: 順序と依存要件
 
-8. Progress tracking and error handling:
-   - Report progress after each completed task
-   - Halt execution if any non-parallel task fails
-   - For parallel tasks [P], continue with successful tasks, report failed ones
-   - Provide clear error messages with context for debugging
-   - Suggest next steps if implementation cannot proceed
-   - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
+### 6. タスク計画に従った実装の実行
 
-9. Completion validation:
-   - Verify all required tasks are completed
-   - Check that implemented features match the original specification
-   - Validate that tests pass and coverage meets requirements
-   - Confirm the implementation follows the technical plan
-   - Report final status with summary of completed work
+- **フェーズごとの実行**: 次のフェーズに進む前に各フェーズを完了させます
+- **依存関係の尊重**: 順次タスクは順番に実行し、並行タスク [P] は一緒に実行できます
+- **TDDアプローチ**: 実装タスクの前にテストタスクを実行します
+- **ファイルベースの協調**: 同じファイルに影響するタスクは順次実行する必要があります
+- **検証チェックポイント**: 進む前に各フェーズの完了を検証します
 
-Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit.tasks` first to regenerate the task list.
+### 7. 実装実行ルール
+
+- **セットアップを最初に**: プロジェクト構造、依存関係、設定を初期化
+- **コードの前にテスト**: カントラクト、エンティティ、統合シナリオのテストを書く必要がある場合
+- **コア開発**: モデル、サービス、CLIコマンド、エンドポイントを実装
+- **統合ワーク**: データベース接続、ミドルウェア、ログ、外部サービス
+- **仕上げと検証**: ユニットテスト、パフォーマンス最適化、ドキュメント
+
+### 8. 進捗追跡とエラー処理
+
+- 各タスク完了後に進捗を報告します
+- 非並行タスクが失敗した場合は実行を停止します
+- 並行タスク [P] の場合は、成功したタスクを続行し、失敗したものを報告します
+- デバッグのためのコンテキストを含む明確なエラーメッセージを提供します
+- 実装を続行できない場合は次のステップを提案します
+- **重要**: 完了したタスクについては、タスクファイルの [X] マークを必ず付けてください。
+
+### 9. 完了検証
+
+- すべての必須タスクが完了していることを確認します
+- 実装された機能が元の仕様と一致することを確認します
+- テストが合格し、カバレッジが要件を満たしていることを検証します
+- 実装が技術計画に従っていることを確認します
+- 完了した作業のサマリーと共に最終ステータスを報告します
+
+注: このコマンドは `tasks.md` に完全なタスク内訳が存在することを前提としています。タスクが不完全または欠落している場合は、まず `/speckit.tasks` を実行してタスクリストを再生成することを提案してください。
