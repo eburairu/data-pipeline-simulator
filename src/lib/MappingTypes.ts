@@ -1,5 +1,5 @@
 
-export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' | 'cleansing';
+export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' | 'cleansing' | 'deduplicator' | 'pivot' | 'unpivot' | 'sql';
 
 export interface TransformationConfig {
   // Common
@@ -138,12 +138,40 @@ export interface CleansingConfig extends TransformationConfig {
   rules: CleansingRule[];
 }
 
+// Deduplicator: 重複行削除（IDMC CDI機能）
+export interface DeduplicatorConfig extends TransformationConfig {
+  keys: string[]; // 重複判定キー（空の場合は全フィールド）
+  caseInsensitive: boolean;
+}
+
+// Pivot: 行→列変換（IDMC CDI機能）
+export interface PivotConfig extends TransformationConfig {
+  groupByFields: string[]; // グループ化キー
+  pivotField: string; // 列名になる値を持つフィールド
+  valueField: string; // 値になるフィールド
+  aggregates?: string[]; // ピボット後の集計（sum, max等 - 簡易実装ではoptional）
+}
+
+// Unpivot: 列→行変換（IDMC CDI機能）
+export interface UnpivotConfig extends TransformationConfig {
+  fieldsToUnpivot: string[]; // 行に展開するフィールド群
+  newHeaderFieldName: string; // 元のフィールド名を格納する列名
+  newValueFieldName: string; // 値を格納する列名
+}
+
+// SQL: SQL実行（IDMC CDI機能 - 簡易シミュレーション）
+export interface SqlConfig extends TransformationConfig {
+  sqlQuery: string; // 実行するSQL
+  dbConnectionId?: string; // 接続先（あれば）
+  mode: 'query' | 'procedure' | 'script';
+}
+
 export interface Transformation {
   id: string;
   type: TransformationType;
   name: string;
   position: { x: number, y: number }; // For visual layout
-  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig | CleansingConfig;
+  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig | CleansingConfig | DeduplicatorConfig | PivotConfig | UnpivotConfig | SqlConfig;
 }
 
 export interface MappingLink {

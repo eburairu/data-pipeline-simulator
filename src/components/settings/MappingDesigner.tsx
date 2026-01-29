@@ -37,9 +37,37 @@ import {
     type RankConfig,
     type SequenceConfig,
     type UpdateStrategyConfig,
-    type CleansingConfig
+    type CleansingConfig,
+    type DeduplicatorConfig,
+    type PivotConfig,
+    type UnpivotConfig,
+    type SqlConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles, Copy, Table, Columns, Database } from 'lucide-react';
+
+// --- Constants ---
+const TRANSFORMATION_TYPES = [
+    { type: 'source', label: 'Source', short: 'SRC', bg: 'bg-green-100', border: 'border-green-500', icon: null },
+    { type: 'filter', label: 'Filter', short: 'FLT', bg: 'bg-yellow-100', border: 'border-yellow-500', icon: null },
+    { type: 'expression', label: 'Expression', short: 'EXP', bg: 'bg-purple-100', border: 'border-purple-500', icon: null },
+    { type: 'aggregator', label: 'Aggregator', short: 'AGG', bg: 'bg-orange-100', border: 'border-orange-500', icon: null },
+    { type: 'validator', label: 'Validator', short: null, bg: 'bg-pink-100', border: 'border-pink-500', icon: CheckSquare },
+    { type: 'joiner', label: 'Joiner', short: 'JOIN', bg: 'bg-blue-100', border: 'border-blue-500', icon: null },
+    { type: 'lookup', label: 'Lookup', short: null, bg: 'bg-cyan-100', border: 'border-cyan-500', icon: Search },
+    { type: 'router', label: 'Router', short: null, bg: 'bg-lime-100', border: 'border-lime-500', icon: GitFork },
+    { type: 'sorter', label: 'Sorter', short: null, bg: 'bg-amber-100', border: 'border-amber-500', icon: ArrowUpDown },
+    { type: 'union', label: 'Union', short: null, bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Merge },
+    { type: 'normalizer', label: 'Normalizer', short: null, bg: 'bg-violet-100', border: 'border-violet-500', icon: Repeat },
+    { type: 'rank', label: 'Rank', short: null, bg: 'bg-rose-100', border: 'border-rose-500', icon: Award },
+    { type: 'sequence', label: 'Sequence', short: null, bg: 'bg-sky-100', border: 'border-sky-500', icon: Hash },
+    { type: 'updateStrategy', label: 'Update Strategy', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Flag },
+    { type: 'cleansing', label: 'Cleansing', short: null, bg: 'bg-teal-100', border: 'border-teal-500', icon: Sparkles },
+    { type: 'deduplicator', label: 'Deduplicator', short: null, bg: 'bg-orange-100', border: 'border-orange-500', icon: Copy },
+    { type: 'pivot', label: 'Pivot', short: null, bg: 'bg-purple-100', border: 'border-purple-500', icon: Table },
+    { type: 'unpivot', label: 'Unpivot', short: null, bg: 'bg-fuchsia-100', border: 'border-fuchsia-500', icon: Columns },
+    { type: 'sql', label: 'SQL', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Database },
+    { type: 'target', label: 'Target', short: 'TGT', bg: 'bg-red-100', border: 'border-red-500', icon: null },
+];
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
@@ -158,6 +186,10 @@ const MappingDesigner: React.FC = () => {
         if (type === 'sequence') newTrans.config = { sequenceField: 'seq', startValue: 1, incrementBy: 1 } as SequenceConfig;
         if (type === 'updateStrategy') newTrans.config = { strategyField: '_strategy', defaultStrategy: 'insert', conditions: [] } as UpdateStrategyConfig;
         if (type === 'cleansing') newTrans.config = { rules: [] } as CleansingConfig;
+        if (type === 'deduplicator') newTrans.config = { keys: [], caseInsensitive: false } as DeduplicatorConfig;
+        if (type === 'pivot') newTrans.config = { groupByFields: [], pivotField: '', valueField: '' } as PivotConfig;
+        if (type === 'unpivot') newTrans.config = { fieldsToUnpivot: [], newHeaderFieldName: 'Metric', newValueFieldName: 'Value' } as UnpivotConfig;
+        if (type === 'sql') newTrans.config = { sqlQuery: '', mode: 'query' } as SqlConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -1139,6 +1171,129 @@ const MappingDesigner: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Deduplicator Editor */}
+                {node.type === 'deduplicator' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Unique Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. email, date"
+                                value={(node.config as DeduplicatorConfig).keys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    keys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Leave empty to use all fields</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={(node.config as DeduplicatorConfig).caseInsensitive || false}
+                                onChange={e => updateTransformationConfig(node.id, { caseInsensitive: e.target.checked })}
+                            />
+                            <label className="text-xs text-gray-500">Case Insensitive</label>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pivot Editor */}
+                {node.type === 'pivot' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Group By Fields</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. region, year"
+                                value={(node.config as PivotConfig).groupByFields?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    groupByFields: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Pivot Field (Column Header Source)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. month"
+                                value={(node.config as PivotConfig).pivotField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { pivotField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Value Field</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. sales"
+                                value={(node.config as PivotConfig).valueField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { valueField: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Unpivot Editor */}
+                {node.type === 'unpivot' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Fields to Unpivot</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. jan_sales, feb_sales, mar_sales"
+                                value={(node.config as UnpivotConfig).fieldsToUnpivot?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    fieldsToUnpivot: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">New Header Column Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. month"
+                                value={(node.config as UnpivotConfig).newHeaderFieldName || 'Metric'}
+                                onChange={e => updateTransformationConfig(node.id, { newHeaderFieldName: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">New Value Column Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. sales_amount"
+                                value={(node.config as UnpivotConfig).newValueFieldName || 'Value'}
+                                onChange={e => updateTransformationConfig(node.id, { newValueFieldName: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* SQL Editor */}
+                {node.type === 'sql' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">SQL Query (Simulation Only)</label>
+                            <textarea
+                                className="w-full border rounded p-1 text-sm font-mono h-24"
+                                placeholder="SELECT * FROM table WHERE ..."
+                                value={(node.config as SqlConfig).sqlQuery || ''}
+                                onChange={e => updateTransformationConfig(node.id, { sqlQuery: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Mode</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as SqlConfig).mode || 'query'}
+                                onChange={e => updateTransformationConfig(node.id, { mode: e.target.value as any })}
+                            >
+                                <option value="query">Query</option>
+                                <option value="procedure">Procedure</option>
+                                <option value="script">Script</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -1164,23 +1319,20 @@ const MappingDesigner: React.FC = () => {
 
                 <div className="flex-grow flex flex-col md:flex-row overflow-hidden relative">
                     {/* Toolbar */}
-                    <div className="w-full md:w-12 h-auto md:h-full bg-gray-100 border-t md:border-t-0 md:border-r flex flex-row md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-4 order-last md:order-first shrink-0">
-                        <button title="Add Source" onClick={() => addTransformation('source')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-green-100 border-green-500 border rounded flex items-center justify-center text-[10px]">SRC</div></button>
-                        <button title="Add Filter" onClick={() => addTransformation('filter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-yellow-100 border-yellow-500 border rounded flex items-center justify-center text-[10px]">FLT</div></button>
-                        <button title="Add Expression" onClick={() => addTransformation('expression')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-purple-100 border-purple-500 border rounded flex items-center justify-center text-[10px]">EXP</div></button>
-                        <button title="Add Aggregator" onClick={() => addTransformation('aggregator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-orange-100 border-orange-500 border rounded flex items-center justify-center text-[10px]">AGG</div></button>
-                        <button title="Add Validator" onClick={() => addTransformation('validator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-pink-100 border-pink-500 border rounded flex items-center justify-center text-[10px]"><CheckSquare size={12} /></div></button>
-                        <button title="Add Joiner" onClick={() => addTransformation('joiner')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-blue-100 border-blue-500 border rounded flex items-center justify-center text-[10px]">JOIN</div></button>
-                        <button title="Add Lookup" onClick={() => addTransformation('lookup')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-cyan-100 border-cyan-500 border rounded flex items-center justify-center text-[10px]"><Search size={12} /></div></button>
-                        <button title="Add Router" onClick={() => addTransformation('router')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-lime-100 border-lime-500 border rounded flex items-center justify-center text-[10px]"><GitFork size={12} /></div></button>
-                        <button title="Add Sorter" onClick={() => addTransformation('sorter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-amber-100 border-amber-500 border rounded flex items-center justify-center text-[10px]"><ArrowUpDown size={12} /></div></button>
-                        <button title="Add Union" onClick={() => addTransformation('union')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-indigo-100 border-indigo-500 border rounded flex items-center justify-center text-[10px]"><Merge size={12} /></div></button>
-                        <button title="Add Normalizer" onClick={() => addTransformation('normalizer')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-violet-100 border-violet-500 border rounded flex items-center justify-center text-[10px]"><Repeat size={12} /></div></button>
-                        <button title="Add Rank" onClick={() => addTransformation('rank')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-rose-100 border-rose-500 border rounded flex items-center justify-center text-[10px]"><Award size={12} /></div></button>
-                        <button title="Add Sequence" onClick={() => addTransformation('sequence')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-sky-100 border-sky-500 border rounded flex items-center justify-center text-[10px]"><Hash size={12} /></div></button>
-                        <button title="Add UpdateStrategy" onClick={() => addTransformation('updateStrategy')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-slate-100 border-slate-500 border rounded flex items-center justify-center text-[10px]"><Flag size={12} /></div></button>
-                        <button title="Add Cleansing" onClick={() => addTransformation('cleansing')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-teal-100 border-teal-500 border rounded flex items-center justify-center text-[10px]"><Sparkles size={12} /></div></button>
-                        <button title="Add Target" onClick={() => addTransformation('target')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-red-100 border-red-500 border rounded flex items-center justify-center text-[10px]">TGT</div></button>
+                    <div className="w-full md:w-48 h-auto md:h-full bg-gray-100 border-t md:border-t-0 md:border-r flex flex-row md:flex-col items-center md:items-stretch justify-start py-2 gap-2 overflow-x-auto md:overflow-y-auto order-last md:order-first shrink-0 px-2">
+                        {TRANSFORMATION_TYPES.map((t) => (
+                            <button
+                                key={t.type}
+                                title={`Add ${t.label}`}
+                                onClick={() => addTransformation(t.type as TransformationType)}
+                                className="flex items-center gap-2 p-1 rounded hover:bg-gray-200 group transition-colors"
+                            >
+                                <div className={`w-8 h-8 ${t.bg} ${t.border} border rounded flex items-center justify-center text-[10px] shrink-0`}>
+                                    {t.icon ? <t.icon size={12} /> : t.short}
+                                </div>
+                                <span className="text-sm text-gray-700 hidden md:block whitespace-nowrap">{t.label}</span>
+                            </button>
+                        ))}
                     </div>
 
                     {/* Canvas */}

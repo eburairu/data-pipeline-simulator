@@ -16,7 +16,11 @@ import {
     type RankConfig,
     type SequenceConfig,
     type UpdateStrategyConfig,
-    type CleansingConfig
+    type CleansingConfig,
+    type DeduplicatorConfig,
+    type PivotConfig,
+    type UnpivotConfig,
+    type SqlConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 
@@ -591,6 +595,98 @@ const traverse = (
                         return newRow;
                     });
                     console.log(`[MappingEngine] Cleansing ${nextNode.name}: cleansed ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'deduplicator': {
+                    // Deduplicator: 重複除外
+                    const conf = nextNode.config as DeduplicatorConfig;
+                    const keys = conf.keys || [];
+                    const caseInsensitive = conf.caseInsensitive || false;
+
+                    const seen = new Set<string>();
+                    processedBatch = batch.filter(row => {
+                        let uniqueKey = '';
+                        if (keys.length === 0) {
+                            // 全フィールドをキーとする
+                            uniqueKey = JSON.stringify(row);
+                        } else {
+                            uniqueKey = keys.map(k => {
+                                const val = row[k];
+                                return (caseInsensitive && typeof val === 'string') ? val.toLowerCase() : val;
+                            }).join('::');
+                        }
+
+                        if (seen.has(uniqueKey)) {
+                            return false;
+                        }
+                        seen.add(uniqueKey);
+                        return true;
+                    });
+                    console.log(`[MappingEngine] Deduplicator ${nextNode.name}: reduced ${batch.length} to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'pivot': {
+                    // Pivot: 行→列変換（簡易実装）
+                    const conf = nextNode.config as PivotConfig;
+                    const groupByFields = conf.groupByFields || [];
+                    const pivotField = conf.pivotField || '';
+                    const valueField = conf.valueField || '';
+
+                    if (!pivotField || !valueField) {
+                        processedBatch = batch;
+                        break;
+                    }
+
+                    // グループ化
+                    const groups: Record<string, any> = {};
+                    batch.forEach(row => {
+                        const groupKey = groupByFields.map(k => row[k]).join('::');
+                        if (!groups[groupKey]) {
+                            groups[groupKey] = {};
+                            groupByFields.forEach(k => groups[groupKey][k] = row[k]);
+                        }
+
+                        // ピボット列の値をキーにして値を格納
+                        const pivotKey = row[pivotField];
+                        if (pivotKey !== undefined && pivotKey !== null) {
+                            groups[groupKey][String(pivotKey)] = row[valueField];
+                        }
+                    });
+
+                    processedBatch = Object.values(groups);
+                    console.log(`[MappingEngine] Pivot ${nextNode.name}: pivoted ${batch.length} rows to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'unpivot': {
+                    // Unpivot: 列→行変換
+                    const conf = nextNode.config as UnpivotConfig;
+                    const fieldsToUnpivot = conf.fieldsToUnpivot || [];
+                    const headerField = conf.newHeaderFieldName || 'Metric';
+                    const valueField = conf.newValueFieldName || 'Value';
+
+                    processedBatch = [];
+                    batch.forEach(row => {
+                        fieldsToUnpivot.forEach(field => {
+                            if (row[field] !== undefined) {
+                                const newRow = { ...row };
+                                // アンピボット対象フィールドは削除して、新しいヘッダーと値フィールドを追加
+                                fieldsToUnpivot.forEach(f => delete newRow[f]);
+                                newRow[headerField] = field;
+                                newRow[valueField] = row[field];
+                                processedBatch.push(newRow);
+                            }
+                        });
+                        // アンピボット対象がない行はスキップされる（IDMC仕様に合わせるなら保持オプションが必要だが簡易実装）
+                    });
+                    console.log(`[MappingEngine] Unpivot ${nextNode.name}: expanded ${batch.length} rows to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'sql': {
+                    // SQL: 簡易シミュレーション（パススルー）
+                    const conf = nextNode.config as SqlConfig;
+                    // 実際にはSQLは実行せず、ログに出力してデータを通過させる
+                    console.log(`[MappingEngine] SQL ${nextNode.name}: Query "${conf.sqlQuery}" executed for ${batch.length} rows (simulation)`);
+                    processedBatch = batch.map(row => ({ ...row, _sql_status: 'success' }));
                     break;
                 }
                 default:
