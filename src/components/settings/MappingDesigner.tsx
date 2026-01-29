@@ -26,9 +26,10 @@ import {
     type TargetConfig,
     type FilterConfig,
     type ExpressionConfig,
-    type AggregatorConfig
+    type AggregatorConfig,
+    type ValidatorConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare } from 'lucide-react';
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
@@ -136,6 +137,7 @@ const MappingDesigner: React.FC = () => {
         if (type === 'filter') newTrans.config = { condition: 'true' } as FilterConfig;
         if (type === 'expression') newTrans.config = { fields: [] } as ExpressionConfig;
         if (type === 'aggregator') newTrans.config = { groupBy: [], aggregates: [] } as AggregatorConfig;
+        if (type === 'validator') newTrans.config = { rules: [], errorBehavior: 'skip' } as ValidatorConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -527,6 +529,104 @@ const MappingDesigner: React.FC = () => {
                         </p>
                     </div>
                 )}
+
+                {/* Validator Editor */}
+                {node.type === 'validator' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Error Behavior</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as ValidatorConfig).errorBehavior}
+                                onChange={e => updateTransformationConfig(node.id, { errorBehavior: e.target.value })}
+                            >
+                                <option value="skip">Skip Row</option>
+                                <option value="error">Fail Job</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Validation Rules</label>
+                            <button
+                                onClick={() => {
+                                    const currentRules = (node.config as ValidatorConfig).rules || [];
+                                    updateTransformationConfig(node.id, {
+                                        rules: [...currentRules, { field: '', type: 'string', required: false }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Rule
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as ValidatorConfig).rules || []).map((rule, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-2">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Field name"
+                                            value={rule.field}
+                                            onChange={e => {
+                                                const rules = [...(node.config as ValidatorConfig).rules];
+                                                rules[idx] = { ...rules[idx], field: e.target.value };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const rules = (node.config as ValidatorConfig).rules.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <label className="flex items-center gap-1 text-xs cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.required}
+                                                onChange={e => {
+                                                    const rules = [...(node.config as ValidatorConfig).rules];
+                                                    rules[idx] = { ...rules[idx], required: e.target.checked };
+                                                    updateTransformationConfig(node.id, { rules });
+                                                }}
+                                            />
+                                            Req
+                                        </label>
+                                        <select
+                                            className="border rounded p-0.5 text-xs flex-grow"
+                                            value={rule.type}
+                                            onChange={e => {
+                                                const rules = [...(node.config as ValidatorConfig).rules];
+                                                rules[idx] = { ...rules[idx], type: e.target.value as any };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        >
+                                            <option value="string">String</option>
+                                            <option value="number">Number</option>
+                                            <option value="boolean">Boolean</option>
+                                        </select>
+                                    </div>
+                                    <input
+                                        className="w-full border rounded p-1 text-xs font-mono"
+                                        placeholder="Regex (optional)"
+                                        value={rule.regex || ''}
+                                        onChange={e => {
+                                            const rules = [...(node.config as ValidatorConfig).rules];
+                                            rules[idx] = { ...rules[idx], regex: e.target.value };
+                                            updateTransformationConfig(node.id, { rules });
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                            {((node.config as ValidatorConfig).rules || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No validation rules defined.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -557,6 +657,7 @@ const MappingDesigner: React.FC = () => {
                         <button title="Add Filter" onClick={() => addTransformation('filter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-yellow-100 border-yellow-500 border rounded flex items-center justify-center text-[10px]">FLT</div></button>
                         <button title="Add Expression" onClick={() => addTransformation('expression')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-purple-100 border-purple-500 border rounded flex items-center justify-center text-[10px]">EXP</div></button>
                         <button title="Add Aggregator" onClick={() => addTransformation('aggregator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-orange-100 border-orange-500 border rounded flex items-center justify-center text-[10px]">AGG</div></button>
+                        <button title="Add Validator" onClick={() => addTransformation('validator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-pink-100 border-pink-500 border rounded flex items-center justify-center text-[10px]"><CheckSquare size={12} /></div></button>
                         <button title="Add Target" onClick={() => addTransformation('target')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-red-100 border-red-500 border rounded flex items-center justify-center text-[10px]">TGT</div></button>
                     </div>
 

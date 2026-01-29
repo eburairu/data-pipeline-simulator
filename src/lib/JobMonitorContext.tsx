@@ -21,13 +21,14 @@ interface JobMonitorContextType {
   logs: JobExecutionLog[];
   addLog: (log: Omit<JobExecutionLog, 'id'>) => void;
   clearLogs: () => void;
+  retryJob: (jobId: string, jobType: JobType) => void;
 }
 
 const JobMonitorContext = createContext<JobMonitorContextType | undefined>(undefined);
 
 const MAX_LOGS = 200;
 
-export const JobMonitorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const JobMonitorProvider: React.FC<{ children: ReactNode; retryJob?: (jobId: string, jobType: JobType) => void }> = ({ children, retryJob }) => {
   const [logs, setLogs] = useState<JobExecutionLog[]>([]);
 
   const addLog = useCallback((logData: Omit<JobExecutionLog, 'id'>) => {
@@ -49,8 +50,10 @@ export const JobMonitorProvider: React.FC<{ children: ReactNode }> = ({ children
     setLogs([]);
   }, []);
 
+  const handleRetry = retryJob || ((id, type) => console.warn(`Retry not implemented for ${type} job ${id}`));
+
   return (
-    <JobMonitorContext.Provider value={{ logs, addLog, clearLogs }}>
+    <JobMonitorContext.Provider value={{ logs, addLog, clearLogs, retryJob: handleRetry }}>
       {children}
     </JobMonitorContext.Provider>
   );

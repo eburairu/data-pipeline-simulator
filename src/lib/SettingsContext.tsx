@@ -24,11 +24,13 @@ export interface DataSourceSettings {
   jobs: GenerationJob[];
 }
 
-export interface Topic {
+export interface TopicDefinition {
   id: string;
   name: string;
   retentionPeriod: number; // ms
 }
+
+export type Topic = TopicDefinition; // Alias for backward compatibility if needed, or replace usages
 
 export interface CollectionJob {
   id: string;
@@ -136,7 +138,7 @@ interface SettingsContextType {
   isHostInUse: (hostName: string) => boolean;
   isDirectoryInUse: (hostName: string, path: string) => boolean;
 
-  topics: Topic[];
+  topics: TopicDefinition[];
   addTopic: (name: string, retentionPeriod: number) => void;
   removeTopic: (id: string) => void;
   updateTopic: (id: string, name: string, retentionPeriod: number) => void;
@@ -245,7 +247,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     { name: 'localhost', directories: ['/incoming', '/internal'] },
   ]);
 
-  const [topics, setTopics] = useState<Topic[]>([
+  const [topics, setTopics] = useState<TopicDefinition[]>([
     { id: 'topic_1', name: 'SalesData', retentionPeriod: 60000 } // Default 1 min
   ]);
 
