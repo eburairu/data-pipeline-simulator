@@ -1,5 +1,5 @@
 
-export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator';
+export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner';
 
 export interface TransformationConfig {
   // Common
@@ -53,12 +53,19 @@ export interface ValidatorConfig extends TransformationConfig {
   errorBehavior: 'skip' | 'error';
 }
 
+// Joiner: 2つのソースからのデータを結合キーで結合する（IDMC CDI機能）
+export interface JoinerConfig extends TransformationConfig {
+  joinType: 'inner' | 'left' | 'right' | 'full';
+  masterKeys: string[];  // マスター側の結合キー
+  detailKeys: string[];  // 詳細側の結合キー
+}
+
 export interface Transformation {
   id: string;
   type: TransformationType;
   name: string;
   position: { x: number, y: number }; // For visual layout
-  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig;
+  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig;
 }
 
 export interface MappingLink {

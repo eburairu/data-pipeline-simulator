@@ -7,7 +7,8 @@ import {
     type FilterConfig,
     type ExpressionConfig,
     type AggregatorConfig,
-    type ValidatorConfig
+    type ValidatorConfig,
+    type JoinerConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 
@@ -196,6 +197,85 @@ const traverse = (
                         }
                     }
                     processedBatch = batch;
+                    break;
+                }
+                case 'joiner': {
+                    // Joiner: 2つの入力を結合
+                    // 最初の入力はキャッシュし、2番目の入力で結合を実行
+                    const conf = nextNode.config as JoinerConfig;
+                    const joinerCacheKey = `joiner_${nextNode.id}`;
+
+                    // 入力エッジを取得（Joinerへの入力）
+                    const incomingLinks = mapping.links.filter(l => l.targetId === nextNode.id);
+
+                    if (incomingLinks.length < 2) {
+                        // 2つの入力がない場合はそのまま通過
+                        console.warn(`[MappingEngine] Joiner ${nextNode.name} requires 2 inputs, only ${incomingLinks.length} connected`);
+                        processedBatch = batch;
+                    } else {
+                        // キャッシュを確認
+                        if (!stats[joinerCacheKey]) {
+                            // 最初の入力: マスターとしてキャッシュ
+                            (stats as any)[joinerCacheKey] = { masterBatch: batch, received: 1 };
+                            processedBatch = []; // 結合はまだ実行しない
+                        } else {
+                            // 2番目の入力: 結合を実行
+                            const cache = (stats as any)[joinerCacheKey];
+                            const masterBatch = cache.masterBatch as any[];
+                            const detailBatch = batch;
+
+                            // 結合キーを取得
+                            const masterKeys = conf.masterKeys || [];
+                            const detailKeys = conf.detailKeys || [];
+
+                            // 結合実行
+                            const joinedRows: any[] = [];
+                            const matchedDetailIndices = new Set<number>();
+
+                            for (const masterRow of masterBatch) {
+                                let matched = false;
+                                for (let di = 0; di < detailBatch.length; di++) {
+                                    const detailRow = detailBatch[di];
+                                    // キー一致チェック
+                                    let keysMatch = true;
+                                    for (let ki = 0; ki < masterKeys.length; ki++) {
+                                        const mk = masterKeys[ki];
+                                        const dk = detailKeys[ki] || mk;
+                                        if (masterRow[mk] !== detailRow[dk]) {
+                                            keysMatch = false;
+                                            break;
+                                        }
+                                    }
+                                    if (keysMatch) {
+                                        matched = true;
+                                        matchedDetailIndices.add(di);
+                                        // マスター + 詳細を結合
+                                        joinedRows.push({ ...masterRow, ...detailRow });
+                                    }
+                                }
+
+                                // Left/Full Join: マッチなしでもマスター行を含める
+                                if (!matched && (conf.joinType === 'left' || conf.joinType === 'full')) {
+                                    joinedRows.push({ ...masterRow });
+                                }
+                            }
+
+                            // Right/Full Join: マッチしなかった詳細行を含める
+                            if (conf.joinType === 'right' || conf.joinType === 'full') {
+                                for (let di = 0; di < detailBatch.length; di++) {
+                                    if (!matchedDetailIndices.has(di)) {
+                                        joinedRows.push({ ...detailBatch[di] });
+                                    }
+                                }
+                            }
+
+                            processedBatch = joinedRows;
+                            console.log(`[MappingEngine] Joiner ${nextNode.name}: ${conf.joinType} join produced ${joinedRows.length} rows`);
+
+                            // キャッシュをクリア
+                            delete (stats as any)[joinerCacheKey];
+                        }
+                    }
                     break;
                 }
                 default:

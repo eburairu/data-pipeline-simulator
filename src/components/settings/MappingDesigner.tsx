@@ -27,7 +27,8 @@ import {
     type FilterConfig,
     type ExpressionConfig,
     type AggregatorConfig,
-    type ValidatorConfig
+    type ValidatorConfig,
+    type JoinerConfig
 } from '../../lib/MappingTypes';
 import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare } from 'lucide-react';
 
@@ -138,6 +139,7 @@ const MappingDesigner: React.FC = () => {
         if (type === 'expression') newTrans.config = { fields: [] } as ExpressionConfig;
         if (type === 'aggregator') newTrans.config = { groupBy: [], aggregates: [] } as AggregatorConfig;
         if (type === 'validator') newTrans.config = { rules: [], errorBehavior: 'skip' } as ValidatorConfig;
+        if (type === 'joiner') newTrans.config = { joinType: 'inner', masterKeys: [], detailKeys: [] } as JoinerConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -627,6 +629,52 @@ const MappingDesigner: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Joiner Editor */}
+                {node.type === 'joiner' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Join Type</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as JoinerConfig).joinType}
+                                onChange={e => updateTransformationConfig(node.id, { joinType: e.target.value })}
+                            >
+                                <option value="inner">Inner Join</option>
+                                <option value="left">Left Outer Join</option>
+                                <option value="right">Right Outer Join</option>
+                                <option value="full">Full Outer Join</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Master Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id, customer_id"
+                                value={(node.config as JoinerConfig).masterKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    masterKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys from the first (master) input</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Detail Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id, cust_id"
+                                value={(node.config as JoinerConfig).detailKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    detailKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys from the second (detail) input</p>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded p-2 text-[10px] text-blue-700">
+                            <strong>Note:</strong> Joiner requires 2 source connections. The first connected source is the master, the second is the detail.
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -658,6 +706,7 @@ const MappingDesigner: React.FC = () => {
                         <button title="Add Expression" onClick={() => addTransformation('expression')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-purple-100 border-purple-500 border rounded flex items-center justify-center text-[10px]">EXP</div></button>
                         <button title="Add Aggregator" onClick={() => addTransformation('aggregator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-orange-100 border-orange-500 border rounded flex items-center justify-center text-[10px]">AGG</div></button>
                         <button title="Add Validator" onClick={() => addTransformation('validator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-pink-100 border-pink-500 border rounded flex items-center justify-center text-[10px]"><CheckSquare size={12} /></div></button>
+                        <button title="Add Joiner" onClick={() => addTransformation('joiner')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-blue-100 border-blue-500 border rounded flex items-center justify-center text-[10px]">JOIN</div></button>
                         <button title="Add Target" onClick={() => addTransformation('target')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-red-100 border-red-500 border rounded flex items-center justify-center text-[10px]">TGT</div></button>
                     </div>
 
