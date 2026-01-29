@@ -524,6 +524,36 @@ const MappingDesigner: React.FC = () => {
                             />
                             <label htmlFor={`truncate-${node.id}`} className="text-xs text-gray-700">Truncate Table before load</label>
                         </div>
+                        <div className="border-t pt-2 mt-2">
+                            <h4 className="text-xs font-semibold mb-2 text-gray-700">Idempotency Settings</h4>
+                            <div className="space-y-2">
+                                <div>
+                                    <label className="block text-xs text-gray-500">Deduplication Keys (comma-separated)</label>
+                                    <input
+                                        className="w-full border rounded p-1 text-sm font-mono"
+                                        placeholder="e.g. id, key"
+                                        value={(node.config as TargetConfig).deduplicationKeys?.join(', ') || ''}
+                                        onChange={e => updateTransformationConfig(node.id, {
+                                            deduplicationKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                        })}
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Keys to check for duplicates before insert</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500">Duplicate Behavior</label>
+                                    <select
+                                        className="w-full border rounded p-1 text-sm"
+                                        value={(node.config as TargetConfig).duplicateBehavior || ''}
+                                        onChange={e => updateTransformationConfig(node.id, { duplicateBehavior: e.target.value })}
+                                    >
+                                        <option value="">None (Insert Always)</option>
+                                        <option value="error">Error</option>
+                                        <option value="ignore">Ignore (Skip)</option>
+                                        <option value="update">Update</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 

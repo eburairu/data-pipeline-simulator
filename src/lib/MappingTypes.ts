@@ -16,6 +16,8 @@ export interface TargetConfig extends TransformationConfig {
   connectionId: string;
   truncate?: boolean;
   updateColumns?: string[]; // Columns to use as keys for update/delete operations
+  deduplicationKeys?: string[];
+  duplicateBehavior?: 'error' | 'ignore' | 'update';
 }
 
 export interface FilterConfig extends TransformationConfig {

@@ -231,8 +231,45 @@ const traverse = (
                                 }
 
                                 if (strategy === 'insert') {
-                                    db.insert(tableName, recordToDb);
-                                    processedBatch.push(row);
+                                    // Idempotency Check
+                                    const dedupKeys = conf.deduplicationKeys || [];
+                                    const dupBehavior = conf.duplicateBehavior;
+
+                                    let shouldInsert = true;
+                                    let shouldUpdate = false;
+                                    let matchId: string | null = null;
+
+                                    if (dedupKeys.length > 0 && dupBehavior) {
+                                        const allRecords = db.select(tableName);
+                                        const match = allRecords.find((r: any) => {
+                                            const data = r.data || r;
+                                            return dedupKeys.every(k => String(data[k]) === String(row[k]));
+                                        });
+
+                                        if (match) {
+                                            shouldInsert = false;
+                                            matchId = match.id;
+                                            if (dupBehavior === 'error') {
+                                                stats[nextNode.id].errors++;
+                                                console.warn(`[MappingEngine] Duplicate detected and treated as error: ${JSON.stringify(row)}`);
+                                                return;
+                                            } else if (dupBehavior === 'ignore') {
+                                                console.log(`[MappingEngine] Duplicate ignored: ${JSON.stringify(row)}`);
+                                                processedBatch.push(row); // Treat as success
+                                                return;
+                                            } else if (dupBehavior === 'update') {
+                                                shouldUpdate = true;
+                                            }
+                                        }
+                                    }
+
+                                    if (shouldUpdate && matchId) {
+                                        db.update(tableName, matchId, recordToDb);
+                                        processedBatch.push(row);
+                                    } else if (shouldInsert) {
+                                        db.insert(tableName, recordToDb);
+                                        processedBatch.push(row);
+                                    }
                                 } else if (strategy === 'update' || strategy === 'delete') {
                                     if (updateCols.length === 0) {
                                         console.warn(`[MappingEngine] ${strategy} requested but no updateColumns defined for ${nextNode.name}`);
