@@ -199,4 +199,5 @@ export interface MappingTask {
   enabled: boolean;
   dependencies?: string[]; // Task IDs that this task depends on
   parameters?: Record<string, string>; // Override parameters for execution
+  badFileDir?: string; // Directory to store bad/rejected rows
 }

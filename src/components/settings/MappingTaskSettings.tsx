@@ -90,6 +90,18 @@ const MappingTaskSettings: React.FC = () => {
                             </div>
 
                             {/* Advanced Settings: Dependencies & Parameters */}
+                            <div className="mt-3">
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Bad File Directory (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={task.badFileDir || ''}
+                                    placeholder="/bad_files/"
+                                    onChange={(e) => handleChange(task.id, { badFileDir: e.target.value })}
+                                    className="w-full border rounded p-1 text-sm font-mono"
+                                />
+                                <p className="text-[10px] text-gray-400 mt-1">Directory to store rejected rows as CSV files.</p>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-3 border-t pt-3 mt-1">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1">Dependencies (Wait for these tasks)</label>
