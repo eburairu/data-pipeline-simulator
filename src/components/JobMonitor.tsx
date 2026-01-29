@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useJobMonitor, type JobType, type JobStatus } from '../lib/JobMonitorContext';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database } from 'lucide-react';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw } from 'lucide-react';
 
 const JobMonitor: React.FC = () => {
-  const { logs, clearLogs } = useJobMonitor();
+  const { logs, clearLogs, retryJob } = useJobMonitor();
   const [statusFilter, setStatusFilter] = useState<'all' | JobStatus>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | JobType>('all');
 
@@ -93,12 +93,13 @@ const JobMonitor: React.FC = () => {
               <th className="p-3 font-semibold w-32 text-right">Duration</th>
               <th className="p-3 font-semibold w-32 text-right">Records (In/Out)</th>
               <th className="p-3 font-semibold">Details / Message</th>
+              <th className="p-3 font-semibold w-16 text-center">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredLogs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-gray-400 italic">
+                <td colSpan={8} className="p-8 text-center text-gray-400 italic">
                   No execution logs found.
                 </td>
               </tr>
@@ -137,13 +138,24 @@ const JobMonitor: React.FC = () => {
                     <span className="text-gray-900 font-semibold">{log.recordsOutput}</span>
                   </td>
                   <td className="p-3 text-gray-600 truncate max-w-[300px]" title={log.errorMessage || log.details}>
-                    {log.errorMessage ? (
-                      <span className="text-red-600 flex items-center gap-1">
-                        {log.errorMessage}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">{log.details}</span>
-                    )}
+                    <div className="flex justify-between items-center gap-2">
+                      {log.errorMessage ? (
+                        <span className="text-red-600 flex items-center gap-1 truncate">
+                          {log.errorMessage}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs truncate">{log.details}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => retryJob(log.jobId, log.jobType)}
+                      className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-blue-50"
+                      title="Retry Job"
+                    >
+                      <RotateCw size={16} />
+                    </button>
                   </td>
                 </tr>
               ))

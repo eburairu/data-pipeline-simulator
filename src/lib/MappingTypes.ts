@@ -1,5 +1,5 @@
 
-export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator';
+export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator';
 
 export interface TransformationConfig {
   // Common
@@ -41,12 +41,24 @@ export interface AggregatorConfig extends TransformationConfig {
   aggregates: AggregateField[];
 }
 
+export interface ValidatorRule {
+  field: string;
+  type?: 'string' | 'number' | 'boolean';
+  required?: boolean;
+  regex?: string;
+}
+
+export interface ValidatorConfig extends TransformationConfig {
+  rules: ValidatorRule[];
+  errorBehavior: 'skip' | 'error';
+}
+
 export interface Transformation {
   id: string;
   type: TransformationType;
   name: string;
   position: { x: number, y: number }; // For visual layout
-  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig;
+  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig;
 }
 
 export interface MappingLink {

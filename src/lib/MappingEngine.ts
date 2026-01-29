@@ -6,7 +6,8 @@ import {
     type TargetConfig,
     type FilterConfig,
     type ExpressionConfig,
-    type AggregatorConfig
+    type AggregatorConfig,
+    type ValidatorConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 
@@ -109,6 +110,59 @@ const traverse = (
                         });
                         return res;
                     });
+                    break;
+                }
+                case 'validator': {
+                    const conf = nextNode.config as ValidatorConfig;
+                    const rules = conf.rules || [];
+                    const validRows: any[] = [];
+
+                    for (const row of batch) {
+                        let isValid = true;
+                        for (const rule of rules) {
+                            const val = row[rule.field];
+
+                            // Required check
+                            if (rule.required && (val === undefined || val === null || val === '')) {
+                                isValid = false; break;
+                            }
+
+                            if (val !== undefined && val !== null && val !== '') {
+                                // Type check
+                                if (rule.type === 'number' && isNaN(Number(val))) {
+                                    isValid = false; break;
+                                }
+                                if (rule.type === 'boolean') {
+                                    const s = String(val).toLowerCase();
+                                    if (s !== 'true' && s !== 'false' && s !== '1' && s !== '0') {
+                                        isValid = false; break;
+                                    }
+                                }
+
+                                // Regex check
+                                if (rule.regex) {
+                                    try {
+                                        const re = new RegExp(rule.regex);
+                                        if (!re.test(String(val))) {
+                                            isValid = false; break;
+                                        }
+                                    } catch (e) {
+                                        console.warn(`[MappingEngine] Invalid regex in validator: ${rule.regex}`);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isValid) {
+                            validRows.push(row);
+                        } else {
+                            if (conf.errorBehavior === 'error') {
+                                throw new Error(`Validation failed for record in node ${nextNode.name}: ${JSON.stringify(row)}`);
+                            }
+                            // 'skip' behavior: simply drop the row
+                        }
+                    }
+                    processedBatch = validRows;
                     break;
                 }
                 case 'target': {
