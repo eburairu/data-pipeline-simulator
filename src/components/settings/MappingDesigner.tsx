@@ -28,9 +28,13 @@ import {
     type ExpressionConfig,
     type AggregatorConfig,
     type ValidatorConfig,
-    type JoinerConfig
+    type JoinerConfig,
+    type LookupConfig,
+    type RouterConfig,
+    type SorterConfig,
+    type UnionConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge } from 'lucide-react';
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
@@ -140,6 +144,10 @@ const MappingDesigner: React.FC = () => {
         if (type === 'aggregator') newTrans.config = { groupBy: [], aggregates: [] } as AggregatorConfig;
         if (type === 'validator') newTrans.config = { rules: [], errorBehavior: 'skip' } as ValidatorConfig;
         if (type === 'joiner') newTrans.config = { joinType: 'inner', masterKeys: [], detailKeys: [] } as JoinerConfig;
+        if (type === 'lookup') newTrans.config = { connectionId: '', lookupKeys: [], referenceKeys: [], returnFields: [], defaultValue: '' } as LookupConfig;
+        if (type === 'router') newTrans.config = { routes: [], defaultGroup: 'default' } as RouterConfig;
+        if (type === 'sorter') newTrans.config = { sortFields: [] } as SorterConfig;
+        if (type === 'union') newTrans.config = {} as UnionConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -675,6 +683,207 @@ const MappingDesigner: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Lookup Editor */}
+                {node.type === 'lookup' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Lookup Connection (Database)</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as LookupConfig).connectionId}
+                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                            >
+                                <option value="">Select Connection</option>
+                                {connections.filter(c => c.type === 'database').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Lookup Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. customer_id"
+                                value={(node.config as LookupConfig).lookupKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    lookupKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys from input data</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Reference Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id"
+                                value={(node.config as LookupConfig).referenceKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    referenceKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys in lookup table</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Return Fields (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. name, category"
+                                value={(node.config as LookupConfig).returnFields?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    returnFields: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Default Value (if no match)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm"
+                                placeholder="e.g. Unknown"
+                                value={(node.config as LookupConfig).defaultValue || ''}
+                                onChange={e => updateTransformationConfig(node.id, { defaultValue: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Router Editor */}
+                {node.type === 'router' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Default Group</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm"
+                                placeholder="default"
+                                value={(node.config as RouterConfig).defaultGroup || 'default'}
+                                onChange={e => updateTransformationConfig(node.id, { defaultGroup: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Routes</label>
+                            <button
+                                onClick={() => {
+                                    const currentRoutes = (node.config as RouterConfig).routes || [];
+                                    updateTransformationConfig(node.id, {
+                                        routes: [...currentRoutes, { condition: '', groupName: `group_${currentRoutes.length + 1}` }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Route
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as RouterConfig).routes || []).map((route, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Group name"
+                                            value={route.groupName}
+                                            onChange={e => {
+                                                const routes = [...(node.config as RouterConfig).routes];
+                                                routes[idx] = { ...routes[idx], groupName: e.target.value };
+                                                updateTransformationConfig(node.id, { routes });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const routes = (node.config as RouterConfig).routes.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { routes });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <input
+                                        className="w-full border rounded p-1 text-xs font-mono"
+                                        placeholder="Condition (e.g. amount > 1000)"
+                                        value={route.condition}
+                                        onChange={e => {
+                                            const routes = [...(node.config as RouterConfig).routes];
+                                            routes[idx] = { ...routes[idx], condition: e.target.value };
+                                            updateTransformationConfig(node.id, { routes });
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                            {((node.config as RouterConfig).routes || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No routes defined. All rows go to default group.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Sorter Editor */}
+                {node.type === 'sorter' && (
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Sort Fields</label>
+                            <button
+                                onClick={() => {
+                                    const currentFields = (node.config as SorterConfig).sortFields || [];
+                                    updateTransformationConfig(node.id, {
+                                        sortFields: [...currentFields, { field: '', direction: 'asc' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Field
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as SorterConfig).sortFields || []).map((sf, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 flex gap-2 items-center">
+                                    <input
+                                        className="flex-1 border rounded p-1 text-xs"
+                                        placeholder="Field name"
+                                        value={sf.field}
+                                        onChange={e => {
+                                            const sortFields = [...(node.config as SorterConfig).sortFields];
+                                            sortFields[idx] = { ...sortFields[idx], field: e.target.value };
+                                            updateTransformationConfig(node.id, { sortFields });
+                                        }}
+                                    />
+                                    <select
+                                        className="border rounded p-1 text-xs"
+                                        value={sf.direction}
+                                        onChange={e => {
+                                            const sortFields = [...(node.config as SorterConfig).sortFields];
+                                            sortFields[idx] = { ...sortFields[idx], direction: e.target.value as 'asc' | 'desc' };
+                                            updateTransformationConfig(node.id, { sortFields });
+                                        }}
+                                    >
+                                        <option value="asc">ASC</option>
+                                        <option value="desc">DESC</option>
+                                    </select>
+                                    <button
+                                        onClick={() => {
+                                            const sortFields = (node.config as SorterConfig).sortFields.filter((_, i) => i !== idx);
+                                            updateTransformationConfig(node.id, { sortFields });
+                                        }}
+                                        className="text-red-500 hover:text-red-700 text-xs"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {((node.config as SorterConfig).sortFields || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No sort fields defined.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Union Info */}
+                {node.type === 'union' && (
+                    <div className="space-y-3">
+                        <div className="bg-indigo-50 border border-indigo-200 rounded p-2 text-[10px] text-indigo-700">
+                            <strong>Union:</strong> Merges multiple input streams into one.
+                            Connect 2+ sources to this node. All rows from all inputs will be combined.
+                        </div>
+                        <p className="text-xs text-gray-500">No additional configuration required.</p>
+                    </div>
+                )}
             </div>
         );
     };
@@ -707,6 +916,10 @@ const MappingDesigner: React.FC = () => {
                         <button title="Add Aggregator" onClick={() => addTransformation('aggregator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-orange-100 border-orange-500 border rounded flex items-center justify-center text-[10px]">AGG</div></button>
                         <button title="Add Validator" onClick={() => addTransformation('validator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-pink-100 border-pink-500 border rounded flex items-center justify-center text-[10px]"><CheckSquare size={12} /></div></button>
                         <button title="Add Joiner" onClick={() => addTransformation('joiner')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-blue-100 border-blue-500 border rounded flex items-center justify-center text-[10px]">JOIN</div></button>
+                        <button title="Add Lookup" onClick={() => addTransformation('lookup')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-cyan-100 border-cyan-500 border rounded flex items-center justify-center text-[10px]"><Search size={12} /></div></button>
+                        <button title="Add Router" onClick={() => addTransformation('router')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-lime-100 border-lime-500 border rounded flex items-center justify-center text-[10px]"><GitFork size={12} /></div></button>
+                        <button title="Add Sorter" onClick={() => addTransformation('sorter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-amber-100 border-amber-500 border rounded flex items-center justify-center text-[10px]"><ArrowUpDown size={12} /></div></button>
+                        <button title="Add Union" onClick={() => addTransformation('union')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-indigo-100 border-indigo-500 border rounded flex items-center justify-center text-[10px]"><Merge size={12} /></div></button>
                         <button title="Add Target" onClick={() => addTransformation('target')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-red-100 border-red-500 border rounded flex items-center justify-center text-[10px]">TGT</div></button>
                     </div>
 

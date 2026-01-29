@@ -8,7 +8,10 @@ import {
     type ExpressionConfig,
     type AggregatorConfig,
     type ValidatorConfig,
-    type JoinerConfig
+    type JoinerConfig,
+    type LookupConfig,
+    type RouterConfig,
+    type SorterConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 
@@ -275,6 +278,143 @@ const traverse = (
                             // キャッシュをクリア
                             delete (stats as any)[joinerCacheKey];
                         }
+                    }
+                    break;
+                }
+                case 'lookup': {
+                    // Lookup: 参照テーブルからデータを参照
+                    const conf = nextNode.config as LookupConfig;
+                    const lookupConn = connections.find(c => c.id === conf.connectionId);
+
+                    if (lookupConn && lookupConn.type === 'database') {
+                        const lookupData = db.select(lookupConn.tableName || '');
+                        const lookupKeys = conf.lookupKeys || [];
+                        const referenceKeys = conf.referenceKeys || [];
+                        const returnFields = conf.returnFields || [];
+
+                        processedBatch = batch.map(row => {
+                            const newRow = { ...row };
+                            // ルックアップテーブルから一致する行を検索
+                            const matched = lookupData.find(lookupRow => {
+                                const data = lookupRow.data || lookupRow;
+                                for (let i = 0; i < lookupKeys.length; i++) {
+                                    const inputKey = lookupKeys[i];
+                                    const refKey = referenceKeys[i] || inputKey;
+                                    if (row[inputKey] !== data[refKey]) {
+                                        return false;
+                                    }
+                                }
+                                return true;
+                            });
+
+                            if (matched) {
+                                const data = matched.data || matched;
+                                returnFields.forEach(field => {
+                                    newRow[field] = data[field];
+                                });
+                            } else if (conf.defaultValue !== undefined) {
+                                returnFields.forEach(field => {
+                                    newRow[field] = conf.defaultValue;
+                                });
+                            }
+                            return newRow;
+                        });
+                        console.log(`[MappingEngine] Lookup ${nextNode.name}: processed ${processedBatch.length} rows`);
+                    } else {
+                        console.warn(`[MappingEngine] Lookup ${nextNode.name}: invalid or missing connection`);
+                        processedBatch = batch;
+                    }
+                    break;
+                }
+                case 'router': {
+                    // Router: 条件に基づいて行を振り分け
+                    const conf = nextNode.config as RouterConfig;
+                    const routes = conf.routes || [];
+
+                    // 各行を評価して振り分け先を決定
+                    const routedGroups: Record<string, any[]> = {};
+                    routedGroups[conf.defaultGroup || 'default'] = [];
+                    routes.forEach(r => {
+                        routedGroups[r.groupName] = [];
+                    });
+
+                    for (const row of batch) {
+                        let routed = false;
+                        for (const route of routes) {
+                            try {
+                                if (evaluateExpression(row, route.condition)) {
+                                    routedGroups[route.groupName].push(row);
+                                    routed = true;
+                                    break; // 最初にマッチしたルートに振り分け
+                                }
+                            } catch (e) {
+                                console.warn(`[MappingEngine] Router condition error: ${route.condition}`);
+                            }
+                        }
+                        if (!routed) {
+                            routedGroups[conf.defaultGroup || 'default'].push(row);
+                        }
+                    }
+
+                    // デフォルトグループを次のノードに渡す
+                    // 注: 現在の実装ではデフォルトグループのみが下流に流れる
+                    // 将来的には複数出力エッジをサポート可能
+                    processedBatch = routedGroups[conf.defaultGroup || 'default'];
+
+                    console.log(`[MappingEngine] Router ${nextNode.name}: routed ${batch.length} rows into groups:`,
+                        Object.entries(routedGroups).map(([k, v]) => `${k}:${v.length}`).join(', '));
+                    break;
+                }
+                case 'sorter': {
+                    // Sorter: 指定フィールドでソート
+                    const conf = nextNode.config as SorterConfig;
+                    const sortFields = conf.sortFields || [];
+
+                    processedBatch = [...batch].sort((a, b) => {
+                        for (const sf of sortFields) {
+                            const aVal = a[sf.field];
+                            const bVal = b[sf.field];
+
+                            let comparison = 0;
+                            if (typeof aVal === 'number' && typeof bVal === 'number') {
+                                comparison = aVal - bVal;
+                            } else {
+                                comparison = String(aVal).localeCompare(String(bVal));
+                            }
+
+                            if (comparison !== 0) {
+                                return sf.direction === 'desc' ? -comparison : comparison;
+                            }
+                        }
+                        return 0;
+                    });
+
+                    console.log(`[MappingEngine] Sorter ${nextNode.name}: sorted ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'union': {
+                    // Union: 複数入力をマージ
+                    // Unionへの入力を蓄積し、全入力が揃ったら結合して出力
+                    const unionCacheKey = `union_${nextNode.id}`;
+                    const incomingLinks = mapping.links.filter(l => l.targetId === nextNode.id);
+
+                    if (!stats[unionCacheKey]) {
+                        (stats as any)[unionCacheKey] = { batches: [batch], received: 1 };
+                    } else {
+                        const cache = (stats as any)[unionCacheKey];
+                        cache.batches.push(batch);
+                        cache.received++;
+                    }
+
+                    const cache = (stats as any)[unionCacheKey];
+                    if (cache.received >= incomingLinks.length) {
+                        // すべての入力が揃った - マージして出力
+                        processedBatch = cache.batches.flat();
+                        console.log(`[MappingEngine] Union ${nextNode.name}: merged ${cache.received} inputs into ${processedBatch.length} rows`);
+                        delete (stats as any)[unionCacheKey];
+                    } else {
+                        // まだ全入力が揃っていない - 待機
+                        processedBatch = [];
                     }
                     break;
                 }
