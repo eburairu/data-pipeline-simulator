@@ -11,7 +11,12 @@ import {
     type JoinerConfig,
     type LookupConfig,
     type RouterConfig,
-    type SorterConfig
+    type SorterConfig,
+    type NormalizerConfig,
+    type RankConfig,
+    type SequenceConfig,
+    type UpdateStrategyConfig,
+    type CleansingConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 
@@ -416,6 +421,176 @@ const traverse = (
                         // まだ全入力が揃っていない - 待機
                         processedBatch = [];
                     }
+                    break;
+                }
+                case 'normalizer': {
+                    // Normalizer: 1行を複数行に展開
+                    const conf = nextNode.config as NormalizerConfig;
+                    const arrayField = conf.arrayField || '';
+                    const outputFields = conf.outputFields || [];
+
+                    processedBatch = [];
+                    for (const row of batch) {
+                        const arrayValue = row[arrayField];
+                        if (Array.isArray(arrayValue)) {
+                            // 配列の各要素ごとに行を生成
+                            arrayValue.forEach((item, idx) => {
+                                const newRow = conf.keepOriginalFields ? { ...row } : {};
+                                delete newRow[arrayField];  // 元の配列フィールドは削除
+                                if (typeof item === 'object') {
+                                    Object.assign(newRow, item);
+                                } else {
+                                    const fieldName = outputFields[idx] || `${arrayField}_${idx}`;
+                                    newRow[fieldName] = item;
+                                }
+                                processedBatch.push(newRow);
+                            });
+                        } else {
+                            // 配列でない場合はそのまま通過
+                            processedBatch.push(row);
+                        }
+                    }
+                    console.log(`[MappingEngine] Normalizer ${nextNode.name}: expanded ${batch.length} rows to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'rank': {
+                    // Rank: ランキング付与
+                    const conf = nextNode.config as RankConfig;
+                    const partitionBy = conf.partitionBy || [];
+                    const orderBy = conf.orderBy || [];
+                    const rankField = conf.rankField || 'rank';
+                    const rankType = conf.rankType || 'rowNumber';
+
+                    // パーティション分割
+                    const partitions: Record<string, any[]> = {};
+                    batch.forEach(row => {
+                        const key = partitionBy.map(p => row[p]).join('::');
+                        if (!partitions[key]) partitions[key] = [];
+                        partitions[key].push(row);
+                    });
+
+                    processedBatch = [];
+                    for (const partitionRows of Object.values(partitions)) {
+                        // ソート
+                        partitionRows.sort((a, b) => {
+                            for (const ob of orderBy) {
+                                const aVal = a[ob.field];
+                                const bVal = b[ob.field];
+                                let cmp = 0;
+                                if (typeof aVal === 'number' && typeof bVal === 'number') {
+                                    cmp = aVal - bVal;
+                                } else {
+                                    cmp = String(aVal).localeCompare(String(bVal));
+                                }
+                                if (cmp !== 0) return ob.direction === 'desc' ? -cmp : cmp;
+                            }
+                            return 0;
+                        });
+
+                        // ランク付与
+                        let rank = 1;
+                        let prevValues: any[] = [];
+                        partitionRows.forEach((row, idx) => {
+                            const currValues = orderBy.map(ob => row[ob.field]);
+                            if (rankType === 'rowNumber') {
+                                row[rankField] = idx + 1;
+                            } else if (rankType === 'denseRank') {
+                                if (idx > 0 && JSON.stringify(currValues) !== JSON.stringify(prevValues)) {
+                                    rank++;
+                                }
+                                row[rankField] = rank;
+                            } else { // rank
+                                if (idx > 0 && JSON.stringify(currValues) !== JSON.stringify(prevValues)) {
+                                    rank = idx + 1;
+                                }
+                                row[rankField] = rank;
+                            }
+                            prevValues = currValues;
+                            processedBatch.push(row);
+                        });
+                    }
+                    console.log(`[MappingEngine] Rank ${nextNode.name}: assigned ranks to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'sequence': {
+                    // Sequence: 連番生成
+                    const conf = nextNode.config as SequenceConfig;
+                    const seqField = conf.sequenceField || 'seq';
+                    const startVal = conf.startValue ?? 1;
+                    const incr = conf.incrementBy ?? 1;
+
+                    processedBatch = batch.map((row, idx) => ({
+                        ...row,
+                        [seqField]: startVal + (idx * incr)
+                    }));
+                    console.log(`[MappingEngine] Sequence ${nextNode.name}: assigned sequence to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'updateStrategy': {
+                    // UpdateStrategy: Insert/Update/Deleteフラグ設定
+                    const conf = nextNode.config as UpdateStrategyConfig;
+                    const strategyField = conf.strategyField || '_strategy';
+                    const defaultStrategy = conf.defaultStrategy || 'insert';
+                    const conditions = conf.conditions || [];
+
+                    processedBatch = batch.map(row => {
+                        const newRow = { ...row };
+                        let strategy = defaultStrategy;
+                        for (const cond of conditions) {
+                            try {
+                                if (evaluateExpression(row, cond.condition)) {
+                                    strategy = cond.strategy;
+                                    break;
+                                }
+                            } catch (e) {
+                                // 条件評価失敗時はデフォルトを使用
+                            }
+                        }
+                        newRow[strategyField] = strategy;
+                        return newRow;
+                    });
+                    console.log(`[MappingEngine] UpdateStrategy ${nextNode.name}: assigned strategies to ${processedBatch.length} rows`);
+                    break;
+                }
+                case 'cleansing': {
+                    // Cleansing: データクレンジング
+                    const conf = nextNode.config as CleansingConfig;
+                    const rules = conf.rules || [];
+
+                    processedBatch = batch.map(row => {
+                        const newRow = { ...row };
+                        for (const rule of rules) {
+                            const val = newRow[rule.field];
+                            switch (rule.operation) {
+                                case 'trim':
+                                    if (typeof val === 'string') newRow[rule.field] = val.trim();
+                                    break;
+                                case 'upper':
+                                    if (typeof val === 'string') newRow[rule.field] = val.toUpperCase();
+                                    break;
+                                case 'lower':
+                                    if (typeof val === 'string') newRow[rule.field] = val.toLowerCase();
+                                    break;
+                                case 'nullToDefault':
+                                    if (val === null || val === undefined || val === '') {
+                                        newRow[rule.field] = rule.defaultValue ?? '';
+                                    }
+                                    break;
+                                case 'replace':
+                                    if (typeof val === 'string' && rule.replacePattern) {
+                                        try {
+                                            const re = new RegExp(rule.replacePattern, 'g');
+                                            newRow[rule.field] = val.replace(re, rule.replaceWith ?? '');
+                                        } catch (e) {
+                                            // Invalid regex
+                                        }
+                                    }
+                                    break;
+                            }
+                        }
+                        return newRow;
+                    });
+                    console.log(`[MappingEngine] Cleansing ${nextNode.name}: cleansed ${processedBatch.length} rows`);
                     break;
                 }
                 default:

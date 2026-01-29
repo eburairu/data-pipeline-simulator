@@ -32,9 +32,14 @@ import {
     type LookupConfig,
     type RouterConfig,
     type SorterConfig,
-    type UnionConfig
+    type UnionConfig,
+    type NormalizerConfig,
+    type RankConfig,
+    type SequenceConfig,
+    type UpdateStrategyConfig,
+    type CleansingConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles } from 'lucide-react';
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
@@ -148,6 +153,11 @@ const MappingDesigner: React.FC = () => {
         if (type === 'router') newTrans.config = { routes: [], defaultGroup: 'default' } as RouterConfig;
         if (type === 'sorter') newTrans.config = { sortFields: [] } as SorterConfig;
         if (type === 'union') newTrans.config = {} as UnionConfig;
+        if (type === 'normalizer') newTrans.config = { arrayField: '', outputFields: [], keepOriginalFields: true } as NormalizerConfig;
+        if (type === 'rank') newTrans.config = { partitionBy: [], orderBy: [], rankField: 'rank', rankType: 'rowNumber' } as RankConfig;
+        if (type === 'sequence') newTrans.config = { sequenceField: 'seq', startValue: 1, incrementBy: 1 } as SequenceConfig;
+        if (type === 'updateStrategy') newTrans.config = { strategyField: '_strategy', defaultStrategy: 'insert', conditions: [] } as UpdateStrategyConfig;
+        if (type === 'cleansing') newTrans.config = { rules: [] } as CleansingConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -884,6 +894,251 @@ const MappingDesigner: React.FC = () => {
                         <p className="text-xs text-gray-500">No additional configuration required.</p>
                     </div>
                 )}
+
+                {/* Normalizer Editor */}
+                {node.type === 'normalizer' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Array Field (to expand)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. items"
+                                value={(node.config as NormalizerConfig).arrayField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { arrayField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Output Fields (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. item_name, item_value"
+                                value={(node.config as NormalizerConfig).outputFields?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    outputFields: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={(node.config as NormalizerConfig).keepOriginalFields !== false}
+                                onChange={e => updateTransformationConfig(node.id, { keepOriginalFields: e.target.checked })}
+                            />
+                            <label className="text-xs text-gray-500">Keep original fields</label>
+                        </div>
+                    </div>
+                )}
+
+                {/* Rank Editor */}
+                {node.type === 'rank' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Rank Field Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="rank"
+                                value={(node.config as RankConfig).rankField || 'rank'}
+                                onChange={e => updateTransformationConfig(node.id, { rankField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Rank Type</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as RankConfig).rankType || 'rowNumber'}
+                                onChange={e => updateTransformationConfig(node.id, { rankType: e.target.value })}
+                            >
+                                <option value="rowNumber">Row Number</option>
+                                <option value="rank">Rank (gaps)</option>
+                                <option value="denseRank">Dense Rank (no gaps)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Partition By (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. department"
+                                value={(node.config as RankConfig).partitionBy?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    partitionBy: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Order By (field:asc/desc, comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. salary:desc"
+                                value={(node.config as RankConfig).orderBy?.map(o => `${o.field}:${o.direction}`).join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    orderBy: e.target.value.split(',').map(s => {
+                                        const [field, dir] = s.trim().split(':');
+                                        return { field, direction: (dir === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc' };
+                                    }).filter(o => o.field)
+                                })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Sequence Editor */}
+                {node.type === 'sequence' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Sequence Field Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="seq"
+                                value={(node.config as SequenceConfig).sequenceField || 'seq'}
+                                onChange={e => updateTransformationConfig(node.id, { sequenceField: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-gray-500">Start Value</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded p-1 text-sm"
+                                    value={(node.config as SequenceConfig).startValue ?? 1}
+                                    onChange={e => updateTransformationConfig(node.id, { startValue: parseInt(e.target.value) || 1 })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500">Increment By</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded p-1 text-sm"
+                                    value={(node.config as SequenceConfig).incrementBy ?? 1}
+                                    onChange={e => updateTransformationConfig(node.id, { incrementBy: parseInt(e.target.value) || 1 })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* UpdateStrategy Editor */}
+                {node.type === 'updateStrategy' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Strategy Field Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="_strategy"
+                                value={(node.config as UpdateStrategyConfig).strategyField || '_strategy'}
+                                onChange={e => updateTransformationConfig(node.id, { strategyField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Default Strategy</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as UpdateStrategyConfig).defaultStrategy || 'insert'}
+                                onChange={e => updateTransformationConfig(node.id, { defaultStrategy: e.target.value })}
+                            >
+                                <option value="insert">Insert</option>
+                                <option value="update">Update</option>
+                                <option value="delete">Delete</option>
+                                <option value="reject">Reject</option>
+                            </select>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded p-2 text-[10px] text-slate-600">
+                            <strong>Tip:</strong> Rows will have the strategy field set based on conditions or default.
+                        </div>
+                    </div>
+                )}
+
+                {/* Cleansing Editor */}
+                {node.type === 'cleansing' && (
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Cleansing Rules</label>
+                            <button
+                                onClick={() => {
+                                    const currentRules = (node.config as CleansingConfig).rules || [];
+                                    updateTransformationConfig(node.id, {
+                                        rules: [...currentRules, { field: '', operation: 'trim' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Rule
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as CleansingConfig).rules || []).map((rule, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Field name"
+                                            value={rule.field}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                rules[idx] = { ...rules[idx], field: e.target.value };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                        <select
+                                            className="border rounded p-1 text-xs"
+                                            value={rule.operation}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                rules[idx] = { ...rules[idx], operation: e.target.value as any };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        >
+                                            <option value="trim">Trim</option>
+                                            <option value="upper">Uppercase</option>
+                                            <option value="lower">Lowercase</option>
+                                            <option value="nullToDefault">Null to Default</option>
+                                            <option value="replace">Replace</option>
+                                        </select>
+                                        <button
+                                            onClick={() => {
+                                                const rules = (node.config as CleansingConfig).rules.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    {(rule.operation === 'nullToDefault' || rule.operation === 'replace') && (
+                                        <input
+                                            className="w-full border rounded p-1 text-xs"
+                                            placeholder="Default/Replace value"
+                                            value={rule.defaultValue || rule.replaceWith || ''}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                if (rule.operation === 'nullToDefault') {
+                                                    rules[idx] = { ...rules[idx], defaultValue: e.target.value };
+                                                } else {
+                                                    rules[idx] = { ...rules[idx], replaceWith: e.target.value };
+                                                }
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                    )}
+                                    {rule.operation === 'replace' && (
+                                        <input
+                                            className="w-full border rounded p-1 text-xs"
+                                            placeholder="Pattern (regex)"
+                                            value={rule.replacePattern || ''}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                rules[idx] = { ...rules[idx], replacePattern: e.target.value };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                            {((node.config as CleansingConfig).rules || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No rules defined.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -920,6 +1175,11 @@ const MappingDesigner: React.FC = () => {
                         <button title="Add Router" onClick={() => addTransformation('router')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-lime-100 border-lime-500 border rounded flex items-center justify-center text-[10px]"><GitFork size={12} /></div></button>
                         <button title="Add Sorter" onClick={() => addTransformation('sorter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-amber-100 border-amber-500 border rounded flex items-center justify-center text-[10px]"><ArrowUpDown size={12} /></div></button>
                         <button title="Add Union" onClick={() => addTransformation('union')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-indigo-100 border-indigo-500 border rounded flex items-center justify-center text-[10px]"><Merge size={12} /></div></button>
+                        <button title="Add Normalizer" onClick={() => addTransformation('normalizer')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-violet-100 border-violet-500 border rounded flex items-center justify-center text-[10px]"><Repeat size={12} /></div></button>
+                        <button title="Add Rank" onClick={() => addTransformation('rank')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-rose-100 border-rose-500 border rounded flex items-center justify-center text-[10px]"><Award size={12} /></div></button>
+                        <button title="Add Sequence" onClick={() => addTransformation('sequence')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-sky-100 border-sky-500 border rounded flex items-center justify-center text-[10px]"><Hash size={12} /></div></button>
+                        <button title="Add UpdateStrategy" onClick={() => addTransformation('updateStrategy')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-slate-100 border-slate-500 border rounded flex items-center justify-center text-[10px]"><Flag size={12} /></div></button>
+                        <button title="Add Cleansing" onClick={() => addTransformation('cleansing')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-teal-100 border-teal-500 border rounded flex items-center justify-center text-[10px]"><Sparkles size={12} /></div></button>
                         <button title="Add Target" onClick={() => addTransformation('target')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-red-100 border-red-500 border rounded flex items-center justify-center text-[10px]">TGT</div></button>
                     </div>
 

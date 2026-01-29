@@ -1,5 +1,5 @@
 
-export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union';
+export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' | 'cleansing';
 
 export interface TransformationConfig {
   // Common
@@ -96,12 +96,54 @@ export interface UnionConfig extends TransformationConfig {
   // 入力はリンクで接続される
 }
 
+// Normalizer: 1行を複数行に展開（IDMC CDI機能）
+export interface NormalizerConfig extends TransformationConfig {
+  arrayField: string;  // 展開する配列フィールド
+  outputFields: string[];  // 出力フィールド名（配列の各要素に対応）
+  keepOriginalFields: boolean;  // 元のフィールドを保持するか
+}
+
+// Rank: ランキング付与（IDMC CDI機能）
+export interface RankConfig extends TransformationConfig {
+  partitionBy: string[];  // パーティションキー
+  orderBy: { field: string; direction: 'asc' | 'desc' }[];  // ソート順
+  rankField: string;  // ランク値を格納するフィールド名
+  rankType: 'rank' | 'denseRank' | 'rowNumber';  // ランクタイプ
+}
+
+// Sequence: 連番生成（IDMC CDI機能）
+export interface SequenceConfig extends TransformationConfig {
+  sequenceField: string;  // 連番を格納するフィールド名
+  startValue: number;  // 開始値
+  incrementBy: number;  // 増分
+}
+
+// UpdateStrategy: Insert/Update/Delete フラグ設定（IDMC CDI機能）
+export interface UpdateStrategyConfig extends TransformationConfig {
+  strategyField: string;  // 戦略フラグを格納するフィールド名
+  defaultStrategy: 'insert' | 'update' | 'delete' | 'reject';  // デフォルト戦略
+  conditions: { condition: string; strategy: 'insert' | 'update' | 'delete' | 'reject' }[];  // 条件付き戦略
+}
+
+// Cleansing: データクレンジング（IDMC CDI機能）
+export interface CleansingRule {
+  field: string;
+  operation: 'trim' | 'upper' | 'lower' | 'nullToDefault' | 'replace';
+  defaultValue?: string;  // nullToDefault, replace用
+  replacePattern?: string;  // replace用
+  replaceWith?: string;  // replace用
+}
+
+export interface CleansingConfig extends TransformationConfig {
+  rules: CleansingRule[];
+}
+
 export interface Transformation {
   id: string;
   type: TransformationType;
   name: string;
   position: { x: number, y: number }; // For visual layout
-  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig;
+  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig | CleansingConfig;
 }
 
 export interface MappingLink {
