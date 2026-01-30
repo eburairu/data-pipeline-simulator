@@ -1,4 +1,4 @@
-import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob, Topic } from './SettingsContext';
+import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob, Topic, ConnectionDefinition } from './SettingsContext';
 
 export interface ValidationError {
   id?: string; // Job ID if applicable
@@ -110,12 +110,25 @@ export const validateTopic = (topic: Topic): ValidationError[] => {
     return errors;
 };
 
+export const validateConnection = (conn: ConnectionDefinition): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    if (!conn.name.trim()) errors.push({ id: conn.id, field: 'name', message: 'Connection Name is required' });
+    if (conn.type === 'file') {
+        if (!conn.host) errors.push({ id: conn.id, field: 'host', message: 'Host is required' });
+        if (!conn.path) errors.push({ id: conn.id, field: 'path', message: 'Path is required' });
+    } else if (conn.type === 'database') {
+        if (!conn.tableName) errors.push({ id: conn.id, field: 'tableName', message: 'Table Name is required' });
+    }
+    return errors;
+};
+
 export const validateAllSettings = (
   dataSource: DataSourceSettings,
   collection: CollectionSettings,
   delivery: DeliverySettings,
   etl: EtlSettings,
-  topics: Topic[]
+  topics: Topic[],
+  connections: ConnectionDefinition[] = [] // Optional for backward compatibility if needed, but we pass it
 ): ValidationError[] => {
   let errors: ValidationError[] = [];
 
@@ -142,6 +155,10 @@ export const validateAllSettings = (
 
   topics.forEach(topic => {
       errors = [...errors, ...validateTopic(topic)];
+  });
+
+  connections.forEach(conn => {
+      errors = [...errors, ...validateConnection(conn)];
   });
 
   return errors;

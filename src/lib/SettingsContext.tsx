@@ -117,7 +117,7 @@ export interface TableDefinition {
   columns: ColumnDefinition[];
 }
 
-// --- IDMC Features ---
+// ... (existing interfaces)
 
 export type ConnectionType = 'file' | 'database';
 
@@ -133,6 +133,12 @@ export interface ConnectionDefinition {
   tableName?: string;    // Default table
 }
 
+export interface BiDashboardSettings {
+  defaultTableId: string;
+  defaultViewType: 'table' | 'chart';
+  refreshInterval: number; // in ms, 0 = manual
+}
+
 // ---------------------
 
 interface SettingsContextType {
@@ -144,8 +150,11 @@ interface SettingsContextType {
   setDelivery: (settings: DeliverySettings) => void;
   etl: EtlSettings;
   setEtl: (settings: EtlSettings) => void;
+  biDashboard: BiDashboardSettings;
+  setBiDashboard: (settings: BiDashboardSettings) => void;
 
   hosts: Host[];
+// ... (rest of the interface)
   addHost: (name: string) => void;
   removeHost: (name: string) => void;
   addDirectory: (hostName: string, path: string) => void;
@@ -261,6 +270,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     summaryTableName: 'summary_data',
     processingTime: 1000,
     executionInterval: 1000,
+  });
+
+  const [biDashboard, setBiDashboard] = useState<BiDashboardSettings>({
+    defaultTableId: '',
+    defaultViewType: 'table',
+    refreshInterval: 0,
   });
 
   const [hosts, setHosts] = useState<Host[]>([
@@ -419,6 +434,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDelivery({ ...parsed.delivery, jobs: migratedJobs });
         }
         if (parsed.etl) setEtl(parsed.etl);
+        if (parsed.biDashboard) setBiDashboard(parsed.biDashboard);
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);
@@ -433,7 +449,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const saveSettings = useCallback(() => {
     // Note: We need to update validation logic for Topics and Connections
-    const errors = validateAllSettings(dataSource, collection, delivery, etl, topics);
+    const errors = validateAllSettings(dataSource, collection, delivery, etl, topics, connections);
     if (errors.length > 0) {
       return { success: false, errors };
     }
@@ -443,6 +459,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       collection,
       delivery,
       etl,
+      biDashboard,
       hosts,
       topics,
       tables,
@@ -457,7 +474,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error("Failed to save settings", e);
       return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
     }
-  }, [dataSource, collection, delivery, etl, hosts, topics, connections, mappings, mappingTasks]);
+  }, [dataSource, collection, delivery, etl, biDashboard, hosts, topics, connections, mappings, mappingTasks]);
 
   const addHost = useCallback((name: string) => {
     setHosts(prev => {
@@ -604,6 +621,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         setDelivery,
         etl,
         setEtl,
+        biDashboard,
+        setBiDashboard,
         hosts,
         addHost,
         removeHost,

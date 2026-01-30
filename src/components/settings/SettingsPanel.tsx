@@ -8,9 +8,10 @@ import DeliverySettings from './DeliverySettings';
 import ConnectionSettings from './ConnectionSettings';
 import MappingDesigner from './MappingDesigner';
 import MappingTaskSettings from './MappingTaskSettings';
-import { Database, ArrowLeftRight, Workflow, Server } from 'lucide-react';
+import BiDashboardSettings from './BiDashboardSettings';
+import { Database, ArrowLeftRight, Workflow, Server, Activity } from 'lucide-react';
 
-type SettingsTab = 'datasource' | 'transfer' | 'processing' | 'database';
+type SettingsTab = 'datasource' | 'transfer' | 'processing' | 'database' | 'bi';
 
 const SettingsPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('datasource');
@@ -20,6 +21,7 @@ const SettingsPanel: React.FC = () => {
     { id: 'transfer', label: '集配信', icon: <ArrowLeftRight size={16} /> },
     { id: 'processing', label: '加工処理', icon: <Workflow size={16} /> },
     { id: 'database', label: 'データベース', icon: <Database size={16} /> },
+    { id: 'bi', label: 'BI Dashboard', icon: <Activity size={16} /> },
   ];
 
   return (
@@ -71,6 +73,12 @@ const SettingsPanel: React.FC = () => {
         {activeTab === 'database' && (
           <div className="space-y-6">
             <DatabaseSettings />
+          </div>
+        )}
+
+        {activeTab === 'bi' && (
+          <div className="space-y-6">
+            <BiDashboardSettings />
           </div>
         )}
       </div>
