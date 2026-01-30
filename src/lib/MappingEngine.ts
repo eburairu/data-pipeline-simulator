@@ -42,6 +42,7 @@ export interface DbOps {
 
 export interface ExecutionStats {
     [transformationId: string]: { input: number; output: number; errors: number; rejects: number };
+    rejectRows?: { row: any; error: string; transformationName: string }[];
 }
 
 export interface ExecutionState {
@@ -189,7 +190,13 @@ const traverse = (
                             validRows.push(row);
                         } else {
                             if (conf.errorBehavior === 'error') {
-                                throw new Error(`Validation failed for record in node ${nextNode.name}: ${JSON.stringify(row)}`);
+                                if (!stats.rejectRows) stats.rejectRows = [];
+                                stats.rejectRows.push({
+                                    row: row,
+                                    error: `Validation failed: Rule validation error`,
+                                    transformationName: nextNode.name
+                                });
+                                stats[nextNode.id].errors++;
                             }
                             // 'skip' behavior: simply drop the row
                         }
@@ -825,6 +832,13 @@ const traverse = (
         } catch (e) {
             console.error(`Error in node ${nextNode.name}`, e);
             stats[nextNode.id].errors += 1;
+            // Capture batch level error
+            if (!stats.rejectRows) stats.rejectRows = [];
+            stats.rejectRows.push({
+                row: { batchSize: batch.length, sample: batch[0] },
+                error: e instanceof Error ? e.message : String(e),
+                transformationName: nextNode.name
+            });
         }
 
         stats[nextNode.id].output += processedBatch.length;
@@ -850,7 +864,10 @@ export const executeMappingTaskRecursive = async (
 
     // Resolve Parameters
     // Priority: Task Parameters > Mapping Parameters > Defaults
+    const startTime = new Date();
     const parameters = {
+        'SYSDATE': startTime.toISOString(),
+        'SESSSTARTTIME': startTime.toISOString(),
         ...(mapping.parameters || {}),
         ...(task.parameters || {})
     };
@@ -858,6 +875,9 @@ export const executeMappingTaskRecursive = async (
     mapping.transformations.forEach(t => {
         stats[t.id] = { input: 0, output: 0, errors: 0, rejects: 0 };
     });
+
+    // Initialize rejectRows
+    stats.rejectRows = [];
 
     const sources = mapping.transformations.filter(t => t.type === 'source');
 
@@ -935,6 +955,29 @@ export const executeMappingTaskRecursive = async (
             traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, parameters);
         }
     }
+
+    // Write Bad File if configured and errors exist
+    if (task.badFileDir && stats.rejectRows && stats.rejectRows.length > 0) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `Bad_Rows_${task.name.replace(/\s+/g, '_')}_${timestamp}.csv`;
+        const header = 'Transformation,Error,RowData\n';
+        const content = stats.rejectRows.map(r => {
+            const rowStr = JSON.stringify(r.row).replace(/"/g, '""'); // CSV escape
+            return `"${r.transformationName}","${r.error}","${rowStr}"`;
+        }).join('\n');
+
+        // Use default if not specified
+        const targetDir = task.badFileDir.endsWith('/') ? task.badFileDir : task.badFileDir + '/';
+
+        try {
+            // Write to localhost (simulated local execution environment)
+            fs.writeFile('localhost', targetDir, filename, header + content);
+            console.log(`[MappingEngine] Bad file created: ${targetDir}${filename}`);
+        } catch (e) {
+            console.error(`[MappingEngine] Failed to write bad file`, e);
+        }
+    }
+
     return { stats, newState };
 }
 
