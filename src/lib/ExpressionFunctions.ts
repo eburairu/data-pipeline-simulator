@@ -66,6 +66,93 @@ export const ExpressionFunctions = {
         return val.trim().length === 0;
     },
 
+    // Encoding & Hashing (Simulated)
+    MD5: (str: string) => {
+        if (typeof str !== 'string') return null;
+        // Simple hash (djb2) -> hex
+        let hash = 5381;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) + hash) + str.charCodeAt(i); /* hash * 33 + c */
+        }
+        return (hash >>> 0).toString(16).padStart(32, '0'); // Simulate 32-char hex
+    },
+    SHA1: (str: string) => {
+        // Similar simulation for visual purpose
+        if (typeof str !== 'string') return null;
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash).toString(16).padStart(40, '0');
+    },
+    BASE64_ENCODE: (str: string) => {
+        if (typeof str !== 'string') return null;
+        try {
+            return btoa(unescape(encodeURIComponent(str)));
+        } catch { return null; }
+    },
+    BASE64_DECODE: (str: string) => {
+        if (typeof str !== 'string') return null;
+        try {
+            return decodeURIComponent(escape(atob(str)));
+        } catch { return null; }
+    },
+    AES_ENCRYPT: (str: string, key: string) => {
+        // Fake encryption: Base64(Reverse(str) + key) - just to show "change"
+        if (!str) return null;
+        return btoa(unescape(encodeURIComponent(str.split('').reverse().join('') + '::' + key)));
+    },
+    AES_DECRYPT: (str: string, key: string) => {
+        // Fake decryption
+        if (!str) return null;
+        try {
+            const decoded = decodeURIComponent(escape(atob(str)));
+            if (decoded.endsWith('::' + key)) {
+                return decoded.substring(0, decoded.length - (key.length + 2)).split('').reverse().join('');
+            }
+            return null;
+        } catch { return null; }
+    },
+
+    // JSON Handling
+    JSON_VALUE: (json: string, path: string) => {
+        if (!json) return null;
+        try {
+            const obj = JSON.parse(json);
+            // Support simple dot notation and array index: "a.b[0].c"
+            // Split by . or [ or ]
+            const parts = path.split(/[.[\]]+/).filter(Boolean);
+            let current = obj;
+            for (const part of parts) {
+                if (current === null || current === undefined) return null;
+                if (Array.isArray(current)) {
+                    const idx = parseInt(part, 10);
+                    current = current[idx];
+                } else {
+                    current = current[part];
+                }
+            }
+            // Return string representation if object, else value
+            if (typeof current === 'object' && current !== null) return JSON.stringify(current);
+            return current;
+        } catch { return null; }
+    },
+
+    // Regex
+    REG_MATCH: (str: string, pattern: string) => {
+        if (typeof str !== 'string' || !pattern) return false;
+        try {
+            return new RegExp(pattern).test(str);
+        } catch { return false; }
+    },
+    REG_REPLACE: (str: string, pattern: string, replace: string) => {
+        if (typeof str !== 'string' || !pattern) return str;
+        try {
+            return str.replace(new RegExp(pattern, 'g'), replace || '');
+        } catch { return str; }
+    },
+
     // Number Enhancements
     ABS: (val: any) => Math.abs(Number(val)),
     CEIL: (val: any) => Math.ceil(Number(val)),
