@@ -134,6 +134,7 @@ export interface ConnectionDefinition {
 }
 
 export interface BiDashboardSettings {
+  showDashboard: boolean;
   defaultTableId: string;
   defaultViewType: 'table' | 'chart';
   refreshInterval: number; // in ms, 0 = manual
@@ -273,6 +274,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
 
   const [biDashboard, setBiDashboard] = useState<BiDashboardSettings>({
+    showDashboard: true,
     defaultTableId: '',
     defaultViewType: 'table',
     refreshInterval: 0,
@@ -434,7 +436,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDelivery({ ...parsed.delivery, jobs: migratedJobs });
         }
         if (parsed.etl) setEtl(parsed.etl);
-        if (parsed.biDashboard) setBiDashboard(parsed.biDashboard);
+        if (parsed.biDashboard) {
+            setBiDashboard(parsed.biDashboard);
+        } else if (parsed.visualization) {
+            // Migration
+            setBiDashboard(prev => ({ ...prev, showDashboard: parsed.visualization.showDashboard }));
+        }
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);

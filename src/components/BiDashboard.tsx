@@ -2,9 +2,35 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useVirtualDB, type DBFilter, type DBRecord } from '../lib/VirtualDB';
 import { useSettings } from '../lib/SettingsContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Play, Plus, Trash2, Filter, Table as TableIcon, Activity } from 'lucide-react';
+import { Play, Plus, Trash2, Filter, Table as TableIcon, Activity, AlertTriangle } from 'lucide-react';
 
-const BiDashboard: React.FC = () => {
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 border border-red-500 bg-red-50 text-red-700 rounded h-full overflow-auto flex flex-col items-start">
+          <h3 className="font-bold flex items-center gap-2"><AlertTriangle size={16} /> Visualization Error</h3>
+          <p className="text-sm mt-2">An error occurred while rendering the dashboard.</p>
+          <div className="text-xs mt-2 bg-white p-2 border rounded overflow-x-auto w-full text-left">
+            <p className="font-semibold">{this.state.error?.message}</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const BiDashboardContent: React.FC = () => {
   const { tables, biDashboard } = useSettings();
   const { query } = useVirtualDB();
 
@@ -16,14 +42,23 @@ const BiDashboard: React.FC = () => {
   const [results, setResults] = useState<DBRecord[]>([]);
   const [hasRun, setHasRun] = useState(false);
 
+  // Safety check for context
+  if (!tables) {
+    return <div className="h-full flex items-center justify-center text-gray-500 italic">Tables configuration not available.</div>;
+  }
+
   const selectedTableDef = tables.find(t => t.id === selectedTableId);
   const columns = selectedTableDef ? selectedTableDef.columns : [];
 
   const handleRunQuery = () => {
     if (!selectedTableDef) return;
-    const res = query(selectedTableDef.name, filters);
-    setResults(res);
-    setHasRun(true);
+    try {
+      const res = query(selectedTableDef.name, filters);
+      setResults(res);
+      setHasRun(true);
+    } catch (e) {
+      console.error("Query execution failed", e);
+    }
   };
 
   // Auto-refresh logic
@@ -39,8 +74,6 @@ const BiDashboard: React.FC = () => {
       if (!selectedTableId && biDashboard.defaultTableId) {
           setSelectedTableId(biDashboard.defaultTableId);
       }
-      // We don't force viewType override on settings change to avoid disrupting user, 
-      // but initial state set above handles the start.
   }, [biDashboard.defaultTableId]);
 
   const addFilter = () => {
@@ -61,38 +94,26 @@ const BiDashboard: React.FC = () => {
 
   // Reset state when table changes
   useEffect(() => {
-      // If switching tables manually, we might want to keep view type? 
-      // For now, keep behavior but maybe don't reset viewType if it's already set.
       setFilters([]);
       setResults([]);
       setHasRun(false);
       if (columns.length > 0) {
           setXAxis(columns[0].name);
-          // Find first numeric column for Y axis default, or just first column
           const numericCol = columns.find(c => c.type === 'number' || c.type === 'integer' || c.type === 'decimal');
           setYAxis(numericCol ? numericCol.name : columns[0].name);
-      }
-      // Auto-run if there's a default table and we just loaded it (conceptually). 
-      // But explicit Run is safer unless auto-refresh is on.
-      if (biDashboard.refreshInterval > 0 && selectedTableId) {
-          // It will be handled by the interval effect, but we might want an immediate run too?
-          // The interval effect will start after delay. Let's rely on user click or wait for interval.
-          // Actually, for better UX, if auto-refresh is on, run immediately.
-          // Need to be careful about dependency loops.
       }
   }, [selectedTableId, columns]);
 
   const chartData = useMemo(() => {
-      if (viewType !== 'chart') return [];
-      return results.map(r => {
-          const d: any = { ...r.data };
-          // Ensure numeric Y
-           if (yAxis) {
-               const val = Number(d[yAxis]);
-               d[yAxis] = isNaN(val) ? null : val;
-           }
-          return d;
-      });
+    if (viewType !== 'chart') return [];
+    return results.map(r => {
+      const d: any = { ...r.data };
+      if (yAxis) {
+        const val = Number(d[yAxis]);
+        d[yAxis] = isNaN(val) ? null : val;
+      }
+      return d;
+    });
   }, [results, viewType, yAxis]);
 
   return (
@@ -264,6 +285,14 @@ const BiDashboard: React.FC = () => {
             )}
         </div>
     </div>
+  );
+};
+
+const BiDashboard: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <BiDashboardContent />
+    </ErrorBoundary>
   );
 };
 

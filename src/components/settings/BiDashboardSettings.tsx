@@ -30,6 +30,26 @@ const BiDashboardSettings: React.FC = () => {
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Show Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start border-b pb-6">
+            <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700">Display</label>
+                <p className="text-xs text-gray-500 mt-1">Control visibility of the dashboard.</p>
+            </div>
+            <div className="md:col-span-2">
+                 <div className="flex items-center gap-3">
+                    <input
+                        type="checkbox"
+                        id="showDashboard"
+                        checked={localSettings.showDashboard}
+                        onChange={(e) => handleChange('showDashboard', e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                    />
+                    <label htmlFor="showDashboard" className="text-sm font-medium text-gray-700">Show BI Dashboard</label>
+                 </div>
+            </div>
+        </div>
+
         {/* Default Table */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start border-b pb-6">
           <div className="md:col-span-1">
