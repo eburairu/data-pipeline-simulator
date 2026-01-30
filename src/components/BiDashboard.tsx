@@ -126,13 +126,13 @@ const BiDashboardContent: React.FC = () => {
         </div>
 
         {/* Controls */}
-        <div className="p-3 md:p-4 border-b space-y-3 md:space-y-4">
-            <div className="flex flex-col md:flex-row gap-3 md:gap-4 md:items-end">
+        <div className="p-2 md:p-4 border-b space-y-2 md:space-y-4">
+            <div className="flex flex-col md:flex-row gap-2 md:gap-4 md:items-end">
                 {/* Table Select */}
-                <div className="flex flex-col gap-1 w-full md:w-auto">
-                    <label className="text-xs font-semibold text-gray-500">Table</label>
+                <div className="flex flex-col gap-0.5 w-full md:w-auto">
+                    <label className="text-[10px] md:text-xs font-semibold text-gray-500 uppercase">Table</label>
                     <select
-                        className="border rounded p-1.5 text-sm w-full md:min-w-[200px]"
+                        className="border rounded p-1.5 text-sm w-full md:min-w-[200px] bg-white shadow-sm"
                         value={selectedTableId}
                         onChange={(e) => setSelectedTableId(e.target.value)}
                     >
@@ -141,20 +141,20 @@ const BiDashboardContent: React.FC = () => {
                     </select>
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
+                <div className="flex gap-2 w-full md:w-auto items-end">
                     {/* View Type */}
-                    <div className="flex bg-gray-100 p-1 rounded gap-1 flex-1 md:flex-none justify-center">
+                    <div className="flex bg-gray-100 p-0.5 md:p-1 rounded gap-1 flex-1 md:flex-none justify-center">
                         <button
                             onClick={() => setViewType('table')}
-                            className={`px-3 py-1 text-sm rounded flex items-center gap-1 flex-1 justify-center ${viewType === 'table' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
+                            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded flex items-center gap-1 flex-1 justify-center transition-all ${viewType === 'table' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
                         >
-                            <TableIcon size={14} /> <span className="hidden sm:inline">Table</span>
+                            <TableIcon size={14} /> <span className="hidden xs:inline">Table</span>
                         </button>
                         <button
                             onClick={() => setViewType('chart')}
-                            className={`px-3 py-1 text-sm rounded flex items-center gap-1 flex-1 justify-center ${viewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
+                            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded flex items-center gap-1 flex-1 justify-center transition-all ${viewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
                         >
-                            <Activity size={14} /> <span className="hidden sm:inline">Chart</span>
+                            <Activity size={14} /> <span className="hidden xs:inline">Chart</span>
                         </button>
                     </div>
 
@@ -162,35 +162,35 @@ const BiDashboardContent: React.FC = () => {
                     <button
                         onClick={handleRunQuery}
                         disabled={!selectedTableId}
-                        className={`flex-1 md:flex-none px-4 py-1.5 rounded flex items-center justify-center gap-2 text-sm font-semibold transition-colors ${!selectedTableId ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                        className={`flex-1 md:flex-none px-3 md:px-4 py-1.5 rounded flex items-center justify-center gap-2 text-sm font-semibold transition-all ${!selectedTableId ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm active:transform active:scale-95'}`}
                     >
-                        <Play size={14} /> <span className="sm:inline">Run</span>
+                        <Play size={14} /> <span className="inline">Run</span>
                     </button>
                 </div>
             </div>
 
             {/* Filters */}
             {selectedTableDef && (
-                <div className="bg-gray-50 p-2 md:p-3 rounded border space-y-2">
+                <div className="bg-gray-50 p-2 md:p-3 rounded border border-gray-100 space-y-2">
                     <div className="flex justify-between items-center">
-                        <span className="text-xs font-semibold text-gray-500 flex items-center gap-1"><Filter size={12}/> Filters</span>
-                        <button onClick={addFilter} className="text-xs flex items-center gap-1 text-blue-600 hover:underline"><Plus size={12}/> Add</button>
+                        <span className="text-[10px] md:text-xs font-semibold text-gray-500 flex items-center gap-1 uppercase"><Filter size={12}/> Filters</span>
+                        <button onClick={addFilter} className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"><Plus size={12}/> Add</button>
                     </div>
-                    {filters.length === 0 && <div className="text-xs text-gray-400 italic">No filters applied</div>}
-                    <div className="space-y-2">
+                    {filters.length === 0 && <div className="text-[10px] md:text-xs text-gray-400 italic py-1">No filters applied</div>}
+                    <div className="space-y-1.5">
                         {filters.map((f, i) => (
-                            <div key={i} className="flex gap-2 items-center flex-wrap">
+                            <div key={i} className="flex gap-1.5 items-center">
                                 <select
                                     value={f.column}
                                     onChange={(e) => updateFilter(i, 'column', e.target.value)}
-                                    className="border rounded p-1 text-sm bg-white flex-1 min-w-[80px]"
+                                    className="border rounded p-1 text-xs md:text-sm bg-white flex-1 min-w-0"
                                 >
                                     {columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                                 </select>
                                 <select
                                     value={f.operator}
                                     onChange={(e) => updateFilter(i, 'operator', e.target.value as any)}
-                                    className="border rounded p-1 text-sm bg-white w-[60px]"
+                                    className="border rounded p-1 text-xs md:text-sm bg-white w-[50px] md:w-[60px]"
                                 >
                                     <option value="=">=</option>
                                     <option value="!=">!=</option>
@@ -204,10 +204,10 @@ const BiDashboardContent: React.FC = () => {
                                     type="text"
                                     value={f.value}
                                     onChange={(e) => updateFilter(i, 'value', e.target.value)}
-                                    className="border rounded p-1 text-sm flex-grow bg-white min-w-[80px]"
+                                    className="border rounded p-1 text-xs md:text-sm flex-grow bg-white min-w-0"
                                     placeholder="Value..."
                                 />
-                                <button onClick={() => removeFilter(i)} className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14}/></button>
+                                <button onClick={() => removeFilter(i)} className="text-red-400 hover:text-red-600 p-1 shrink-0"><Trash2 size={14}/></button>
                             </div>
                         ))}
                     </div>
@@ -216,18 +216,18 @@ const BiDashboardContent: React.FC = () => {
 
             {/* Chart Config */}
             {selectedTableDef && viewType === 'chart' && (
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-start sm:items-center bg-blue-50 p-2 rounded border border-blue-100">
-                    <span className="text-xs font-semibold text-blue-800">Chart Settings:</span>
-                    <div className="flex gap-4 w-full sm:w-auto">
-                        <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                            <label className="text-xs text-blue-600">X</label>
-                            <select value={xAxis} onChange={e => setXAxis(e.target.value)} className="border rounded p-1 text-sm bg-white w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-start sm:items-center bg-blue-50/50 p-2 rounded border border-blue-100">
+                    <span className="text-[10px] md:text-xs font-semibold text-blue-800 uppercase shrink-0">Chart:</span>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
+                            <label className="text-[10px] md:text-xs text-blue-600 font-medium">X</label>
+                            <select value={xAxis} onChange={e => setXAxis(e.target.value)} className="border rounded p-1 text-xs md:text-sm bg-white w-full sm:w-auto">
                                 {columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
-                        <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                            <label className="text-xs text-blue-600">Y</label>
-                            <select value={yAxis} onChange={e => setYAxis(e.target.value)} className="border rounded p-1 text-sm bg-white w-full sm:w-auto">
+                        <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
+                            <label className="text-[10px] md:text-xs text-blue-600 font-medium">Y</label>
+                            <select value={yAxis} onChange={e => setYAxis(e.target.value)} className="border rounded p-1 text-xs md:text-sm bg-white w-full sm:w-auto">
                                 {columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
