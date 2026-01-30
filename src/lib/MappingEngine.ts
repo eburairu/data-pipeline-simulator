@@ -777,6 +777,13 @@ export const executeMappingTaskRecursive = async (
                         });
                     } catch (e) {
                         console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
+                        stats.transformations[sourceNode.id].errors++;
+                        if (!stats.rejectRows) stats.rejectRows = [];
+                        stats.rejectRows.push({
+                            row: { file: file.name },
+                            error: `Failed to parse CSV: ${e instanceof Error ? e.message : String(e)}`,
+                            transformationName: sourceNode.name
+                        });
                     }
                 } else {
                     try {
