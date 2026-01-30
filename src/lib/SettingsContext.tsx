@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
 import { validateAllSettings, type ValidationError } from './validation';
 import { type Mapping, type MappingTask } from './MappingTypes';
+import { type DBFilter } from './VirtualDB';
 
 export interface DataSourceDefinition {
   id: string;
@@ -133,11 +134,22 @@ export interface ConnectionDefinition {
   tableName?: string;    // Default table
 }
 
+export interface DashboardItem {
+  id: string;
+  title?: string;
+  tableId: string;
+  viewType: 'table' | 'chart';
+  filters: DBFilter[];
+  chartConfig?: {
+    xAxis: string;
+    yAxis: string;
+  };
+  refreshInterval: number;
+}
+
 export interface BiDashboardSettings {
   showDashboard: boolean;
-  defaultTableId: string;
-  defaultViewType: 'table' | 'chart';
-  refreshInterval: number; // in ms, 0 = manual
+  items: DashboardItem[];
 }
 
 // ---------------------
@@ -275,9 +287,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const [biDashboard, setBiDashboard] = useState<BiDashboardSettings>({
     showDashboard: true,
-    defaultTableId: '',
-    defaultViewType: 'table',
-    refreshInterval: 0,
+    items: [],
   });
 
   const [hosts, setHosts] = useState<Host[]>([
@@ -437,10 +447,27 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         if (parsed.etl) setEtl(parsed.etl);
         if (parsed.biDashboard) {
+          // Migration for old structure (flat properties to items array)
+          if ('defaultTableId' in parsed.biDashboard) {
+            const old = parsed.biDashboard;
+            const newItem: DashboardItem = {
+              id: 'dashboard_item_1',
+              title: 'Default View',
+              tableId: old.defaultTableId || '',
+              viewType: old.defaultViewType || 'table',
+              filters: [],
+              refreshInterval: old.refreshInterval || 0,
+            };
+            setBiDashboard({
+              showDashboard: old.showDashboard,
+              items: newItem.tableId ? [newItem] : [],
+            });
+          } else {
             setBiDashboard(parsed.biDashboard);
+          }
         } else if (parsed.visualization) {
-            // Migration
-            setBiDashboard(prev => ({ ...prev, showDashboard: parsed.visualization.showDashboard }));
+          // Migration
+          setBiDashboard(prev => ({ ...prev, showDashboard: parsed.visualization.showDashboard }));
         }
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
