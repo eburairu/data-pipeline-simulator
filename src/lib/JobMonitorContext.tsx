@@ -3,6 +3,19 @@ import React, { createContext, useContext, useState, useCallback, type ReactNode
 export type JobType = 'collection' | 'delivery' | 'mapping';
 export type JobStatus = 'success' | 'failed';
 
+export interface MappingExecutionDetails {
+  transformations: {
+    [transformationId: string]: { name: string; input: number; output: number; errors: number; rejects: number };
+  };
+  rejectRows?: { row: any; error: string; transformationName: string }[];
+}
+
+export interface TransferExecutionDetails {
+  fileSize?: number;
+  bandwidth?: number;
+  throughput?: number;
+}
+
 export interface JobExecutionLog {
   id: string;
   jobId: string;
@@ -15,6 +28,7 @@ export interface JobExecutionLog {
   recordsOutput: number;
   errorMessage?: string;
   details?: string; // Filename or other context
+  extendedDetails?: MappingExecutionDetails | TransferExecutionDetails;
 }
 
 interface JobMonitorContextType {

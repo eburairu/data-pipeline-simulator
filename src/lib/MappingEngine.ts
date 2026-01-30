@@ -41,7 +41,7 @@ export interface DbOps {
 }
 
 export interface ExecutionStats {
-    transformations: { [transformationId: string]: { input: number; output: number; errors: number; rejects: number } };
+    transformations: { [transformationId: string]: { name: string; input: number; output: number; errors: number; rejects: number } };
     rejectRows?: { row: any; error: string; transformationName: string }[];
     cache?: { [key: string]: any };
 }
@@ -876,7 +876,7 @@ export const executeMappingTaskRecursive = async (
     };
 
     mapping.transformations.forEach(t => {
-        stats.transformations[t.id] = { input: 0, output: 0, errors: 0, rejects: 0 };
+        stats.transformations[t.id] = { name: t.name, input: 0, output: 0, errors: 0, rejects: 0 };
     });
 
     // Initialize rejectRows

@@ -158,7 +158,12 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
             endTime: Date.now(),
             recordsInput: 1,
             recordsOutput: 1,
-            details: `Moved ${file.name} to ${targetHost}:${targetPath}`
+            details: `Moved ${file.name} to ${targetHost}:${targetPath}`,
+            extendedDetails: {
+              fileSize: file.content.length,
+              bandwidth: job.bandwidth,
+              throughput: (file.content.length / ((Date.now() - startTime) / 1000))
+            }
           });
 
         } catch (e) {
@@ -248,7 +253,12 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
             endTime: Date.now(),
             recordsInput: 1,
             recordsOutput: 1,
-            details: `Delivered ${file.name} to ${job.targetHost}:${job.targetPath}`
+            details: `Delivered ${file.name} to ${job.targetHost}:${job.targetPath}`,
+            extendedDetails: {
+              fileSize: file.content.length,
+              bandwidth: job.bandwidth,
+              throughput: (file.content.length / ((Date.now() - startTime) / 1000))
+            }
           });
 
         } catch (e) {
@@ -331,7 +341,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           recordsInput: totalInput,
           recordsOutput: totalOutput,
           details: `Processed via mapping ${mapping.name}`,
-          errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : undefined
+          errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : undefined,
+          extendedDetails: stats
         });
       }
 
