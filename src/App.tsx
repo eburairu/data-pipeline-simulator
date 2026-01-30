@@ -7,6 +7,7 @@ import PipelineFlow from './components/PipelineFlow';
 import SettingsPanel from './components/settings/SettingsPanel';
 import JobMonitor from './components/JobMonitor';
 import { processTemplate } from './lib/templateUtils';
+import { generateDataFromSchema } from './lib/DataGenerator';
 import { executeMappingTaskRecursive, type ExecutionState } from './lib/MappingEngine';
 import 'reactflow/dist/style.css';
 import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3, MonitorPlay } from 'lucide-react';
@@ -385,7 +386,13 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       if (!def) return null;
       return setInterval(() => {
         const ctx = { hostname: def.host, timestamp: new Date() };
-        writeFile(def.host, def.path, processTemplate(job.fileNamePattern, ctx), processTemplate(job.fileContent, ctx));
+        let content = '';
+        if (job.mode === 'schema' && job.schema) {
+          content = generateDataFromSchema(job.schema, job.rowCount || 1, ctx);
+        } else {
+          content = processTemplate(job.fileContent, ctx);
+        }
+        writeFile(def.host, def.path, processTemplate(job.fileNamePattern, ctx), content);
       }, job.executionInterval);
     }).filter(Boolean) as ReturnType<typeof setInterval>[];
     return () => timers.forEach(clearInterval);
@@ -441,7 +448,16 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     dataSource.jobs.forEach(job => {
       if (!job.enabled) return;
       const d = dataSource.definitions.find(def => def.id === job.dataSourceId);
-      if (d) writeFile(d.host, d.path, processTemplate(job.fileNamePattern, { hostname: d.host, timestamp: new Date() }), processTemplate(job.fileContent, { hostname: d.host, timestamp: new Date() }));
+      if (d) {
+        const ctx = { hostname: d.host, timestamp: new Date() };
+        let content = '';
+        if (job.mode === 'schema' && job.schema) {
+          content = generateDataFromSchema(job.schema, job.rowCount || 1, ctx);
+        } else {
+          content = processTemplate(job.fileContent, ctx);
+        }
+        writeFile(d.host, d.path, processTemplate(job.fileNamePattern, ctx), content);
+      }
     });
   };
 

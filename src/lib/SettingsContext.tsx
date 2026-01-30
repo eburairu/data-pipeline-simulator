@@ -9,12 +9,27 @@ export interface DataSourceDefinition {
   path: string;
 }
 
+export type GeneratorType = 'static' | 'randomInt' | 'randomFloat' | 'sin' | 'cos' | 'sequence' | 'uuid' | 'list';
+
+export interface ColumnSchema {
+  id: string;
+  name: string;
+  type: GeneratorType;
+  params: Record<string, any>;
+}
+
 export interface GenerationJob {
   id: string;
   name: string;
   dataSourceId: string; // Refers to DataSourceDefinition.id
   fileNamePattern: string;
+  // Template mode
   fileContent: string;
+  // Schema mode
+  mode?: 'template' | 'schema';
+  rowCount?: number;
+  schema?: ColumnSchema[];
+
   executionInterval: number;
   enabled: boolean;
 }
@@ -187,6 +202,13 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         dataSourceId: 'ds_def_1',
         fileNamePattern: '${host}_data_${timestamp}.csv',
         fileContent: 'col1,col2,col3\nsample,data,123',
+        mode: 'schema',
+        rowCount: 1,
+        schema: [
+          { id: 'c_1', name: 'id', type: 'sequence', params: { start: 1, step: 1 } },
+          { id: 'c_2', name: 'value', type: 'randomInt', params: { min: 0, max: 100 } },
+          { id: 'c_3', name: 'ts', type: 'static', params: { value: '${timestamp}' } }
+        ],
         executionInterval: 1000,
         enabled: true,
       }
@@ -370,6 +392,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
                   dataSourceId: defId,
                   fileNamePattern: oldJob.fileNamePattern,
                   fileContent: oldJob.fileContent,
+                  mode: oldJob.mode || 'template', // Default to template for migrated jobs
+                  rowCount: oldJob.rowCount || 1,
+                  schema: oldJob.schema || [],
                   executionInterval: oldJob.executionInterval,
                   enabled: oldJob.enabled
                 });
