@@ -1,6 +1,6 @@
 
-import { executeMappingTaskRecursive, FileSystemOps, DbOps, ExecutionState } from './MappingEngine';
-import { Mapping, MappingTask } from './MappingTypes';
+import { executeMappingTaskRecursive, type FileSystemOps, type DbOps, type ExecutionState } from './MappingEngine';
+import type { Mapping, MappingTask } from './MappingTypes';
 import { describe, test, expect, vi } from 'vitest';
 
 describe('MappingEngine Reject File', () => {
@@ -77,8 +77,8 @@ describe('MappingEngine Reject File', () => {
         );
 
         // Assertions
-        expect(result.stats[validId].errors).toBe(1); // Alice fails
-        expect(result.stats[validId].output).toBe(1); // Bob passes
+        expect(result.stats.transformations[validId].errors).toBe(1); // Alice fails
+        expect(result.stats.transformations[validId].output).toBe(1); // Bob passes
 
         expect(mockFs.writeFile).toHaveBeenCalledWith(
             'localhost',
@@ -166,7 +166,7 @@ describe('MappingEngine Reject File', () => {
             state
         );
 
-        expect(result.stats[exprId].output).toBe(1);
-        expect(result.stats[exprId].errors).toBe(0);
+        expect(result.stats.transformations[exprId].output).toBe(1);
+        expect(result.stats.transformations[exprId].errors).toBe(0);
     });
 });

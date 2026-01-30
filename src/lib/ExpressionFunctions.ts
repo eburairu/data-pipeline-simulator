@@ -82,11 +82,11 @@ export const ExpressionFunctions = {
 
     // Date
     GET_DATE: () => new Date(), // Returns Date object
-    TO_DATE: (str: string, format?: string) => {
+    TO_DATE: (str: string, _format?: string) => {
         // Very basic parsing, ignoring format for now as JS Date handles ISO well
         return new Date(str);
     },
-    TO_CHAR: (val: any, format?: string) => {
+    TO_CHAR: (val: any, _format?: string) => {
         if (val instanceof Date) return val.toISOString();
         return String(val);
     },
@@ -130,7 +130,7 @@ export const ExpressionFunctions = {
         else if (part === 'YYYY') { d.setMonth(0, 1); d.setHours(0, 0, 0, 0); }
         return d;
     },
-    IS_DATE: (val: any, format?: string) => {
+    IS_DATE: (val: any, _format?: string) => {
         if (!val) return false;
         const d = new Date(val);
         return !isNaN(d.getTime());

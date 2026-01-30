@@ -42,7 +42,7 @@ export const validateGenerationJob = (job: GenerationJob, definitions: DataSourc
     if (!job.schema || job.schema.length === 0) {
       errors.push({ id: job.id, field: 'schema', message: 'At least one column is required' });
     } else {
-      job.schema.forEach((col, idx) => {
+      job.schema.forEach((col) => {
         if (!col.name.trim()) {
           errors.push({ id: job.id, field: `schema`, message: 'Column Name is required' });
         }
