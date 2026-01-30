@@ -7,10 +7,17 @@ export interface DBRecord {
   insertedAt: number;
 }
 
+export interface DBFilter {
+  column: string;
+  operator: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';
+  value: string;
+}
+
 interface VirtualDBContextType {
   records: DBRecord[];
   insert: (table: string, data: Record<string, unknown>) => void;
   select: (table: string) => DBRecord[];
+  query: (table: string, filters: DBFilter[]) => DBRecord[];
   update: (table: string, id: string, data: Record<string, unknown>) => void;
   remove: (table: string, id: string) => void;
 }
@@ -35,6 +42,37 @@ export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children 
     return records.filter((r) => r.table === table);
   }, [records]);
 
+  const query = useCallback((table: string, filters: DBFilter[]) => {
+    let result = records.filter((r) => r.table === table);
+
+    if (filters && filters.length > 0) {
+      result = result.filter(record => {
+        return filters.every(filter => {
+          const val = record.data[filter.column];
+          const target = filter.value;
+
+          if (val === undefined || val === null) return false;
+
+          const isNum = !isNaN(Number(target)) && target.trim() !== '' && !isNaN(Number(val));
+          const vNum = isNum ? Number(val) : NaN;
+          const tNum = isNum ? Number(target) : NaN;
+
+          switch (filter.operator) {
+            case '=': return String(val) == target;
+            case '!=': return String(val) != target;
+            case '>': return isNum ? vNum > tNum : String(val) > target;
+            case '<': return isNum ? vNum < tNum : String(val) < target;
+            case '>=': return isNum ? vNum >= tNum : String(val) >= target;
+            case '<=': return isNum ? vNum <= tNum : String(val) <= target;
+            case 'contains': return String(val).toLowerCase().includes(target.toLowerCase());
+            default: return true;
+          }
+        });
+      });
+    }
+    return result;
+  }, [records]);
+
   const update = useCallback((table: string, id: string, data: Record<string, unknown>) => {
     setRecords((prev) => prev.map(r => {
       if (r.table === table && r.id === id) {
@@ -51,7 +89,7 @@ export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, []);
 
   return (
-    <VirtualDBContext.Provider value={{ records, insert, select, update, remove }}>
+    <VirtualDBContext.Provider value={{ records, insert, select, query, update, remove }}>
       {children}
     </VirtualDBContext.Provider>
   );

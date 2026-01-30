@@ -4,6 +4,7 @@ import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import { SettingsProvider, useSettings } from './lib/SettingsContext';
 import { JobMonitorProvider, useJobMonitor, type JobType } from './lib/JobMonitorContext';
 import PipelineFlow from './components/PipelineFlow';
+import BiDashboard from './components/BiDashboard';
 import SettingsPanel from './components/settings/SettingsPanel';
 import JobMonitor from './components/JobMonitor';
 import { processTemplate } from './lib/templateUtils';
@@ -515,8 +516,13 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
             <DatabaseView tables={tables} select={select} />
           </div>
         </div>
-        <div className="h-[600px] bg-white rounded shadow border border-gray-200 overflow-hidden">
-          <PipelineFlow activeSteps={activeSteps} />
+        <div className="flex flex-col gap-4">
+          <div className="h-[400px]">
+            <BiDashboard />
+          </div>
+          <div className="h-[500px] bg-white rounded shadow border border-gray-200 overflow-hidden">
+            <PipelineFlow activeSteps={activeSteps} />
+          </div>
         </div>
       </div>
     </>
