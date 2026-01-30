@@ -1,7 +1,146 @@
-import React from 'react';
-import { useSettings, type DataSourceDefinition, type GenerationJob } from '../../lib/SettingsContext';
-import { validateDataSourceDefinition, validateGenerationJob } from '../../lib/validation';
-import { Trash2, Plus, FolderOpen, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { useSettings, type DataSourceDefinition, type GenerationJob, type ColumnSchema, type GeneratorType } from '../../lib/SettingsContext';
+import { validateDataSourceDefinition, validateGenerationJob, type ValidationError } from '../../lib/validation';
+import { Trash2, Plus, FolderOpen, FileText, Settings, AlignJustify, List } from 'lucide-react';
+
+const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list'];
+
+const SchemaEditor: React.FC<{
+    schema: ColumnSchema[];
+    onChange: (schema: ColumnSchema[]) => void;
+    errors: ValidationError[];
+    jobId: string;
+}> = ({ schema, onChange, errors, jobId }) => {
+
+    const addColumn = () => {
+        const newCol: ColumnSchema = {
+            id: `col_${Date.now()}`,
+            name: `column${schema.length + 1}`,
+            type: 'static',
+            params: { value: '' }
+        };
+        onChange([...schema, newCol]);
+    };
+
+    const removeColumn = (id: string) => {
+        onChange(schema.filter(c => c.id !== id));
+    };
+
+    const updateColumn = (id: string, updates: Partial<ColumnSchema>) => {
+        onChange(schema.map(c => c.id === id ? { ...c, ...updates } : c));
+    };
+
+    const updateParams = (id: string, key: string, value: any) => {
+        const col = schema.find(c => c.id === id);
+        if (!col) return;
+        updateColumn(id, { params: { ...col.params, [key]: value } });
+    };
+
+    const getError = (idx: number, field: string) => {
+        return errors.find(e => e.id === jobId && e.field === `schema[${idx}].${field}`)?.message; // Adjust matching logic if validation key format differs
+        // Ideally validation returns flattened keys like "schema" or specific indices.
+        // Our validation returns `schema` or `schema` (generic) for now in some cases, let's refining validation output handling if needed.
+        // Actually validation code uses `schema` for generic empty error, and `schema` (reused) for specific col name error.
+        // Let's rely on finding errors that contain schema index if possible, but currently validation.ts pushes `schema` for name errors.
+        // Let's just check generic schema errors for now or update validation.ts to be more specific?
+        // validation.ts was updated to push { field: `schema`, message: ... } for col name empty.
+        // It should ideally be specific like `schema.${idx}.name`.
+        // Let's assume validation gives us enough info or just show inline error if simple.
+    };
+
+    // Helper to find specific error for a column field
+    const getColumnError = (index: number, subField: string) => {
+        // Validation.ts logic: errors.push({ id: job.id, field: `schema`, message: 'Column Name is required' });
+        // It doesn't include index currently for name empty.
+        // But let's assume we want to show it.
+        // We can just rely on built-in required check or simple visual feedback for now.
+        return null;
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 border-b pb-1 mb-2">
+                <div className="col-span-3">Column Name</div>
+                <div className="col-span-3">Type</div>
+                <div className="col-span-5">Parameters</div>
+                <div className="col-span-1"></div>
+            </div>
+            {schema.map((col, idx) => (
+                <div key={col.id} className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-3">
+                        <input
+                            type="text"
+                            value={col.name}
+                            onChange={(e) => updateColumn(col.id, { name: e.target.value })}
+                            className="w-full border rounded p-1 text-sm"
+                            placeholder="Name"
+                        />
+                    </div>
+                    <div className="col-span-3">
+                        <select
+                            value={col.type}
+                            onChange={(e) => updateColumn(col.id, { type: e.target.value as GeneratorType, params: {} })}
+                            className="w-full border rounded p-1 text-sm bg-white"
+                        >
+                            {GENERATOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+                    <div className="col-span-5">
+                        {/* Dynamic Params Inputs */}
+                        <div className="grid grid-cols-2 gap-1">
+                            {col.type === 'static' && (
+                                <input type="text" placeholder="Value (Template supported)" className="col-span-2 border rounded p-1 text-sm" value={col.params.value || ''} onChange={e => updateParams(col.id, 'value', e.target.value)} />
+                            )}
+                            {col.type === 'randomInt' && (
+                                <>
+                                    <input type="number" placeholder="Min" className="border rounded p-1 text-sm" value={col.params.min ?? 0} onChange={e => updateParams(col.id, 'min', e.target.value)} />
+                                    <input type="number" placeholder="Max" className="border rounded p-1 text-sm" value={col.params.max ?? 100} onChange={e => updateParams(col.id, 'max', e.target.value)} />
+                                </>
+                            )}
+                            {col.type === 'randomFloat' && (
+                                <>
+                                    <input type="number" placeholder="Min" className="border rounded p-1 text-sm" value={col.params.min ?? 0} onChange={e => updateParams(col.id, 'min', e.target.value)} />
+                                    <input type="number" placeholder="Max" className="border rounded p-1 text-sm" value={col.params.max ?? 1} onChange={e => updateParams(col.id, 'max', e.target.value)} />
+                                    <input type="number" placeholder="Precision" className="col-span-2 border rounded p-1 text-sm" value={col.params.precision ?? 2} onChange={e => updateParams(col.id, 'precision', e.target.value)} />
+                                </>
+                            )}
+                            {(col.type === 'sin' || col.type === 'cos') && (
+                                <>
+                                    <input type="number" placeholder="Period (ms)" className="border rounded p-1 text-sm" value={col.params.period ?? 10000} onChange={e => updateParams(col.id, 'period', e.target.value)} />
+                                    <input type="number" placeholder="Amplitude" className="border rounded p-1 text-sm" value={col.params.amplitude ?? 1} onChange={e => updateParams(col.id, 'amplitude', e.target.value)} />
+                                    <input type="number" placeholder="Offset" className="col-span-2 border rounded p-1 text-sm" value={col.params.offset ?? 0} onChange={e => updateParams(col.id, 'offset', e.target.value)} />
+                                </>
+                            )}
+                             {col.type === 'sequence' && (
+                                <>
+                                    <input type="number" placeholder="Start" className="border rounded p-1 text-sm" value={col.params.start ?? 1} onChange={e => updateParams(col.id, 'start', e.target.value)} />
+                                    <input type="number" placeholder="Step" className="border rounded p-1 text-sm" value={col.params.step ?? 1} onChange={e => updateParams(col.id, 'step', e.target.value)} />
+                                </>
+                            )}
+                             {col.type === 'list' && (
+                                <input type="text" placeholder="Values (comma separated)" className="col-span-2 border rounded p-1 text-sm" value={col.params.values || ''} onChange={e => updateParams(col.id, 'values', e.target.value)} />
+                            )}
+                             {col.type === 'uuid' && (
+                                <span className="col-span-2 text-xs text-gray-400 italic flex items-center">Generates unique ID</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                        <button onClick={() => removeColumn(col.id)} className="text-gray-400 hover:text-red-500">
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
+                </div>
+            ))}
+            <button
+                onClick={addColumn}
+                className="w-full flex items-center justify-center gap-2 py-1 border border-dashed border-gray-300 rounded-md text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors text-xs"
+            >
+                <Plus size={14} /> Add Column
+            </button>
+        </div>
+    );
+};
 
 const DataSourceSettings: React.FC = () => {
   const { dataSource, setDataSource, hosts } = useSettings();
@@ -43,8 +182,6 @@ const DataSourceSettings: React.FC = () => {
   };
 
   const removeDefinition = (id: string) => {
-    // Note: We might want to warn if jobs are using this definition, but for now just allow delete.
-    // Validation will flag jobs with missing definitions.
     setDataSource({
       ...dataSource,
       definitions: dataSource.definitions.filter(d => d.id !== id)
@@ -71,6 +208,12 @@ const DataSourceSettings: React.FC = () => {
       dataSourceId: defaultDefId,
       fileNamePattern: '${host}_data_${timestamp}.csv',
       fileContent: 'sample,data,123',
+      mode: 'schema',
+      rowCount: 1,
+      schema: [
+          { id: `c_${Date.now()}_1`, name: 'id', type: 'sequence', params: { start: 1, step: 1 } },
+          { id: `c_${Date.now()}_2`, name: 'value', type: 'randomInt', params: { min: 0, max: 100 } }
+      ],
       executionInterval: 1000,
       enabled: true,
     };
@@ -162,6 +305,7 @@ const DataSourceSettings: React.FC = () => {
           const errors = validateGenerationJob(job, dataSource.definitions);
           const hasError = (field: string) => errors.some(e => e.field === field);
           const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+          const currentMode = job.mode || 'template';
 
           return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
@@ -220,15 +364,59 @@ const DataSourceSettings: React.FC = () => {
                      />
                    </div>
                 </div>
-                <div>
-                     <label className="block text-xs font-medium text-gray-500">File Content Template</label>
-                     <textarea
-                        value={job.fileContent}
-                        onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
-                        className="w-full border rounded p-1 text-sm font-mono h-24"
-                        placeholder="col1,col2,col3&#10;data1,data2,data3"
-                     />
+
+                {/* Mode Selector */}
+                <div className="flex items-center gap-4 border-t pt-3 mt-1">
+                    <label className="text-xs font-medium text-gray-500">Generation Mode:</label>
+                    <div className="flex bg-gray-100 rounded p-1">
+                        <button
+                            onClick={() => handleJobChange(job.id, 'mode', 'template')}
+                            className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'template' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <AlignJustify size={14} /> Template Text
+                        </button>
+                        <button
+                            onClick={() => handleJobChange(job.id, 'mode', 'schema')}
+                            className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'schema' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <List size={14} /> Schema List
+                        </button>
+                    </div>
                 </div>
+
+                {currentMode === 'template' ? (
+                     <div>
+                         <label className="block text-xs font-medium text-gray-500">File Content Template</label>
+                         <textarea
+                            value={job.fileContent}
+                            onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
+                            className="w-full border rounded p-1 text-sm font-mono h-32"
+                            placeholder="col1,col2,col3&#10;data1,data2,data3"
+                         />
+                    </div>
+                ) : (
+                    <div>
+                         <div className="mb-2">
+                             <label className="block text-xs font-medium text-gray-500 mb-1">Rows per Execution</label>
+                             <input
+                                type="number"
+                                value={job.rowCount || 1}
+                                onChange={(e) => handleJobChange(job.id, 'rowCount', parseInt(e.target.value) || 1)}
+                                className={`w-32 border rounded p-1 text-sm ${hasError('rowCount') ? 'border-red-500' : ''}`}
+                             />
+                         </div>
+                         <label className="block text-xs font-medium text-gray-500 mb-1">Column Definitions</label>
+                         {hasError('schema') && <p className="text-xs text-red-500 mb-1">{getErrorMsg('schema')}</p>}
+                         <div className="border rounded p-2 bg-gray-50">
+                             <SchemaEditor
+                                schema={job.schema || []}
+                                onChange={(newSchema) => handleJobChange(job.id, 'schema', newSchema)}
+                                errors={errors}
+                                jobId={job.id}
+                             />
+                         </div>
+                    </div>
+                )}
              </div>
           </div>
         );

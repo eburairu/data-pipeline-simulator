@@ -34,6 +34,22 @@ export const validateGenerationJob = (job: GenerationJob, definitions: DataSourc
 
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (!job.fileNamePattern.trim()) errors.push({ id: job.id, field: 'fileNamePattern', message: 'File Name Pattern is required' });
+
+  if (job.mode === 'schema') {
+    if ((job.rowCount ?? 0) <= 0) {
+      errors.push({ id: job.id, field: 'rowCount', message: 'Row Count must be > 0' });
+    }
+    if (!job.schema || job.schema.length === 0) {
+      errors.push({ id: job.id, field: 'schema', message: 'At least one column is required' });
+    } else {
+      job.schema.forEach((col, idx) => {
+        if (!col.name.trim()) {
+          errors.push({ id: job.id, field: `schema`, message: 'Column Name is required' });
+        }
+      });
+    }
+  }
+
   return errors;
 };
 
