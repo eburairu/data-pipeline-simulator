@@ -630,7 +630,7 @@ function App() {
   const retryHandlerRef = useRef<(id: string, type: JobType) => void>(() => { });
   const retryWrapper = useCallback((id: string, type: JobType) => retryHandlerRef.current(id, type), []);
   const [activeTab, setActiveTab] = useState<'simulation' | 'dashboard' | 'monitor' | 'settings'>('simulation');
-  const { saveSettings, biDashboard } = useSettings();
+  const { saveSettings } = useSettings();
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const handleSave = () => {
