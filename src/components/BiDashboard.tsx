@@ -38,7 +38,6 @@ const BiDashboard: React.FC = () => {
 
   const updateFilter = (index: number, field: keyof DBFilter, value: string) => {
     const newFilters = [...filters];
-    // @ts-expect-error dynamic assignment
     newFilters[index] = { ...newFilters[index], [field]: value };
     setFilters(newFilters);
   };

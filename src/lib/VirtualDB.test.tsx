@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { VirtualDBProvider, useVirtualDB, type DBFilter } from './VirtualDB';
+import { VirtualDBProvider, useVirtualDB } from './VirtualDB';
 
 describe('VirtualDB', () => {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
