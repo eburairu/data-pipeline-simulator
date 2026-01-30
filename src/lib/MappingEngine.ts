@@ -41,8 +41,9 @@ export interface DbOps {
 }
 
 export interface ExecutionStats {
-    [transformationId: string]: { input: number; output: number; errors: number; rejects: number };
+    transformations: { [transformationId: string]: { input: number; output: number; errors: number; rejects: number } };
     rejectRows?: { row: any; error: string; transformationName: string }[];
+    cache?: { [key: string]: any };
 }
 
 export interface ExecutionState {
@@ -101,7 +102,7 @@ const traverse = (
 
     for (const nextNode of nextNodes) {
         let processedBatch: any[] = [];
-        stats[nextNode.id].input += batch.length;
+        stats.transformations[nextNode.id].input += batch.length;
 
         try {
             switch (nextNode.type) {
@@ -196,7 +197,7 @@ const traverse = (
                                     error: `Validation failed: Rule validation error`,
                                     transformationName: nextNode.name
                                 });
-                                stats[nextNode.id].errors++;
+                                stats.transformations[nextNode.id].errors++;
                             }
                             // 'skip' behavior: simply drop the row
                         }
@@ -221,7 +222,7 @@ const traverse = (
                                 delete rowToProcess['_strategy']; // Remove internal flag
 
                                 if (strategy === 'reject') {
-                                    stats[nextNode.id].rejects++;
+                                    stats.transformations[nextNode.id].rejects++;
                                     return; // Skip downstream
                                 }
 
@@ -257,7 +258,7 @@ const traverse = (
                                             shouldInsert = false;
                                             matchId = match.id;
                                             if (dupBehavior === 'error') {
-                                                stats[nextNode.id].errors++;
+                                                stats.transformations[nextNode.id].errors++;
                                                 console.warn(`[MappingEngine] Duplicate detected and treated as error: ${JSON.stringify(row)}`);
                                                 return;
                                             } else if (dupBehavior === 'ignore') {
@@ -281,7 +282,7 @@ const traverse = (
                                     if (updateCols.length === 0) {
                                         console.warn(`[MappingEngine] ${strategy} requested but no updateColumns defined for ${nextNode.name}`);
                                         // Fallback to insert? No, risky. log error
-                                        stats[nextNode.id].errors++;
+                                        stats.transformations[nextNode.id].errors++;
                                         return;
                                     }
 
@@ -340,13 +341,14 @@ const traverse = (
                         processedBatch = batch;
                     } else {
                         // キャッシュを確認
-                        if (!stats[joinerCacheKey]) {
+                        if (!stats.cache) stats.cache = {};
+                        if (!stats.cache[joinerCacheKey]) {
                             // 最初の入力: マスターとしてキャッシュ
-                            (stats as any)[joinerCacheKey] = { masterBatch: batch, received: 1 };
+                            stats.cache[joinerCacheKey] = { masterBatch: batch, received: 1 };
                             processedBatch = []; // 結合はまだ実行しない
                         } else {
                             // 2番目の入力: 結合を実行
-                            const cache = (stats as any)[joinerCacheKey];
+                            const cache = stats.cache[joinerCacheKey];
                             const masterBatch = cache.masterBatch as any[];
                             const detailBatch = batch;
 
@@ -399,7 +401,7 @@ const traverse = (
                             console.log(`[MappingEngine] Joiner ${nextNode.name}: ${conf.joinType} join produced ${joinedRows.length} rows`);
 
                             // キャッシュをクリア
-                            delete (stats as any)[joinerCacheKey];
+                            delete stats.cache[joinerCacheKey];
                         }
                     }
                     break;
@@ -521,20 +523,21 @@ const traverse = (
                     const unionCacheKey = `union_${nextNode.id}`;
                     const incomingLinks = mapping.links.filter(l => l.targetId === nextNode.id);
 
-                    if (!stats[unionCacheKey]) {
-                        (stats as any)[unionCacheKey] = { batches: [batch], received: 1 };
+                    if (!stats.cache) stats.cache = {};
+                    if (!stats.cache[unionCacheKey]) {
+                        stats.cache[unionCacheKey] = { batches: [batch], received: 1 };
                     } else {
-                        const cache = (stats as any)[unionCacheKey];
+                        const cache = stats.cache[unionCacheKey];
                         cache.batches.push(batch);
                         cache.received++;
                     }
 
-                    const cache = (stats as any)[unionCacheKey];
+                    const cache = stats.cache[unionCacheKey];
                     if (cache.received >= incomingLinks.length) {
                         // すべての入力が揃った - マージして出力
                         processedBatch = cache.batches.flat();
                         console.log(`[MappingEngine] Union ${nextNode.name}: merged ${cache.received} inputs into ${processedBatch.length} rows`);
-                        delete (stats as any)[unionCacheKey];
+                        delete stats.cache[unionCacheKey];
                     } else {
                         // まだ全入力が揃っていない - 待機
                         processedBatch = [];
@@ -831,7 +834,7 @@ const traverse = (
             }
         } catch (e) {
             console.error(`Error in node ${nextNode.name}`, e);
-            stats[nextNode.id].errors += 1;
+            stats.transformations[nextNode.id].errors += 1;
             // Capture batch level error
             if (!stats.rejectRows) stats.rejectRows = [];
             stats.rejectRows.push({
@@ -841,7 +844,7 @@ const traverse = (
             });
         }
 
-        stats[nextNode.id].output += processedBatch.length;
+        stats.transformations[nextNode.id].output += processedBatch.length;
         if (processedBatch.length > 0) {
             traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, parameters);
         }
@@ -859,7 +862,7 @@ export const executeMappingTaskRecursive = async (
     state: ExecutionState
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
-    const stats: ExecutionStats = {};
+    const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
     const newState = { ...state };
 
     // Resolve Parameters
@@ -873,7 +876,7 @@ export const executeMappingTaskRecursive = async (
     };
 
     mapping.transformations.forEach(t => {
-        stats[t.id] = { input: 0, output: 0, errors: 0, rejects: 0 };
+        stats.transformations[t.id] = { input: 0, output: 0, errors: 0, rejects: 0 };
     });
 
     // Initialize rejectRows
@@ -948,8 +951,8 @@ export const executeMappingTaskRecursive = async (
             }
         }
 
-        stats[sourceNode.id].input = records.length;
-        stats[sourceNode.id].output = records.length;
+        stats.transformations[sourceNode.id].input = records.length;
+        stats.transformations[sourceNode.id].output = records.length;
 
         if (records.length > 0) {
             traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, parameters);

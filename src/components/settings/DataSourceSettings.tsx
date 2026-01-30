@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSettings, type DataSourceDefinition, type GenerationJob, type ColumnSchema, type GeneratorType } from '../../lib/SettingsContext';
 import { validateDataSourceDefinition, validateGenerationJob, type ValidationError } from '../../lib/validation';
-import { Trash2, Plus, FolderOpen, FileText, Settings, AlignJustify, List } from 'lucide-react';
+import { Trash2, Plus, FolderOpen, FileText, AlignJustify, List } from 'lucide-react';
 
 const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list'];
 
@@ -10,7 +10,7 @@ const SchemaEditor: React.FC<{
     onChange: (schema: ColumnSchema[]) => void;
     errors: ValidationError[];
     jobId: string;
-}> = ({ schema, onChange, errors, jobId }) => {
+}> = ({ schema, onChange }) => {
 
     const addColumn = () => {
         const newCol: ColumnSchema = {
@@ -36,27 +36,6 @@ const SchemaEditor: React.FC<{
         updateColumn(id, { params: { ...col.params, [key]: value } });
     };
 
-    const getError = (idx: number, field: string) => {
-        return errors.find(e => e.id === jobId && e.field === `schema[${idx}].${field}`)?.message; // Adjust matching logic if validation key format differs
-        // Ideally validation returns flattened keys like "schema" or specific indices.
-        // Our validation returns `schema` or `schema` (generic) for now in some cases, let's refining validation output handling if needed.
-        // Actually validation code uses `schema` for generic empty error, and `schema` (reused) for specific col name error.
-        // Let's rely on finding errors that contain schema index if possible, but currently validation.ts pushes `schema` for name errors.
-        // Let's just check generic schema errors for now or update validation.ts to be more specific?
-        // validation.ts was updated to push { field: `schema`, message: ... } for col name empty.
-        // It should ideally be specific like `schema.${idx}.name`.
-        // Let's assume validation gives us enough info or just show inline error if simple.
-    };
-
-    // Helper to find specific error for a column field
-    const getColumnError = (index: number, subField: string) => {
-        // Validation.ts logic: errors.push({ id: job.id, field: `schema`, message: 'Column Name is required' });
-        // It doesn't include index currently for name empty.
-        // But let's assume we want to show it.
-        // We can just rely on built-in required check or simple visual feedback for now.
-        return null;
-    };
-
     return (
         <div className="space-y-2">
             <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 border-b pb-1 mb-2">
@@ -65,7 +44,7 @@ const SchemaEditor: React.FC<{
                 <div className="col-span-5">Parameters</div>
                 <div className="col-span-1"></div>
             </div>
-            {schema.map((col, idx) => (
+            {schema.map((col) => (
                 <div key={col.id} className="grid grid-cols-12 gap-2 items-start">
                     <div className="col-span-3">
                         <input
