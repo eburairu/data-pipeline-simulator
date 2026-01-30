@@ -45,6 +45,7 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
   const [yAxis, setYAxis] = useState<string>(item.chartConfig?.yAxis || '');
   const [results, setResults] = useState<DBRecord[]>([]);
   const [hasRun, setHasRun] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const prevTableIdRef = useRef(item.tableId);
 
   // Safety check for context
@@ -74,13 +75,21 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-refresh logic
+  // Auto-refresh logic (Settings)
   useEffect(() => {
-    if (item.refreshInterval > 0 && selectedTableId) {
+    if (item.refreshInterval > 0 && selectedTableId && !autoRefresh) {
         const interval = setInterval(handleRunQuery, item.refreshInterval);
         return () => clearInterval(interval);
     }
-  }, [item.refreshInterval, selectedTableId, filters]);
+  }, [item.refreshInterval, selectedTableId, filters, autoRefresh]);
+
+  // Auto-refresh logic (Manual Toggle 1s)
+  useEffect(() => {
+    if (autoRefresh && selectedTableId) {
+        const interval = setInterval(handleRunQuery, 1000);
+        return () => clearInterval(interval);
+    }
+  }, [autoRefresh, selectedTableId, filters]);
 
   // Update xAxis/yAxis defaults if columns change and not set
   useEffect(() => {
@@ -185,6 +194,16 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
                         className={`flex-1 xl:flex-none px-3 py-1 rounded flex items-center justify-center gap-2 text-xs font-semibold transition-all ${!selectedTableId ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm active:transform active:scale-95'}`}
                     >
                         <Play size={12} /> <span className="inline">Run</span>
+                    </button>
+
+                    {/* Auto Refresh Toggle */}
+                    <button
+                        onClick={() => setAutoRefresh(!autoRefresh)}
+                        disabled={!selectedTableId}
+                        className={`flex-1 xl:flex-none px-3 py-1 rounded flex items-center justify-center gap-2 text-xs font-semibold transition-all ${!selectedTableId ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : autoRefresh ? 'bg-green-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        title="Auto Refresh (1s)"
+                    >
+                        <Activity size={12} /> <span className="inline">Auto (1s)</span>
                     </button>
                 </div>
             </div>
@@ -325,7 +344,7 @@ const BiDashboard: React.FC = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full overflow-y-auto pb-8">
        {biDashboard.items.map(item => (
            <ErrorBoundary key={item.id}>
-               <div className="h-[400px] lg:h-[500px]">
+               <div className="h-[800px] lg:h-[1000px]">
                    <DashboardWidget item={item} />
                </div>
            </ErrorBoundary>

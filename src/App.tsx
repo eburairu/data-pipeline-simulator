@@ -533,7 +533,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         </div>
         <div className="flex flex-col gap-4">
           {biDashboard.showDashboard && (
-            <div className="h-[350px] sm:h-[400px]">
+            <div className="h-[700px] sm:h-[800px]">
               <BiDashboard />
             </div>
           )}
