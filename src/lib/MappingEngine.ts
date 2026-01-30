@@ -49,16 +49,13 @@ export interface ExecutionStats {
 export interface ExecutionState {
     processedFiles?: Set<string>;
     lastProcessedTimestamp?: number;
+    sequences?: Record<string, number>; // Persist sequence values by Node ID
     [key: string]: any;
 }
 
 // Helper to evaluate conditions/expressions safely-ish
 const evaluateExpression = (record: any, expression: string, parameters: Record<string, string> = {}): any => {
     try {
-        // Allow accessing record fields like "amount" or "record.amount"
-        // Also allow accessing parameters like "PARAM_1"
-        // And standard functions like "IIF", "ISNULL", etc.
-
         const recordKeys = Object.keys(record);
         const recordValues = Object.values(record);
 
@@ -94,6 +91,7 @@ const traverse = (
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats,
+    state: ExecutionState, // Added state for persistent sequences
     parameters: Record<string, string> = {}
 ) => {
     // Find next nodes
@@ -199,7 +197,6 @@ const traverse = (
                                 });
                                 stats.transformations[nextNode.id].errors++;
                             }
-                            // 'skip' behavior: simply drop the row
                         }
                     }
                     processedBatch = validRows;
@@ -239,7 +236,6 @@ const traverse = (
                                 }
 
                                 if (strategy === 'insert') {
-                                    // Idempotency Check
                                     const dedupKeys = conf.deduplicationKeys || [];
                                     const dupBehavior = conf.duplicateBehavior;
 
@@ -259,10 +255,8 @@ const traverse = (
                                             matchId = match.id;
                                             if (dupBehavior === 'error') {
                                                 stats.transformations[nextNode.id].errors++;
-                                                console.warn(`[MappingEngine] Duplicate detected and treated as error: ${JSON.stringify(row)}`);
                                                 return;
                                             } else if (dupBehavior === 'ignore') {
-                                                console.log(`[MappingEngine] Duplicate ignored: ${JSON.stringify(row)}`);
                                                 processedBatch.push(row); // Treat as success
                                                 return;
                                             } else if (dupBehavior === 'update') {
@@ -279,37 +273,28 @@ const traverse = (
                                         processedBatch.push(row);
                                     }
                                 } else if (strategy === 'update' || strategy === 'delete') {
-                                    if (updateCols.length === 0) {
-                                        console.warn(`[MappingEngine] ${strategy} requested but no updateColumns defined for ${nextNode.name}`);
-                                        // Fallback to insert? No, risky. log error
-                                        stats.transformations[nextNode.id].errors++;
-                                        return;
-                                    }
+                                    if (updateCols.length > 0) {
+                                        const allRecords = db.select(tableName);
+                                        const match = allRecords.find((r: any) => {
+                                            const data = r.data || r;
+                                            return updateCols.every(col => String(data[col]) === String(row[col]));
+                                        });
 
-                                    // Find record to update/delete (Inefficient scan for simulation)
-                                    // In real DB this would be a WHERE clause
-                                    const allRecords = db.select(tableName);
-                                    const match = allRecords.find((r: any) => {
-                                        const data = r.data || r;
-                                        return updateCols.every(col => String(data[col]) === String(row[col]));
-                                    });
-
-                                    if (match) {
-                                        if (strategy === 'update') {
-                                            db.update(tableName, match.id, recordToDb);
-                                            processedBatch.push(row);
-                                        } else if (strategy === 'delete') {
-                                            db.delete(tableName, match.id);
-                                            processedBatch.push(row);
+                                        if (match) {
+                                            if (strategy === 'update') {
+                                                db.update(tableName, match.id, recordToDb);
+                                                processedBatch.push(row);
+                                            } else if (strategy === 'delete') {
+                                                db.delete(tableName, match.id);
+                                                processedBatch.push(row);
+                                            }
+                                        } else {
+                                            // Record not found for update/delete
                                         }
-                                    } else {
-                                        console.warn(`[MappingEngine] Record not found for ${strategy} in ${nextNode.name}`);
-                                        // stats[nextNode.id].errors++; // Optional: treat as error or ignore?
                                     }
                                 }
                             });
                         } else if (targetConn.type === 'file') {
-                            // File targets typically only support append (insert) in this sim
                             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                             const filename = `output_${timestamp}.json`;
                             const cleanBatch = batch.map(r => {
@@ -327,36 +312,23 @@ const traverse = (
                     break;
                 }
                 case 'joiner': {
-                    // Joiner: 2つの入力を結合
-                    // 最初の入力はキャッシュし、2番目の入力で結合を実行
                     const conf = nextNode.config as JoinerConfig;
                     const joinerCacheKey = `joiner_${nextNode.id}`;
-
-                    // 入力エッジを取得（Joinerへの入力）
                     const incomingLinks = mapping.links.filter(l => l.targetId === nextNode.id);
 
                     if (incomingLinks.length < 2) {
-                        // 2つの入力がない場合はそのまま通過
-                        console.warn(`[MappingEngine] Joiner ${nextNode.name} requires 2 inputs, only ${incomingLinks.length} connected`);
                         processedBatch = batch;
                     } else {
-                        // キャッシュを確認
                         if (!stats.cache) stats.cache = {};
                         if (!stats.cache[joinerCacheKey]) {
-                            // 最初の入力: マスターとしてキャッシュ
                             stats.cache[joinerCacheKey] = { masterBatch: batch, received: 1 };
-                            processedBatch = []; // 結合はまだ実行しない
+                            processedBatch = [];
                         } else {
-                            // 2番目の入力: 結合を実行
                             const cache = stats.cache[joinerCacheKey];
                             const masterBatch = cache.masterBatch as any[];
                             const detailBatch = batch;
-
-                            // 結合キーを取得
                             const masterKeys = conf.masterKeys || [];
                             const detailKeys = conf.detailKeys || [];
-
-                            // 結合実行
                             const joinedRows: any[] = [];
                             const matchedDetailIndices = new Set<number>();
 
@@ -364,7 +336,6 @@ const traverse = (
                                 let matched = false;
                                 for (let di = 0; di < detailBatch.length; di++) {
                                     const detailRow = detailBatch[di];
-                                    // キー一致チェック
                                     let keysMatch = true;
                                     for (let ki = 0; ki < masterKeys.length; ki++) {
                                         const mk = masterKeys[ki];
@@ -377,18 +348,13 @@ const traverse = (
                                     if (keysMatch) {
                                         matched = true;
                                         matchedDetailIndices.add(di);
-                                        // マスター + 詳細を結合
                                         joinedRows.push({ ...masterRow, ...detailRow });
                                     }
                                 }
-
-                                // Left/Full Join: マッチなしでもマスター行を含める
                                 if (!matched && (conf.joinType === 'left' || conf.joinType === 'full')) {
                                     joinedRows.push({ ...masterRow });
                                 }
                             }
-
-                            // Right/Full Join: マッチしなかった詳細行を含める
                             if (conf.joinType === 'right' || conf.joinType === 'full') {
                                 for (let di = 0; di < detailBatch.length; di++) {
                                     if (!matchedDetailIndices.has(di)) {
@@ -396,36 +362,42 @@ const traverse = (
                                     }
                                 }
                             }
-
                             processedBatch = joinedRows;
-                            console.log(`[MappingEngine] Joiner ${nextNode.name}: ${conf.joinType} join produced ${joinedRows.length} rows`);
-
-                            // キャッシュをクリア
                             delete stats.cache[joinerCacheKey];
                         }
                     }
                     break;
                 }
                 case 'lookup': {
-                    // Lookup: 参照テーブルからデータを参照
                     const conf = nextNode.config as LookupConfig;
                     const lookupConn = connections.find(c => c.id === conf.connectionId);
 
                     if (lookupConn && lookupConn.type === 'database') {
-                        const lookupData = db.select(lookupConn.tableName || '');
+                        // Cached Lookup Implementation
+                        const cacheKey = `lookup_cache_${nextNode.id}`;
+                        if (!stats.cache) stats.cache = {};
+
+                        // Build Cache if not exists
+                        if (!stats.cache[cacheKey]) {
+                            const rawData = db.select(lookupConn.tableName || '');
+                            stats.cache[cacheKey] = rawData.map((r: any) => r.data || r); // Ensure pure data objects
+                            console.log(`[MappingEngine] Lookup ${nextNode.name}: Cached ${stats.cache[cacheKey].length} rows`);
+                        }
+
+                        const lookupData = stats.cache[cacheKey] as any[];
                         const lookupKeys = conf.lookupKeys || [];
                         const referenceKeys = conf.referenceKeys || [];
                         const returnFields = conf.returnFields || [];
 
                         processedBatch = batch.map(row => {
                             const newRow = { ...row };
-                            // ルックアップテーブルから一致する行を検索
-                            const matched = lookupData.find(lookupRow => {
-                                const data = lookupRow.data || lookupRow;
+                            // Find match in cache
+                            const matched = lookupData.find(data => {
                                 for (let i = 0; i < lookupKeys.length; i++) {
                                     const inputKey = lookupKeys[i];
                                     const refKey = referenceKeys[i] || inputKey;
-                                    if (row[inputKey] !== data[refKey]) {
+                                    // Use loose equality for safety (string vs number)
+                                    if (String(row[inputKey]) !== String(data[refKey])) {
                                         return false;
                                     }
                                 }
@@ -433,9 +405,8 @@ const traverse = (
                             });
 
                             if (matched) {
-                                const data = matched.data || matched;
                                 returnFields.forEach(field => {
-                                    newRow[field] = data[field];
+                                    newRow[field] = matched[field];
                                 });
                             } else if (conf.defaultValue !== undefined) {
                                 returnFields.forEach(field => {
@@ -444,85 +415,56 @@ const traverse = (
                             }
                             return newRow;
                         });
-                        console.log(`[MappingEngine] Lookup ${nextNode.name}: processed ${processedBatch.length} rows`);
                     } else {
-                        console.warn(`[MappingEngine] Lookup ${nextNode.name}: invalid or missing connection`);
                         processedBatch = batch;
                     }
                     break;
                 }
                 case 'router': {
-                    // Router: 条件に基づいて行を振り分け
                     const conf = nextNode.config as RouterConfig;
                     const routes = conf.routes || [];
-
-                    // 各行を評価して振り分け先を決定
                     const routedGroups: Record<string, any[]> = {};
                     routedGroups[conf.defaultGroup || 'default'] = [];
-                    routes.forEach(r => {
-                        routedGroups[r.groupName] = [];
-                    });
+                    routes.forEach(r => { routedGroups[r.groupName] = []; });
 
                     for (const row of batch) {
                         let routed = false;
                         for (const route of routes) {
-                            try {
-                                if (evaluateExpression(row, route.condition, parameters)) {
-                                    routedGroups[route.groupName].push(row);
-                                    routed = true;
-                                    break; // 最初にマッチしたルートに振り分け
-                                }
-                            } catch (e) {
-                                console.warn(`[MappingEngine] Router condition error: ${route.condition}`);
+                            if (evaluateExpression(row, route.condition, parameters)) {
+                                routedGroups[route.groupName].push(row);
+                                routed = true;
+                                break;
                             }
                         }
                         if (!routed) {
                             routedGroups[conf.defaultGroup || 'default'].push(row);
                         }
                     }
-
-                    // デフォルトグループを次のノードに渡す
-                    // 注: 現在の実装ではデフォルトグループのみが下流に流れる
-                    // 将来的には複数出力エッジをサポート可能
                     processedBatch = routedGroups[conf.defaultGroup || 'default'];
-
-                    console.log(`[MappingEngine] Router ${nextNode.name}: routed ${batch.length} rows into groups:`,
-                        Object.entries(routedGroups).map(([k, v]) => `${k}:${v.length}`).join(', '));
                     break;
                 }
                 case 'sorter': {
-                    // Sorter: 指定フィールドでソート
                     const conf = nextNode.config as SorterConfig;
                     const sortFields = conf.sortFields || [];
-
                     processedBatch = [...batch].sort((a, b) => {
                         for (const sf of sortFields) {
                             const aVal = a[sf.field];
                             const bVal = b[sf.field];
-
                             let comparison = 0;
                             if (typeof aVal === 'number' && typeof bVal === 'number') {
                                 comparison = aVal - bVal;
                             } else {
                                 comparison = String(aVal).localeCompare(String(bVal));
                             }
-
-                            if (comparison !== 0) {
-                                return sf.direction === 'desc' ? -comparison : comparison;
-                            }
+                            if (comparison !== 0) return sf.direction === 'desc' ? -comparison : comparison;
                         }
                         return 0;
                     });
-
-                    console.log(`[MappingEngine] Sorter ${nextNode.name}: sorted ${processedBatch.length} rows`);
                     break;
                 }
                 case 'union': {
-                    // Union: 複数入力をマージ
-                    // Unionへの入力を蓄積し、全入力が揃ったら結合して出力
                     const unionCacheKey = `union_${nextNode.id}`;
                     const incomingLinks = mapping.links.filter(l => l.targetId === nextNode.id);
-
                     if (!stats.cache) stats.cache = {};
                     if (!stats.cache[unionCacheKey]) {
                         stats.cache[unionCacheKey] = { batches: [batch], received: 1 };
@@ -531,33 +473,26 @@ const traverse = (
                         cache.batches.push(batch);
                         cache.received++;
                     }
-
                     const cache = stats.cache[unionCacheKey];
                     if (cache.received >= incomingLinks.length) {
-                        // すべての入力が揃った - マージして出力
                         processedBatch = cache.batches.flat();
-                        console.log(`[MappingEngine] Union ${nextNode.name}: merged ${cache.received} inputs into ${processedBatch.length} rows`);
                         delete stats.cache[unionCacheKey];
                     } else {
-                        // まだ全入力が揃っていない - 待機
                         processedBatch = [];
                     }
                     break;
                 }
                 case 'normalizer': {
-                    // Normalizer: 1行を複数行に展開
                     const conf = nextNode.config as NormalizerConfig;
                     const arrayField = conf.arrayField || '';
                     const outputFields = conf.outputFields || [];
-
                     processedBatch = [];
                     for (const row of batch) {
                         const arrayValue = row[arrayField];
                         if (Array.isArray(arrayValue)) {
-                            // 配列の各要素ごとに行を生成
                             arrayValue.forEach((item, idx) => {
                                 const newRow = conf.keepOriginalFields ? { ...row } : {};
-                                delete newRow[arrayField];  // 元の配列フィールドは削除
+                                delete newRow[arrayField];
                                 if (typeof item === 'object') {
                                     Object.assign(newRow, item);
                                 } else {
@@ -567,48 +502,36 @@ const traverse = (
                                 processedBatch.push(newRow);
                             });
                         } else {
-                            // 配列でない場合はそのまま通過
                             processedBatch.push(row);
                         }
                     }
-                    console.log(`[MappingEngine] Normalizer ${nextNode.name}: expanded ${batch.length} rows to ${processedBatch.length} rows`);
                     break;
                 }
                 case 'rank': {
-                    // Rank: ランキング付与
                     const conf = nextNode.config as RankConfig;
                     const partitionBy = conf.partitionBy || [];
                     const orderBy = conf.orderBy || [];
                     const rankField = conf.rankField || 'rank';
                     const rankType = conf.rankType || 'rowNumber';
-
-                    // パーティション分割
                     const partitions: Record<string, any[]> = {};
                     batch.forEach(row => {
                         const key = partitionBy.map(p => row[p]).join('::');
                         if (!partitions[key]) partitions[key] = [];
                         partitions[key].push(row);
                     });
-
                     processedBatch = [];
                     for (const partitionRows of Object.values(partitions)) {
-                        // ソート
                         partitionRows.sort((a, b) => {
                             for (const ob of orderBy) {
                                 const aVal = a[ob.field];
                                 const bVal = b[ob.field];
                                 let cmp = 0;
-                                if (typeof aVal === 'number' && typeof bVal === 'number') {
-                                    cmp = aVal - bVal;
-                                } else {
-                                    cmp = String(aVal).localeCompare(String(bVal));
-                                }
+                                if (typeof aVal === 'number' && typeof bVal === 'number') cmp = aVal - bVal;
+                                else cmp = String(aVal).localeCompare(String(bVal));
                                 if (cmp !== 0) return ob.direction === 'desc' ? -cmp : cmp;
                             }
                             return 0;
                         });
-
-                        // ランク付与
                         let rank = 1;
                         let prevValues: any[] = [];
                         partitionRows.forEach((row, idx) => {
@@ -616,145 +539,112 @@ const traverse = (
                             if (rankType === 'rowNumber') {
                                 row[rankField] = idx + 1;
                             } else if (rankType === 'denseRank') {
-                                if (idx > 0 && JSON.stringify(currValues) !== JSON.stringify(prevValues)) {
-                                    rank++;
-                                }
+                                if (idx > 0 && JSON.stringify(currValues) !== JSON.stringify(prevValues)) rank++;
                                 row[rankField] = rank;
-                            } else { // rank
-                                if (idx > 0 && JSON.stringify(currValues) !== JSON.stringify(prevValues)) {
-                                    rank = idx + 1;
-                                }
+                            } else {
+                                if (idx > 0 && JSON.stringify(currValues) !== JSON.stringify(prevValues)) rank = idx + 1;
                                 row[rankField] = rank;
                             }
                             prevValues = currValues;
                             processedBatch.push(row);
                         });
                     }
-                    console.log(`[MappingEngine] Rank ${nextNode.name}: assigned ranks to ${processedBatch.length} rows`);
                     break;
                 }
                 case 'sequence': {
-                    // Sequence: 連番生成
+                    // Sequence: 連番生成 (Persistent)
                     const conf = nextNode.config as SequenceConfig;
                     const seqField = conf.sequenceField || 'seq';
                     const startVal = conf.startValue ?? 1;
                     const incr = conf.incrementBy ?? 1;
 
-                    processedBatch = batch.map((row, idx) => ({
-                        ...row,
-                        [seqField]: startVal + (idx * incr)
-                    }));
-                    console.log(`[MappingEngine] Sequence ${nextNode.name}: assigned sequence to ${processedBatch.length} rows`);
+                    // Initialize or retrieve current sequence value from state
+                    if (!state.sequences) state.sequences = {};
+                    let currentVal = state.sequences[nextNode.id] ?? startVal;
+
+                    processedBatch = batch.map((row) => {
+                        const rowSeq = currentVal;
+                        currentVal += incr;
+                        return {
+                            ...row,
+                            [seqField]: rowSeq
+                        };
+                    });
+
+                    // Update state
+                    state.sequences[nextNode.id] = currentVal;
+                    console.log(`[MappingEngine] Sequence ${nextNode.name}: updated next value to ${currentVal}`);
                     break;
                 }
                 case 'updateStrategy': {
-                    // UpdateStrategy: Insert/Update/Deleteフラグ設定
                     const conf = nextNode.config as UpdateStrategyConfig;
                     const strategyField = conf.strategyField || '_strategy';
                     const defaultStrategy = conf.defaultStrategy || 'insert';
                     const conditions = conf.conditions || [];
-
                     processedBatch = batch.map(row => {
                         const newRow = { ...row };
                         let strategy = defaultStrategy;
                         for (const cond of conditions) {
-                            try {
-                                if (evaluateExpression(row, cond.condition, parameters)) {
-                                    strategy = cond.strategy;
-                                    break;
-                                }
-                            } catch (e) {
-                                // 条件評価失敗時はデフォルトを使用
+                            if (evaluateExpression(row, cond.condition, parameters)) {
+                                strategy = cond.strategy;
+                                break;
                             }
                         }
                         newRow[strategyField] = strategy;
                         return newRow;
                     });
-                    console.log(`[MappingEngine] UpdateStrategy ${nextNode.name}: assigned strategies to ${processedBatch.length} rows`);
                     break;
                 }
                 case 'cleansing': {
-                    // Cleansing: データクレンジング
                     const conf = nextNode.config as CleansingConfig;
                     const rules = conf.rules || [];
-
                     processedBatch = batch.map(row => {
                         const newRow = { ...row };
                         for (const rule of rules) {
                             const val = newRow[rule.field];
                             switch (rule.operation) {
-                                case 'trim':
-                                    if (typeof val === 'string') newRow[rule.field] = val.trim();
-                                    break;
-                                case 'upper':
-                                    if (typeof val === 'string') newRow[rule.field] = val.toUpperCase();
-                                    break;
-                                case 'lower':
-                                    if (typeof val === 'string') newRow[rule.field] = val.toLowerCase();
-                                    break;
-                                case 'nullToDefault':
-                                    if (val === null || val === undefined || val === '') {
-                                        newRow[rule.field] = rule.defaultValue ?? '';
-                                    }
-                                    break;
+                                case 'trim': if (typeof val === 'string') newRow[rule.field] = val.trim(); break;
+                                case 'upper': if (typeof val === 'string') newRow[rule.field] = val.toUpperCase(); break;
+                                case 'lower': if (typeof val === 'string') newRow[rule.field] = val.toLowerCase(); break;
+                                case 'nullToDefault': if (val === null || val === undefined || val === '') newRow[rule.field] = rule.defaultValue ?? ''; break;
                                 case 'replace':
                                     if (typeof val === 'string' && rule.replacePattern) {
                                         try {
                                             const re = new RegExp(rule.replacePattern, 'g');
                                             newRow[rule.field] = val.replace(re, rule.replaceWith ?? '');
-                                        } catch (e) {
-                                            // Invalid regex
-                                        }
+                                        } catch (e) { }
                                     }
                                     break;
                             }
                         }
                         return newRow;
                     });
-                    console.log(`[MappingEngine] Cleansing ${nextNode.name}: cleansed ${processedBatch.length} rows`);
                     break;
                 }
                 case 'deduplicator': {
-                    // Deduplicator: 重複除外
                     const conf = nextNode.config as DeduplicatorConfig;
                     const keys = conf.keys || [];
                     const caseInsensitive = conf.caseInsensitive || false;
-
                     const seen = new Set<string>();
                     processedBatch = batch.filter(row => {
                         let uniqueKey = '';
-                        if (keys.length === 0) {
-                            // 全フィールドをキーとする
-                            uniqueKey = JSON.stringify(row);
-                        } else {
-                            uniqueKey = keys.map(k => {
-                                const val = row[k];
-                                return (caseInsensitive && typeof val === 'string') ? val.toLowerCase() : val;
-                            }).join('::');
-                        }
-
-                        if (seen.has(uniqueKey)) {
-                            return false;
-                        }
+                        if (keys.length === 0) uniqueKey = JSON.stringify(row);
+                        else uniqueKey = keys.map(k => {
+                            const val = row[k];
+                            return (caseInsensitive && typeof val === 'string') ? val.toLowerCase() : val;
+                        }).join('::');
+                        if (seen.has(uniqueKey)) return false;
                         seen.add(uniqueKey);
                         return true;
                     });
-                    console.log(`[MappingEngine] Deduplicator ${nextNode.name}: reduced ${batch.length} to ${processedBatch.length} rows`);
                     break;
                 }
                 case 'pivot': {
-                    // Pivot: 行→列変換（簡易実装）
                     const conf = nextNode.config as PivotConfig;
                     const groupByFields = conf.groupByFields || [];
                     const pivotField = conf.pivotField || '';
                     const valueField = conf.valueField || '';
-
-                    if (!pivotField || !valueField) {
-                        processedBatch = batch;
-                        break;
-                    }
-
-                    // グループ化
+                    if (!pivotField || !valueField) { processedBatch = batch; break; }
                     const groups: Record<string, any> = {};
                     batch.forEach(row => {
                         const groupKey = groupByFields.map(k => row[k]).join('::');
@@ -762,70 +652,48 @@ const traverse = (
                             groups[groupKey] = {};
                             groupByFields.forEach(k => groups[groupKey][k] = row[k]);
                         }
-
-                        // ピボット列の値をキーにして値を格納
                         const pivotKey = row[pivotField];
                         if (pivotKey !== undefined && pivotKey !== null) {
                             groups[groupKey][String(pivotKey)] = row[valueField];
                         }
                     });
-
                     processedBatch = Object.values(groups);
-                    console.log(`[MappingEngine] Pivot ${nextNode.name}: pivoted ${batch.length} rows to ${processedBatch.length} rows`);
                     break;
                 }
                 case 'unpivot': {
-                    // Unpivot: 列→行変換
                     const conf = nextNode.config as UnpivotConfig;
                     const fieldsToUnpivot = conf.fieldsToUnpivot || [];
                     const headerField = conf.newHeaderFieldName || 'Metric';
                     const valueField = conf.newValueFieldName || 'Value';
-
                     processedBatch = [];
                     batch.forEach(row => {
                         fieldsToUnpivot.forEach(field => {
                             if (row[field] !== undefined) {
                                 const newRow = { ...row };
-                                // アンピボット対象フィールドは削除して、新しいヘッダーと値フィールドを追加
                                 fieldsToUnpivot.forEach(f => delete newRow[f]);
                                 newRow[headerField] = field;
                                 newRow[valueField] = row[field];
                                 processedBatch.push(newRow);
                             }
                         });
-                        // アンピボット対象がない行はスキップされる（IDMC仕様に合わせるなら保持オプションが必要だが簡易実装）
                     });
-                    console.log(`[MappingEngine] Unpivot ${nextNode.name}: expanded ${batch.length} rows to ${processedBatch.length} rows`);
                     break;
                 }
                 case 'sql': {
                     const conf = nextNode.config as SqlConfig;
                     const sqlQuery = substituteParams(conf.sqlQuery, parameters);
-                    console.log(`[MappingEngine] SQL ${nextNode.name}: Executing "${sqlQuery}"`);
-
-                    // Simple regex simulation for DELETE/UPDATE statements on VirtualDB
-                    // Supported: "DELETE FROM table WHERE field = 'value'"
-                    // Supported: "UPDATE table SET field = 'value' WHERE field = 'value'" (very basic)
-
                     if (conf.mode === 'script' || conf.mode === 'query') {
                         const sql = sqlQuery.trim();
                         const deleteMatch = sql.match(/DELETE\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*=\s*['"]?([^'"]+)['"]?/i);
-
                         if (deleteMatch) {
                             const [, tableName, field, value] = deleteMatch;
                             const records = db.select(tableName);
-                            let deletedCount = 0;
                             records.forEach((r: any) => {
                                 const data = r.data || r;
-                                if (String(data[field]) === String(value)) {
-                                    db.delete(tableName, r.id);
-                                    deletedCount++;
-                                }
+                                if (String(data[field]) === String(value)) db.delete(tableName, r.id);
                             });
-                            console.log(`[MappingEngine] SQL Executed: Deleted ${deletedCount} rows from ${tableName}`);
                         }
                     }
-
                     processedBatch = batch.map(row => ({ ...row, _sql_status: 'success' }));
                     break;
                 }
@@ -835,7 +703,6 @@ const traverse = (
         } catch (e) {
             console.error(`Error in node ${nextNode.name}`, e);
             stats.transformations[nextNode.id].errors += 1;
-            // Capture batch level error
             if (!stats.rejectRows) stats.rejectRows = [];
             stats.rejectRows.push({
                 row: { batchSize: batch.length, sample: batch[0] },
@@ -846,7 +713,7 @@ const traverse = (
 
         stats.transformations[nextNode.id].output += processedBatch.length;
         if (processedBatch.length > 0) {
-            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, parameters);
+            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters);
         }
     }
 };
@@ -863,10 +730,11 @@ export const executeMappingTaskRecursive = async (
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
     const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
-    const newState = { ...state };
+    // Clone state to avoid mutating the original reference directly, though strictly standard JS objects are mutable
+    // We want to return a fresh state object that includes updates
+    const newState = { ...state, sequences: { ...(state.sequences || {}) } };
 
     // Resolve Parameters
-    // Priority: Task Parameters > Mapping Parameters > Defaults
     const startTime = new Date();
     const parameters = {
         'SYSDATE': startTime.toISOString(),
@@ -879,7 +747,6 @@ export const executeMappingTaskRecursive = async (
         stats.transformations[t.id] = { input: 0, output: 0, errors: 0, rejects: 0 };
     });
 
-    // Initialize rejectRows
     stats.rejectRows = [];
 
     const sources = mapping.transformations.filter(t => t.type === 'source');
@@ -893,8 +760,7 @@ export const executeMappingTaskRecursive = async (
 
         if (conn.type === 'file') {
             const files = fs.listFiles(conn.host!, conn.path!);
-            const processedSet = state.processedFiles || new Set<string>();
-            // Only process ONE file per interval to simulate flow visibly
+            const processedSet = newState.processedFiles || new Set<string>();
             const file = files.find(f => !processedSet.has(`${task.id}:${f.name}`));
 
             if (file) {
@@ -909,15 +775,11 @@ export const executeMappingTaskRecursive = async (
                             headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
                             return rec;
                         });
-                        if (records.length === 0) {
-                            console.warn(`[MappingEngine] No records parsed from CSV file: ${file.name}`);
-                        }
                     } catch (e) {
                         console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
                     }
                 } else {
                     try {
-                        // Try JSON
                         records = JSON.parse(content);
                         if (!Array.isArray(records)) records = [records];
                     } catch {
@@ -925,7 +787,6 @@ export const executeMappingTaskRecursive = async (
                     }
                 }
 
-                // Add source filename as column if configured (IDMC CDI feature)
                 if (config.filenameColumn && config.filenameColumn.trim()) {
                     records = records.map(rec => ({
                         ...rec,
@@ -942,7 +803,7 @@ export const executeMappingTaskRecursive = async (
             }
         } else if (conn.type === 'database') {
             const raw = db.select(conn.tableName || '');
-            const lastTs = state.lastProcessedTimestamp || 0;
+            const lastTs = newState.lastProcessedTimestamp || 0;
             records = raw.filter(r => r.insertedAt > lastTs).map(r => ({ ...r.data, insertedAt: r.insertedAt }));
 
             if (records.length > 0) {
@@ -955,27 +816,23 @@ export const executeMappingTaskRecursive = async (
         stats.transformations[sourceNode.id].output = records.length;
 
         if (records.length > 0) {
-            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, parameters);
+            // Pass newState to traverse so it can update sequences
+            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters);
         }
     }
 
-    // Write Bad File if configured and errors exist
     if (task.badFileDir && stats.rejectRows && stats.rejectRows.length > 0) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `Bad_Rows_${task.name.replace(/\s+/g, '_')}_${timestamp}.csv`;
         const header = 'Transformation,Error,RowData\n';
         const content = stats.rejectRows.map(r => {
-            const rowStr = JSON.stringify(r.row).replace(/"/g, '""'); // CSV escape
+            const rowStr = JSON.stringify(r.row).replace(/"/g, '""');
             return `"${r.transformationName}","${r.error}","${rowStr}"`;
         }).join('\n');
 
-        // Use default if not specified
         const targetDir = task.badFileDir.endsWith('/') ? task.badFileDir : task.badFileDir + '/';
-
         try {
-            // Write to localhost (simulated local execution environment)
             fs.writeFile('localhost', targetDir, filename, header + content);
-            console.log(`[MappingEngine] Bad file created: ${targetDir}${filename}`);
         } catch (e) {
             console.error(`[MappingEngine] Failed to write bad file`, e);
         }
