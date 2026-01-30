@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useVirtualDB, type DBFilter, type DBRecord } from '../lib/VirtualDB';
-import { useSettings } from '../lib/SettingsContext';
+import { useSettings, type DashboardItem } from '../lib/SettingsContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Play, Plus, Trash2, Filter, Table as TableIcon, Activity, AlertTriangle } from 'lucide-react';
 
@@ -30,17 +30,22 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-const BiDashboardContent: React.FC = () => {
-  const { tables, biDashboard } = useSettings();
+interface DashboardWidgetProps {
+  item: DashboardItem;
+}
+
+const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
+  const { tables } = useSettings();
   const { query } = useVirtualDB();
 
-  const [selectedTableId, setSelectedTableId] = useState<string>(biDashboard.defaultTableId || '');
-  const [filters, setFilters] = useState<DBFilter[]>([]);
-  const [viewType, setViewType] = useState<'table' | 'chart'>((biDashboard.defaultViewType as 'table' | 'chart') || 'table');
-  const [xAxis, setXAxis] = useState<string>('');
-  const [yAxis, setYAxis] = useState<string>('');
+  const [selectedTableId, setSelectedTableId] = useState<string>(item.tableId);
+  const [filters, setFilters] = useState<DBFilter[]>(item.filters || []);
+  const [viewType, setViewType] = useState<'table' | 'chart'>(item.viewType);
+  const [xAxis, setXAxis] = useState<string>(item.chartConfig?.xAxis || '');
+  const [yAxis, setYAxis] = useState<string>(item.chartConfig?.yAxis || '');
   const [results, setResults] = useState<DBRecord[]>([]);
   const [hasRun, setHasRun] = useState(false);
+  const prevTableIdRef = useRef(item.tableId);
 
   // Safety check for context
   if (!tables) {
@@ -61,20 +66,47 @@ const BiDashboardContent: React.FC = () => {
     }
   };
 
+  // Run automatically on mount if configured
+  useEffect(() => {
+      if (selectedTableId) {
+          handleRunQuery();
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-refresh logic
   useEffect(() => {
-    if (biDashboard.refreshInterval > 0 && selectedTableId) {
-        const interval = setInterval(handleRunQuery, biDashboard.refreshInterval);
+    if (item.refreshInterval > 0 && selectedTableId) {
+        const interval = setInterval(handleRunQuery, item.refreshInterval);
         return () => clearInterval(interval);
     }
-  }, [biDashboard.refreshInterval, selectedTableId, filters]);
+  }, [item.refreshInterval, selectedTableId, filters]);
 
-  // Update defaults if settings change and local state is empty/default
+  // Update xAxis/yAxis defaults if columns change and not set
   useEffect(() => {
-      if (!selectedTableId && biDashboard.defaultTableId) {
-          setSelectedTableId(biDashboard.defaultTableId);
+      if (columns.length > 0) {
+          if (!xAxis) setXAxis(columns[0].name);
+          if (!yAxis) {
+            const numericCol = columns.find(c => c.type === 'number' || c.type === 'integer' || c.type === 'decimal');
+            setYAxis(numericCol ? numericCol.name : columns[0].name);
+          }
       }
-  }, [biDashboard.defaultTableId]);
+  }, [selectedTableId, columns, xAxis, yAxis]);
+
+  // Reset state when table changes (only if changed by user, not initial load)
+  useEffect(() => {
+    if (prevTableIdRef.current !== selectedTableId) {
+        setFilters([]);
+        setResults([]);
+        setHasRun(false);
+        if (columns.length > 0) {
+            setXAxis(columns[0].name);
+            const numericCol = columns.find(c => c.type === 'number' || c.type === 'integer' || c.type === 'decimal');
+            setYAxis(numericCol ? numericCol.name : columns[0].name);
+        }
+        prevTableIdRef.current = selectedTableId;
+    }
+  }, [selectedTableId, columns]);
 
   const addFilter = () => {
     if (columns.length > 0) {
@@ -92,18 +124,6 @@ const BiDashboardContent: React.FC = () => {
     setFilters(newFilters);
   };
 
-  // Reset state when table changes
-  useEffect(() => {
-      setFilters([]);
-      setResults([]);
-      setHasRun(false);
-      if (columns.length > 0) {
-          setXAxis(columns[0].name);
-          const numericCol = columns.find(c => c.type === 'number' || c.type === 'integer' || c.type === 'decimal');
-          setYAxis(numericCol ? numericCol.name : columns[0].name);
-      }
-  }, [selectedTableId, columns]);
-
   const chartData = useMemo(() => {
     if (viewType !== 'chart') return [];
     return results.map(r => {
@@ -119,20 +139,20 @@ const BiDashboardContent: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-white rounded shadow border border-gray-200 overflow-hidden">
         {/* Header */}
-        <div className="p-3 md:p-4 border-b bg-gray-50 flex justify-between items-center">
-             <h2 className="text-lg md:text-xl font-bold flex items-center gap-2 text-gray-800">
-                <Activity className="w-5 h-5" /> BI Dashboard
+        <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+             <h2 className="text-base font-bold flex items-center gap-2 text-gray-800 truncate" title={item.title}>
+                <Activity className="w-4 h-4 text-blue-600" /> {item.title || selectedTableDef?.name || 'Dashboard Widget'}
              </h2>
         </div>
 
         {/* Controls */}
-        <div className="p-2 md:p-4 border-b space-y-2 md:space-y-4">
-            <div className="flex flex-col md:flex-row gap-2 md:gap-4 md:items-end">
-                {/* Table Select */}
-                <div className="flex flex-col gap-0.5 w-full md:w-auto">
-                    <label className="text-[10px] md:text-xs font-semibold text-gray-500 uppercase">Table</label>
+        <div className="p-2 border-b space-y-2">
+            <div className="flex flex-col xl:flex-row gap-2 xl:items-end">
+                {/* Table Select (Read-onlyish or editable for temp view) */}
+                <div className="flex flex-col gap-0.5 w-full xl:w-auto">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase">Table</label>
                     <select
-                        className="border rounded p-1.5 text-sm w-full md:min-w-[200px] bg-white shadow-sm"
+                        className="border rounded p-1.5 text-xs w-full xl:min-w-[150px] bg-white shadow-sm"
                         value={selectedTableId}
                         onChange={(e) => setSelectedTableId(e.target.value)}
                     >
@@ -141,20 +161,20 @@ const BiDashboardContent: React.FC = () => {
                     </select>
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto items-end">
+                <div className="flex gap-2 w-full xl:w-auto items-end flex-wrap">
                     {/* View Type */}
-                    <div className="flex bg-gray-100 p-0.5 md:p-1 rounded gap-1 flex-1 md:flex-none justify-center">
+                    <div className="flex bg-gray-100 p-0.5 rounded gap-1 flex-1 xl:flex-none justify-center">
                         <button
                             onClick={() => setViewType('table')}
-                            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded flex items-center gap-1 flex-1 justify-center transition-all ${viewType === 'table' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
+                            className={`px-2 py-1 text-xs rounded flex items-center gap-1 flex-1 justify-center transition-all ${viewType === 'table' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
                         >
-                            <TableIcon size={14} /> <span className="hidden xs:inline">Table</span>
+                            <TableIcon size={12} /> <span className="">Table</span>
                         </button>
                         <button
                             onClick={() => setViewType('chart')}
-                            className={`px-2 md:px-3 py-1 text-xs md:text-sm rounded flex items-center gap-1 flex-1 justify-center transition-all ${viewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
+                            className={`px-2 py-1 text-xs rounded flex items-center gap-1 flex-1 justify-center transition-all ${viewType === 'chart' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
                         >
-                            <Activity size={14} /> <span className="hidden xs:inline">Chart</span>
+                            <Activity size={12} /> <span className="">Chart</span>
                         </button>
                     </div>
 
@@ -162,35 +182,35 @@ const BiDashboardContent: React.FC = () => {
                     <button
                         onClick={handleRunQuery}
                         disabled={!selectedTableId}
-                        className={`flex-1 md:flex-none px-3 md:px-4 py-1.5 rounded flex items-center justify-center gap-2 text-sm font-semibold transition-all ${!selectedTableId ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm active:transform active:scale-95'}`}
+                        className={`flex-1 xl:flex-none px-3 py-1 rounded flex items-center justify-center gap-2 text-xs font-semibold transition-all ${!selectedTableId ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm active:transform active:scale-95'}`}
                     >
-                        <Play size={14} /> <span className="inline">Run</span>
+                        <Play size={12} /> <span className="inline">Run</span>
                     </button>
                 </div>
             </div>
 
             {/* Filters */}
             {selectedTableDef && (
-                <div className="bg-gray-50 p-2 md:p-3 rounded border border-gray-100 space-y-2">
+                <div className="bg-gray-50 p-2 rounded border border-gray-100 space-y-2">
                     <div className="flex justify-between items-center">
-                        <span className="text-[10px] md:text-xs font-semibold text-gray-500 flex items-center gap-1 uppercase"><Filter size={12}/> Filters</span>
-                        <button onClick={addFilter} className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"><Plus size={12}/> Add</button>
+                        <span className="text-[10px] font-semibold text-gray-500 flex items-center gap-1 uppercase"><Filter size={10}/> Filters (Temp)</span>
+                        <button onClick={addFilter} className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"><Plus size={10}/> Add</button>
                     </div>
-                    {filters.length === 0 && <div className="text-[10px] md:text-xs text-gray-400 italic py-1">No filters applied</div>}
-                    <div className="space-y-1.5">
+                    {filters.length === 0 && <div className="text-[10px] text-gray-400 italic py-1">No additional filters</div>}
+                    <div className="space-y-1.5 max-h-[100px] overflow-y-auto">
                         {filters.map((f, i) => (
                             <div key={i} className="flex gap-1.5 items-center">
                                 <select
                                     value={f.column}
                                     onChange={(e) => updateFilter(i, 'column', e.target.value)}
-                                    className="border rounded p-1 text-xs md:text-sm bg-white flex-1 min-w-0"
+                                    className="border rounded p-1 text-[10px] bg-white flex-1 min-w-0"
                                 >
                                     {columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                                 </select>
                                 <select
                                     value={f.operator}
                                     onChange={(e) => updateFilter(i, 'operator', e.target.value as any)}
-                                    className="border rounded p-1 text-xs md:text-sm bg-white w-[50px] md:w-[60px]"
+                                    className="border rounded p-1 text-[10px] bg-white w-[40px]"
                                 >
                                     <option value="=">=</option>
                                     <option value="!=">!=</option>
@@ -198,16 +218,16 @@ const BiDashboardContent: React.FC = () => {
                                     <option value="<">&lt;</option>
                                     <option value=">=">&gt;=</option>
                                     <option value="<=">&lt;=</option>
-                                    <option value="contains">cont.</option>
+                                    <option value="contains">c.</option>
                                 </select>
                                 <input
                                     type="text"
                                     value={f.value}
                                     onChange={(e) => updateFilter(i, 'value', e.target.value)}
-                                    className="border rounded p-1 text-xs md:text-sm flex-grow bg-white min-w-0"
+                                    className="border rounded p-1 text-[10px] flex-grow bg-white min-w-0"
                                     placeholder="Value..."
                                 />
-                                <button onClick={() => removeFilter(i)} className="text-red-400 hover:text-red-600 p-1 shrink-0"><Trash2 size={14}/></button>
+                                <button onClick={() => removeFilter(i)} className="text-red-400 hover:text-red-600 p-1 shrink-0"><Trash2 size={12}/></button>
                             </div>
                         ))}
                     </div>
@@ -217,17 +237,17 @@ const BiDashboardContent: React.FC = () => {
             {/* Chart Config */}
             {selectedTableDef && viewType === 'chart' && (
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-start sm:items-center bg-blue-50/50 p-2 rounded border border-blue-100">
-                    <span className="text-[10px] md:text-xs font-semibold text-blue-800 uppercase shrink-0">Chart:</span>
+                    <span className="text-[10px] font-semibold text-blue-800 uppercase shrink-0">Chart:</span>
                     <div className="flex gap-2 w-full sm:w-auto">
                         <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
-                            <label className="text-[10px] md:text-xs text-blue-600 font-medium">X</label>
-                            <select value={xAxis} onChange={e => setXAxis(e.target.value)} className="border rounded p-1 text-xs md:text-sm bg-white w-full sm:w-auto">
+                            <label className="text-[10px] text-blue-600 font-medium">X</label>
+                            <select value={xAxis} onChange={e => setXAxis(e.target.value)} className="border rounded p-1 text-[10px] bg-white w-full sm:w-auto">
                                 {columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
                         <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
-                            <label className="text-[10px] md:text-xs text-blue-600 font-medium">Y</label>
-                            <select value={yAxis} onChange={e => setYAxis(e.target.value)} className="border rounded p-1 text-xs md:text-sm bg-white w-full sm:w-auto">
+                            <label className="text-[10px] text-blue-600 font-medium">Y</label>
+                            <select value={yAxis} onChange={e => setYAxis(e.target.value)} className="border rounded p-1 text-[10px] bg-white w-full sm:w-auto">
                                 {columns.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
@@ -237,13 +257,13 @@ const BiDashboardContent: React.FC = () => {
         </div>
 
         {/* Content */}
-        <div className="flex-grow overflow-auto p-2 md:p-4 bg-gray-50/50">
-            {!hasRun && <div className="h-full flex items-center justify-center text-gray-400 italic text-center p-4">Select a table and run query to see results</div>}
+        <div className="flex-grow overflow-auto p-2 bg-gray-50/50">
+            {!hasRun && <div className="h-full flex items-center justify-center text-gray-400 italic text-center p-4 text-xs">Run query to see results</div>}
 
             {hasRun && viewType === 'table' && (
                 <div className="bg-white border rounded shadow-sm overflow-hidden h-full">
                     <div className="overflow-auto h-full">
-                        <table className="w-full text-left text-sm relative">
+                        <table className="w-full text-left text-xs relative">
                             <thead className="bg-gray-100 border-b sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     {columns.map(c => <th key={c.name} className="p-2 font-semibold text-gray-600 whitespace-nowrap">{c.name}</th>)}
@@ -255,7 +275,7 @@ const BiDashboardContent: React.FC = () => {
                                 ) : (
                                     results.map(r => (
                                         <tr key={r.id} className="hover:bg-gray-50">
-                                            {columns.map(c => <td key={c.name} className="p-2 truncate max-w-[200px] whitespace-nowrap">{String(r.data[c.name] ?? '')}</td>)}
+                                            {columns.map(c => <td key={c.name} className="p-2 truncate max-w-[150px] whitespace-nowrap">{String(r.data[c.name] ?? '')}</td>)}
                                         </tr>
                                     ))
                                 )}
@@ -266,18 +286,18 @@ const BiDashboardContent: React.FC = () => {
             )}
 
             {hasRun && viewType === 'chart' && (
-                <div className="bg-white border rounded shadow-sm p-2 md:p-4 h-full min-h-[300px]">
+                <div className="bg-white border rounded shadow-sm p-2 h-full min-h-[200px]">
                     {results.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-gray-500 italic">No results found</div>
                     ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey={xAxis} tick={{fontSize: 12}} />
-                                <YAxis tick={{fontSize: 12}} />
+                                <XAxis dataKey={xAxis} tick={{fontSize: 10}} />
+                                <YAxis tick={{fontSize: 10}} />
                                 <Tooltip />
-                                <Legend wrapperStyle={{fontSize: '12px'}} />
-                                <Line type="monotone" dataKey={yAxis} stroke="#2563eb" activeDot={{ r: 8 }} />
+                                <Legend wrapperStyle={{fontSize: '10px'}} />
+                                <Line type="monotone" dataKey={yAxis} stroke="#2563eb" activeDot={{ r: 6 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     )}
@@ -289,10 +309,28 @@ const BiDashboardContent: React.FC = () => {
 };
 
 const BiDashboard: React.FC = () => {
+  const { biDashboard } = useSettings();
+
+  if (!biDashboard.items || biDashboard.items.length === 0) {
+      return (
+          <div className="h-full flex flex-col items-center justify-center text-gray-500 bg-white rounded border border-dashed p-8 m-4">
+              <Activity size={48} className="mb-4 text-gray-300"/>
+              <p className="text-lg font-medium">No dashboard widgets configured.</p>
+              <p className="text-sm mt-2">Go to <span className="font-bold">Settings &gt; BI Dashboard</span> to add and configure widgets.</p>
+          </div>
+      )
+  }
+
   return (
-    <ErrorBoundary>
-      <BiDashboardContent />
-    </ErrorBoundary>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full overflow-y-auto pb-8">
+       {biDashboard.items.map(item => (
+           <ErrorBoundary key={item.id}>
+               <div className="h-[400px] lg:h-[500px]">
+                   <DashboardWidget item={item} />
+               </div>
+           </ErrorBoundary>
+       ))}
+    </div>
   );
 };
 
