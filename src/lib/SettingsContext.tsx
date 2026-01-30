@@ -51,13 +51,11 @@ export type Topic = TopicDefinition; // Alias for backward compatibility if need
 export interface CollectionJob {
   id: string;
   name: string;
-  sourceHost: string;
-  sourcePath: string;
+  sourceConnectionId: string; // ConnectionDefinition.id (type='file')
   filterRegex: string;
 
   targetType?: 'host' | 'topic'; // Default: 'host'
-  targetHost: string; // Used when targetType is 'host'
-  targetPath: string; // Used when targetType is 'host'
+  targetConnectionId?: string; // Used when targetType is 'host'
   targetTopicId?: string; // Used when targetType is 'topic'
 
   bandwidth: number; // 帯域幅 (文字数/秒)
@@ -76,12 +74,11 @@ export interface DeliveryJob {
   name: string;
 
   sourceType?: 'host' | 'topic'; // Default: 'host'
-  sourceHost: string; // Used when sourceType is 'host'
-  sourcePath: string; // Used when sourceType is 'host'
+  sourceConnectionId?: string; // Used when sourceType is 'host'
   sourceTopicId?: string; // Used when sourceType is 'topic'
 
-  targetHost: string;
-  targetPath: string;
+  targetConnectionId: string; // ConnectionDefinition.id (type='file')
+
   filterRegex: string;
   bandwidth: number; // 帯域幅 (文字数/秒)
   processingTime: number; // レイテンシ/オーバーヘッド (ms)
@@ -242,12 +239,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       {
         id: 'col_job_1',
         name: 'Default Collection',
-        sourceHost: 'host1',
-        sourcePath: '/source',
+        sourceConnectionId: 'conn_src_host1',
         filterRegex: '.*',
         targetType: 'host',
-        targetHost: 'localhost',
-        targetPath: '/incoming',
+        targetConnectionId: 'conn_incoming',
         bandwidth: 100,
         renamePattern: '${fileName}',
         executionInterval: 1000,
@@ -263,10 +258,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         id: 'del_job_1',
         name: 'Default Delivery',
         sourceType: 'host',
-        sourceHost: 'localhost',
-        sourcePath: '/incoming',
-        targetHost: 'localhost',
-        targetPath: '/internal',
+        sourceConnectionId: 'conn_incoming',
+        targetConnectionId: 'conn_internal',
         filterRegex: '.*',
         bandwidth: 100,
         processingTime: 1000,
@@ -341,6 +334,27 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       name: 'Summary Database',
       type: 'database',
       tableName: 'summary_data'
+    },
+    {
+        id: 'conn_src_host1',
+        name: 'Source (Host1)',
+        type: 'file',
+        host: 'host1',
+        path: '/source'
+    },
+    {
+        id: 'conn_incoming',
+        name: 'Incoming Folder',
+        type: 'file',
+        host: 'localhost',
+        path: '/incoming'
+    },
+    {
+        id: 'conn_internal',
+        name: 'Internal Folder',
+        type: 'file',
+        host: 'localhost',
+        path: '/internal'
     }
   ]);
 
@@ -395,6 +409,24 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+
+        let loadedConnections = parsed.connections || connections;
+
+        const findOrCreateConnection = (host: string, path: string) => {
+            const existing = loadedConnections.find((c: ConnectionDefinition) => c.type === 'file' && c.host === host && c.path === path);
+            if (existing) return existing;
+
+            const newConn: ConnectionDefinition = {
+                id: `conn_${Date.now()}_auto_${Math.floor(Math.random() * 1000)}`,
+                name: `Auto ${host}:${path}`,
+                type: 'file',
+                host,
+                path
+            };
+            loadedConnections = [...loadedConnections, newConn];
+            return newConn;
+        };
+
         if (parsed.dataSource) {
           // Check if it's the new structure
           if (parsed.dataSource.definitions && parsed.dataSource.jobs) {
@@ -429,22 +461,58 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
              setDataSource({ definitions: newDefinitions, jobs: newJobs });
           }
         }
+
         if (parsed.collection) {
-            // Migration for new targetType fields
-            const migratedJobs = parsed.collection.jobs.map((job: any) => ({
-                ...job,
-                targetType: job.targetType || 'host',
-            }));
+            // Migration for new targetType fields AND connection migration
+            const migratedJobs = parsed.collection.jobs.map((job: any) => {
+                let newJob = { ...job, targetType: job.targetType || 'host' };
+
+                // Migrate Source Host/Path -> Connection
+                if (job.sourceHost) {
+                   const conn = findOrCreateConnection(job.sourceHost, job.sourcePath);
+                   newJob.sourceConnectionId = conn.id;
+                   delete newJob.sourceHost;
+                   delete newJob.sourcePath;
+                }
+
+                // Migrate Target Host/Path -> Connection
+                if (newJob.targetType === 'host' && job.targetHost) {
+                   const conn = findOrCreateConnection(job.targetHost, job.targetPath);
+                   newJob.targetConnectionId = conn.id;
+                   delete newJob.targetHost;
+                   delete newJob.targetPath;
+                }
+                return newJob;
+            });
             setCollection({ ...parsed.collection, jobs: migratedJobs });
         }
+
         if (parsed.delivery) {
              // Migration for new sourceType fields
-            const migratedJobs = parsed.delivery.jobs.map((job: any) => ({
-                ...job,
-                sourceType: job.sourceType || 'host',
-            }));
+            const migratedJobs = parsed.delivery.jobs.map((job: any) => {
+                let newJob = { ...job, sourceType: job.sourceType || 'host' };
+
+                // Migrate Source Host/Path -> Connection
+                if (newJob.sourceType === 'host' && job.sourceHost) {
+                   const conn = findOrCreateConnection(job.sourceHost, job.sourcePath);
+                   newJob.sourceConnectionId = conn.id;
+                   delete newJob.sourceHost;
+                   delete newJob.sourcePath;
+                }
+
+                // Migrate Target Host/Path -> Connection
+                if (job.targetHost) {
+                   const conn = findOrCreateConnection(job.targetHost, job.targetPath);
+                   newJob.targetConnectionId = conn.id;
+                   delete newJob.targetHost;
+                   delete newJob.targetPath;
+                }
+
+                return newJob;
+            });
             setDelivery({ ...parsed.delivery, jobs: migratedJobs });
         }
+
         if (parsed.etl) setEtl(parsed.etl);
         if (parsed.biDashboard) {
           // Migration for old structure (flat properties to items array)
@@ -472,9 +540,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);
-        if (parsed.connections) setConnections(parsed.connections);
         if (parsed.mappings) setMappings(parsed.mappings);
         if (parsed.mappingTasks) setMappingTasks(parsed.mappingTasks);
+
+        // Finally set connections (which might have been updated during migration)
+        setConnections(loadedConnections);
+
       } catch (e) {
         console.error('Failed to parse settings', e);
       }
@@ -616,32 +687,42 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const isHostInUse = useCallback((hostName: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName);
+
+    // Check connections first
+    const connectionsUsingHost = connections.filter(c => c.type === 'file' && c.host === hostName).map(c => c.id);
+
     const inCollection = collection.jobs.some(j =>
-        j.sourceHost === hostName || (j.targetType === 'host' && j.targetHost === hostName)
+        (connectionsUsingHost.includes(j.sourceConnectionId)) ||
+        (j.targetType === 'host' && j.targetConnectionId && connectionsUsingHost.includes(j.targetConnectionId))
     );
     const inDelivery = delivery.jobs.some(j =>
-        (j.sourceType === 'host' && j.sourceHost === hostName) || j.targetHost === hostName
+        (j.sourceType === 'host' && j.sourceConnectionId && connectionsUsingHost.includes(j.sourceConnectionId)) ||
+        (j.targetConnectionId && connectionsUsingHost.includes(j.targetConnectionId))
     );
-    const inEtl = etl.sourceHost === hostName;
-    const inConnections = connections.some(c => c.type === 'file' && c.host === hostName);
 
-    return inDataSource || inCollection || inDelivery || inEtl || inConnections;
+    const inEtl = etl.sourceHost === hostName;
+    // const inConnections = connections.some(c => c.type === 'file' && c.host === hostName); // Already checked via connections usage
+
+    return inDataSource || inCollection || inDelivery || inEtl || connectionsUsingHost.length > 0;
   }, [dataSource, collection, delivery, etl, connections]);
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
+
+    const connectionsUsingDir = connections.filter(c => c.type === 'file' && c.host === hostName && c.path === path).map(c => c.id);
+
     const inCollection = collection.jobs.some(j =>
-      (j.sourceHost === hostName && j.sourcePath === path) ||
-      (j.targetType === 'host' && j.targetHost === hostName && j.targetPath === path)
+      (connectionsUsingDir.includes(j.sourceConnectionId)) ||
+      (j.targetType === 'host' && j.targetConnectionId && connectionsUsingDir.includes(j.targetConnectionId))
     );
     const inDelivery = delivery.jobs.some(j =>
-      (j.sourceType === 'host' && j.sourceHost === hostName && j.sourcePath === path) ||
-      (j.targetHost === hostName && j.targetPath === path)
+      (j.sourceType === 'host' && j.sourceConnectionId && connectionsUsingDir.includes(j.sourceConnectionId)) ||
+      (j.targetConnectionId && connectionsUsingDir.includes(j.targetConnectionId))
     );
     const inEtl = etl.sourceHost === hostName && etl.sourcePath === path;
-    const inConnections = connections.some(c => c.type === 'file' && c.host === hostName && c.path === path);
+    // const inConnections = connections.some(c => c.type === 'file' && c.host === hostName && c.path === path);
 
-    return inDataSource || inCollection || inDelivery || inEtl || inConnections;
+    return inDataSource || inCollection || inDelivery || inEtl || connectionsUsingDir.length > 0;
   }, [dataSource, collection, delivery, etl, connections]);
 
   return (
