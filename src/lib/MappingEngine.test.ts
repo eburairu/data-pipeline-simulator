@@ -169,4 +169,61 @@ describe('MappingEngine Reject File', () => {
         expect(result.stats.transformations[exprId].output).toBe(1);
         expect(result.stats.transformations[exprId].errors).toBe(0);
     });
+
+    test('should include transformation names in stats', async () => {
+        // Setup Mocks
+        const mockFs: FileSystemOps = {
+            listFiles: vi.fn(),
+            readFile: vi.fn(),
+            deleteFile: vi.fn(),
+            writeFile: vi.fn(),
+        };
+        const mockDb: DbOps = {
+            select: vi.fn(),
+            insert: vi.fn(),
+            update: vi.fn(),
+            delete: vi.fn(),
+        };
+        const state: ExecutionState = {};
+
+        const sourceId = 'src1';
+        const mapping: Mapping = {
+            id: 'm3',
+            name: 'Name Check Mapping',
+            transformations: [
+                {
+                    id: sourceId,
+                    type: 'source',
+                    name: 'My Source Node',
+                    position: { x: 0, y: 0 },
+                    config: { connectionId: 'conn1' }
+                }
+            ],
+            links: []
+        };
+        const task: MappingTask = {
+            id: 't3',
+            name: 'Name Check Task',
+            mappingId: 'm3',
+            executionInterval: 1000,
+            enabled: true
+        };
+
+        // Execute (no files needed if we just check initialization, but let's provide one to run logic)
+        (mockFs.listFiles as any).mockReturnValue([]);
+
+        const result = await executeMappingTaskRecursive(
+            task,
+            mapping,
+            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }],
+            [],
+            mockFs,
+            mockDb,
+            state
+        );
+
+        // Assertions
+        expect(result.stats.transformations[sourceId]).toBeDefined();
+        expect(result.stats.transformations[sourceId].name).toBe('My Source Node');
+    });
 });
