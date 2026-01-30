@@ -67,6 +67,12 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
     }
   };
 
+  // Keep a ref to the latest handler to avoid stale closures in intervals
+  const handleRunQueryRef = useRef(handleRunQuery);
+  useEffect(() => {
+    handleRunQueryRef.current = handleRunQuery;
+  });
+
   // Run automatically on mount if configured
   useEffect(() => {
       if (selectedTableId) {
@@ -78,18 +84,18 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
   // Auto-refresh logic (Settings)
   useEffect(() => {
     if (item.refreshInterval > 0 && selectedTableId && !autoRefresh) {
-        const interval = setInterval(handleRunQuery, item.refreshInterval);
+        const interval = setInterval(() => handleRunQueryRef.current(), item.refreshInterval);
         return () => clearInterval(interval);
     }
-  }, [item.refreshInterval, selectedTableId, filters, autoRefresh]);
+  }, [item.refreshInterval, selectedTableId, autoRefresh]);
 
   // Auto-refresh logic (Manual Toggle 1s)
   useEffect(() => {
     if (autoRefresh && selectedTableId) {
-        const interval = setInterval(handleRunQuery, 1000);
+        const interval = setInterval(() => handleRunQueryRef.current(), 1000);
         return () => clearInterval(interval);
     }
-  }, [autoRefresh, selectedTableId, filters]);
+  }, [autoRefresh, selectedTableId]);
 
   // Update xAxis/yAxis defaults if columns change and not set
   useEffect(() => {
