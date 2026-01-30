@@ -70,27 +70,25 @@ describe('Validation Logic', () => {
     const baseJob: CollectionJob = {
       id: 'job1',
       name: 'Test Job',
-      sourceHost: 'srcHost',
-      sourcePath: '/src',
+      sourceConnectionId: 'conn1',
       filterRegex: '.*',
       bandwidth: 100,
       renamePattern: '',
       executionInterval: 1000,
       enabled: true,
       targetType: 'host',
-      targetHost: 'tgtHost',
-      targetPath: '/tgt'
+      targetConnectionId: 'conn2',
     };
 
     it('should validate valid host target job', () => {
       expect(validateCollectionJob(baseJob)).toHaveLength(0);
     });
 
-    it('should fail if targetHost is missing for host type', () => {
-      const job = { ...baseJob, targetHost: '' };
+    it('should fail if targetConnectionId is missing for host type', () => {
+      const job = { ...baseJob, targetConnectionId: '' };
       const errors = validateCollectionJob(job);
       expect(errors).toHaveLength(1);
-      expect(errors[0].field).toBe('targetHost');
+      expect(errors[0].field).toBe('targetConnectionId');
     });
 
     it('should validate valid topic target job', () => {
@@ -98,8 +96,7 @@ describe('Validation Logic', () => {
         ...baseJob,
         targetType: 'topic',
         targetTopicId: 'topic1',
-        targetHost: '', // Should be ignored
-        targetPath: ''  // Should be ignored
+        targetConnectionId: '', // Should be ignored
       };
       expect(validateCollectionJob(job)).toHaveLength(0);
     });
@@ -121,10 +118,8 @@ describe('Validation Logic', () => {
       id: 'job1',
       name: 'Test Job',
       sourceType: 'host',
-      sourceHost: 'srcHost',
-      sourcePath: '/src',
-      targetHost: 'tgtHost',
-      targetPath: '/tgt',
+      sourceConnectionId: 'conn1',
+      targetConnectionId: 'conn2',
       filterRegex: '.*',
       bandwidth: 100,
       processingTime: 100,
@@ -136,11 +131,11 @@ describe('Validation Logic', () => {
       expect(validateDeliveryJob(baseJob)).toHaveLength(0);
     });
 
-    it('should fail if sourceHost is missing for host type', () => {
-      const job = { ...baseJob, sourceHost: '' };
+    it('should fail if sourceConnectionId is missing for host type', () => {
+      const job = { ...baseJob, sourceConnectionId: '' };
       const errors = validateDeliveryJob(job);
       expect(errors).toHaveLength(1);
-      expect(errors[0].field).toBe('sourceHost');
+      expect(errors[0].field).toBe('sourceConnectionId');
     });
 
     it('should validate valid topic source job', () => {
@@ -148,8 +143,7 @@ describe('Validation Logic', () => {
         ...baseJob,
         sourceType: 'topic',
         sourceTopicId: 'topic1',
-        sourceHost: '', // Should be ignored
-        sourcePath: ''  // Should be ignored
+        sourceConnectionId: '', // Should be ignored
       };
       expect(validateDeliveryJob(job)).toHaveLength(0);
     });

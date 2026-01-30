@@ -96,17 +96,47 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     // ... logic copied from above ...
     const job = collection.jobs.find(j => j.id === jobId);
     if (!job) return;
-    // Note: Removed the "if (collectionLocks.current[job.id]) return;" check here to allow manual retry even if "running"?
-    // No, manual retry should also respect locks to avoid double processing.
-    // However, if the job FAILED, the lock should have been released in finally block.
-    // So checking lock is safe.
+
+    // Resolve Source Connection
+    const sourceConn = connections.find(c => c.id === job.sourceConnectionId);
+    if (!sourceConn || sourceConn.type !== 'file' || !sourceConn.host || !sourceConn.path) {
+        // If connection is missing (e.g. deleted), log error and return
+        setErrors(prev => {
+            const msg = `Collection Job ${job.name}: Invalid Source Connection`;
+            return prev.includes(msg) ? prev : [...prev, msg];
+        });
+        return;
+    }
+    const sourceHost = sourceConn.host;
+    const sourcePath = sourceConn.path;
+
+    // Resolve Target
+    let targetHost = '';
+    let targetPath = '';
+
+    if (job.targetType === 'topic' && job.targetTopicId) {
+        targetHost = 'localhost';
+        targetPath = `/topics/${job.targetTopicId}`;
+    } else {
+        const targetConn = connections.find(c => c.id === job.targetConnectionId);
+        if (!targetConn || targetConn.type !== 'file' || !targetConn.host || !targetConn.path) {
+             setErrors(prev => {
+                const msg = `Collection Job ${job.name}: Invalid Target Connection`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+            });
+            return;
+        }
+        targetHost = targetConn.host;
+        targetPath = targetConn.path;
+    }
+
     if (collectionLocks.current[job.id]) {
       console.warn(`Job ${job.name} is currently locked/running.`);
       return;
     }
 
     try {
-      const currentFiles = listFilesRef.current(job.sourceHost, job.sourcePath);
+      const currentFiles = listFilesRef.current(sourceHost, sourcePath);
       if (currentFiles.length === 0) return;
 
       let regex: RegExp;
@@ -120,11 +150,11 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       // For retry, we might want to target a SPECIFIC file if we knew which one failed.
       // But specs say "re-run the job". So picking *a* file is acceptable for now.
       // Ideally retry context has file info, but let's stick to "try processing available files".
-      const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(job.sourceHost, job.sourcePath, f.name));
+      const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(sourceHost, sourcePath, f.name));
       if (!file) return;
 
       collectionLocks.current[job.id] = true;
-      lockFile(job.sourceHost, job.sourcePath, file.name);
+      lockFile(sourceHost, sourcePath, file.name);
 
       toggleStep(`transfer_1_${job.id}`, true);
       const startTime = Date.now();
@@ -133,17 +163,10 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
         await delay(processingTime);
 
-        let targetHost = job.targetHost;
-        let targetPath = job.targetPath;
-
-        if (job.targetType === 'topic' && job.targetTopicId) {
-          targetHost = 'localhost';
-          targetPath = `/topics/${job.targetTopicId}`;
-        }
-
+        // Rename logic
         try {
           const context = {
-            hostname: job.sourceHost,
+            hostname: sourceHost,
             timestamp: new Date(),
             collectionHost: targetHost,
             fileName: file.name
@@ -151,7 +174,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           const renamePattern = job.renamePattern || '${fileName}';
           const newFileName = processTemplate(renamePattern, context);
 
-          moveFile(file.name, job.sourceHost, job.sourcePath, targetHost, targetPath, newFileName);
+          moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath, newFileName);
           setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
 
           addLog({
@@ -188,14 +211,14 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           });
         }
       } finally {
-        unlockFile(job.sourceHost, job.sourcePath, file.name);
+        unlockFile(sourceHost, sourcePath, file.name);
         toggleStep(`transfer_1_${job.id}`, false);
         collectionLocks.current[job.id] = false;
       }
     } catch (e) {
       collectionLocks.current[job.id] = false;
     }
-  }, [collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile, addLog]);
+  }, [collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile, addLog, connections]);
 
   const executeDeliveryJob = useCallback(async (jobId: string) => {
     const job = delivery.jobs.find(j => j.id === jobId);
@@ -203,13 +226,35 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     if (deliveryLocks.current[job.id]) return;
 
     try {
-      let sourceHost = job.sourceHost;
-      let sourcePath = job.sourcePath;
+      let sourceHost = '';
+      let sourcePath = '';
 
       if (job.sourceType === 'topic' && job.sourceTopicId) {
         sourceHost = 'localhost';
         sourcePath = `/topics/${job.sourceTopicId}`;
+      } else {
+        const sourceConn = connections.find(c => c.id === job.sourceConnectionId);
+        if (!sourceConn || sourceConn.type !== 'file' || !sourceConn.host || !sourceConn.path) {
+             setErrors(prev => {
+                const msg = `Delivery Job ${job.name}: Invalid Source Connection`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+            });
+            return;
+        }
+        sourceHost = sourceConn.host;
+        sourcePath = sourceConn.path;
       }
+
+      const targetConn = connections.find(c => c.id === job.targetConnectionId);
+      if (!targetConn || targetConn.type !== 'file' || !targetConn.host || !targetConn.path) {
+           setErrors(prev => {
+                const msg = `Delivery Job ${job.name}: Invalid Target Connection`;
+                return prev.includes(msg) ? prev : [...prev, msg];
+            });
+           return;
+      }
+      const targetHost = targetConn.host;
+      const targetPath = targetConn.path;
 
       let currentFiles = listFilesRef.current(sourceHost, sourcePath);
       if (currentFiles.length === 0) return;
@@ -242,10 +287,10 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
         try {
           if (job.sourceType === 'topic') {
-            writeFile(job.targetHost, job.targetPath, file.name, file.content);
+            writeFile(targetHost, targetPath, file.name, file.content);
             processedFilesRef.current.add(`${job.id}:${file.name}`);
           } else {
-            moveFile(file.name, sourceHost, sourcePath, job.targetHost, job.targetPath);
+            moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath);
           }
           setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
 
@@ -258,7 +303,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
             endTime: Date.now(),
             recordsInput: 1,
             recordsOutput: 1,
-            details: `Delivered ${file.name} to ${job.targetHost}:${job.targetPath}`,
+            details: `Delivered ${file.name} to ${targetHost}:${targetPath}`,
             extendedDetails: {
               fileSize: file.content.length,
               bandwidth: job.bandwidth,
@@ -267,7 +312,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           });
 
         } catch (e) {
-          const errMsg = `Delivery Job ${job.name}: Failed to move/copy to '${job.targetHost}:${job.targetPath}'`;
+          const errMsg = `Delivery Job ${job.name}: Failed to move/copy to '${targetHost}:${targetPath}'`;
           setErrors(prev => prev.includes(errMsg) ? prev : [...prev, errMsg]);
           addLog({
             jobId: job.id,
@@ -290,7 +335,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     } catch (e) {
       deliveryLocks.current[job.id] = false;
     }
-  }, [delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog]);
+  }, [delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog, connections]);
 
   const executeMappingJob = useCallback(async (taskId: string) => {
     const task = mappingTasks.find(t => t.id === taskId);
@@ -539,7 +584,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
             </div>
 
             {/* Storage Views... reused logic */}
-            <StorageViews dataSource={dataSource} collection={collection} delivery={delivery} topics={topics} listFiles={safeListFiles} />
+            <StorageViews dataSource={dataSource} collection={collection} delivery={delivery} topics={topics} listFiles={safeListFiles} connections={connections} />
 
             {/* DB View */}
             <DatabaseView tables={tables} select={select} />
@@ -560,7 +605,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   );
 };
 
-import { type DataSourceSettings, type CollectionSettings, type DeliverySettings, type TopicDefinition, type TableDefinition } from './lib/SettingsContext';
+import { type DataSourceSettings, type CollectionSettings, type DeliverySettings, type TopicDefinition, type TableDefinition, type ConnectionDefinition } from './lib/SettingsContext';
 
 // Helper Components for Cleaner Render
 interface StorageViewsProps {
@@ -568,10 +613,11 @@ interface StorageViewsProps {
   collection: CollectionSettings;
   delivery: DeliverySettings;
   topics: TopicDefinition[];
+  connections: ConnectionDefinition[];
   listFiles: (host: string, path: string) => VFile[];
 }
 
-const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, delivery, topics, listFiles }) => {
+const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, delivery, topics, connections, listFiles }) => {
   const { t } = useTranslation();
   // ... same logic for gathering storages ...
   const sourceStorages = dataSource.definitions.map((d) => ({ name: d.name, host: d.host, path: d.path, type: 'source' }));
@@ -580,14 +626,20 @@ const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, del
   const incomingStorages: { host: string, path: string, type: 'incoming' }[] = [];
   collection.jobs.forEach((job) => {
     if (job.targetType === 'topic') return;
-    const key = `${job.targetHost}:${job.targetPath}`;
-    if (!incomingPaths.has(key)) { incomingPaths.add(key); incomingStorages.push({ host: job.targetHost, path: job.targetPath, type: 'incoming' }); }
+    const conn = connections.find(c => c.id === job.targetConnectionId);
+    if (conn && conn.type === 'file' && conn.host && conn.path) {
+        const key = `${conn.host}:${conn.path}`;
+        if (!incomingPaths.has(key)) { incomingPaths.add(key); incomingStorages.push({ host: conn.host, path: conn.path, type: 'incoming' }); }
+    }
   });
   const internalPaths = new Set<string>();
   const internalStorages: { host: string, path: string, type: 'internal' }[] = [];
   delivery.jobs.forEach((job) => {
-    const key = `${job.targetHost}:${job.targetPath}`;
-    if (!internalPaths.has(key)) { internalPaths.add(key); internalStorages.push({ host: job.targetHost, path: job.targetPath, type: 'internal' }); }
+    const conn = connections.find(c => c.id === job.targetConnectionId);
+    if (conn && conn.type === 'file' && conn.host && conn.path) {
+        const key = `${conn.host}:${conn.path}`;
+        if (!internalPaths.has(key)) { internalPaths.add(key); internalStorages.push({ host: conn.host, path: conn.path, type: 'internal' }); }
+    }
   });
 
   return (

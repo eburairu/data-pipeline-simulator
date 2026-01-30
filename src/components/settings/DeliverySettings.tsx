@@ -4,21 +4,11 @@ import { validateDeliveryJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const DeliverySettings: React.FC = () => {
-  const { delivery, setDelivery, hosts, topics } = useSettings();
+  const { delivery, setDelivery, topics, connections } = useSettings();
 
   const handleJobChange = (id: string, field: keyof DeliveryJob, value: any) => {
     const newJobs = delivery.jobs.map(job =>
       job.id === id ? { ...job, [field]: value } : job
-    );
-    setDelivery({ ...delivery, jobs: newJobs });
-  };
-
-  const handleHostChange = (id: string, hostField: 'sourceHost' | 'targetHost', pathField: 'sourcePath' | 'targetPath', newHostName: string) => {
-    const selectedHost = hosts.find(h => h.name === newHostName);
-    const newPath = selectedHost && selectedHost.directories.length > 0 ? selectedHost.directories[0] : '';
-
-    const newJobs = delivery.jobs.map(job =>
-      job.id === id ? { ...job, [hostField]: newHostName, [pathField]: newPath } : job
     );
     setDelivery({ ...delivery, jobs: newJobs });
   };
@@ -28,17 +18,18 @@ const DeliverySettings: React.FC = () => {
           if (job.id !== id) return job;
 
           if (type === 'host') {
-             const defaultHost = hosts[0];
+             const defaultConn = connections.find(c => c.type === 'file');
              return {
                  ...job,
                  sourceType: type,
-                 sourceHost: job.sourceHost || defaultHost?.name || '',
-                 sourcePath: job.sourcePath || defaultHost?.directories[0] || ''
+                 sourceConnectionId: job.sourceConnectionId || defaultConn?.id || '',
+                 sourceTopicId: undefined
              };
           } else {
              return {
                  ...job,
                  sourceType: type,
+                 sourceConnectionId: undefined,
                  sourceTopicId: job.sourceTopicId || (topics.length > 0 ? topics[0].id : '')
              };
           }
@@ -47,23 +38,16 @@ const DeliverySettings: React.FC = () => {
   };
 
   const addJob = () => {
-    // Default to available hosts
-    const defaultHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: [] };
-    const defaultPath = defaultHost.directories.length > 0 ? defaultHost.directories[0] : '/incoming';
-
-    // For target, reuse or pick next
-    const defaultTargetHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: [] }; // Usually localhost for internal
-    const defaultTargetPath = defaultTargetHost.directories.length > 1 ? defaultTargetHost.directories[1] : (defaultTargetHost.directories[0] || '/internal');
-
+    const fileConns = connections.filter(c => c.type === 'file');
+    const defaultConn = fileConns.length > 0 ? fileConns[0] : undefined;
+    const secondConn = fileConns.length > 1 ? fileConns[1] : defaultConn;
 
     const newJob: DeliveryJob = {
       id: `del_job_${Date.now()}`,
       name: `Delivery ${delivery.jobs.length + 1}`,
       sourceType: 'host',
-      sourceHost: defaultHost.name,
-      sourcePath: defaultPath,
-      targetHost: defaultTargetHost.name,
-      targetPath: defaultTargetPath,
+      sourceConnectionId: defaultConn?.id || '',
+      targetConnectionId: secondConn?.id || defaultConn?.id || '',
       filterRegex: '.*',
       bandwidth: 100,
       processingTime: 1000,
@@ -76,6 +60,8 @@ const DeliverySettings: React.FC = () => {
   const removeJob = (id: string) => {
     setDelivery({ ...delivery, jobs: delivery.jobs.filter(j => j.id !== id) });
   };
+
+  const fileConnections = connections.filter(c => c.type === 'file');
 
   return (
     <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
@@ -128,7 +114,7 @@ const DeliverySettings: React.FC = () => {
                                 checked={job.sourceType !== 'topic'}
                                 onChange={() => handleSourceTypeChange(job.id, 'host')}
                                 className="mr-1"
-                            /> Host / Directory
+                            /> Connection (File)
                         </label>
                         <label className="flex items-center text-xs cursor-pointer">
                             <input
@@ -156,62 +142,36 @@ const DeliverySettings: React.FC = () => {
                              </select>
                          </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                           <div>
-                             <label className="block text-xs font-medium text-gray-500">Source Host</label>
+                        <div>
+                             <label className="block text-xs font-medium text-gray-500">Source Connection</label>
                              <select
-                                value={job.sourceHost}
-                                onChange={(e) => handleHostChange(job.id, 'sourceHost', 'sourcePath', e.target.value)}
-                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceHost') ? 'border-red-500 bg-red-50' : ''}`}
-                                title={getErrorMsg('sourceHost')}
+                                value={job.sourceConnectionId || ''}
+                                onChange={(e) => handleJobChange(job.id, 'sourceConnectionId', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceConnectionId') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('sourceConnectionId')}
                              >
-                                {hosts.map(h => (
-                                    <option key={h.name} value={h.name}>{h.name}</option>
+                                <option value="">Select Connection</option>
+                                {fileConnections.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name} ({c.host}:{c.path})</option>
                                 ))}
                              </select>
-                           </div>
-                           <div>
-                             <label className="block text-xs font-medium text-gray-500">Source Path</label>
-                             <select
-                                value={job.sourcePath}
-                                onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
-                                title={getErrorMsg('sourcePath')}
-                             >
-                                {hosts.find(h => h.name === job.sourceHost)?.directories.map(dir => (
-                                    <option key={dir} value={dir}>{dir}</option>
-                                )) || <option value="">Select Host First</option>}
-                             </select>
-                           </div>
-                        </div>
+                         </div>
                     )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                     <label className="block text-xs font-medium text-gray-500">Target Host</label>
+                     <label className="block text-xs font-medium text-gray-500">Target Connection</label>
                      <select
-                        value={job.targetHost}
-                        onChange={(e) => handleHostChange(job.id, 'targetHost', 'targetPath', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetHost') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('targetHost')}
+                        value={job.targetConnectionId || ''}
+                        onChange={(e) => handleJobChange(job.id, 'targetConnectionId', e.target.value)}
+                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetConnectionId') ? 'border-red-500 bg-red-50' : ''}`}
+                        title={getErrorMsg('targetConnectionId')}
                      >
-                        {hosts.map(h => (
-                            <option key={h.name} value={h.name}>{h.name}</option>
+                        <option value="">Select Connection</option>
+                        {fileConnections.map(c => (
+                            <option key={c.id} value={c.id}>{c.name} ({c.host}:{c.path})</option>
                         ))}
-                     </select>
-                   </div>
-                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Target Path</label>
-                     <select
-                        value={job.targetPath}
-                        onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('targetPath')}
-                     >
-                        {hosts.find(h => h.name === job.targetHost)?.directories.map(dir => (
-                            <option key={dir} value={dir}>{dir}</option>
-                        )) || <option value="">Select Host First</option>}
                      </select>
                    </div>
                 </div>
