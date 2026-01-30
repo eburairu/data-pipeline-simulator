@@ -3,7 +3,14 @@ import { useSettings, type DataSourceDefinition, type GenerationJob, type Column
 import { validateDataSourceDefinition, validateGenerationJob, type ValidationError } from '../../lib/validation';
 import { Trash2, Plus, FolderOpen, FileText, AlignJustify, List } from 'lucide-react';
 
-const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list'];
+const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list', 'timestamp'];
+
+const ParamInput = ({ label, ...props }: any) => (
+    <div className="flex flex-col">
+        <label className="text-[10px] text-gray-500 font-medium ml-1 mb-0.5">{label}</label>
+        <input className="border rounded p-1 text-sm w-full" {...props} />
+    </div>
+);
 
 const SchemaEditor: React.FC<{
     schema: ColumnSchema[];
@@ -66,41 +73,52 @@ const SchemaEditor: React.FC<{
                     </div>
                     <div className="col-span-5">
                         {/* Dynamic Params Inputs */}
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-2 gap-1 items-end">
                             {col.type === 'static' && (
-                                <input type="text" placeholder="Value (Template supported)" className="col-span-2 border rounded p-1 text-sm" value={col.params.value || ''} onChange={e => updateParams(col.id, 'value', e.target.value)} />
+                                <div className="col-span-2">
+                                    <ParamInput label="Value (Template)" type="text" value={col.params.value || ''} onChange={(e: any) => updateParams(col.id, 'value', e.target.value)} />
+                                </div>
                             )}
                             {col.type === 'randomInt' && (
                                 <>
-                                    <input type="number" placeholder="Min" className="border rounded p-1 text-sm" value={col.params.min ?? 0} onChange={e => updateParams(col.id, 'min', e.target.value)} />
-                                    <input type="number" placeholder="Max" className="border rounded p-1 text-sm" value={col.params.max ?? 100} onChange={e => updateParams(col.id, 'max', e.target.value)} />
+                                    <ParamInput label="Min" type="number" value={col.params.min ?? 0} onChange={(e: any) => updateParams(col.id, 'min', e.target.value)} />
+                                    <ParamInput label="Max" type="number" value={col.params.max ?? 100} onChange={(e: any) => updateParams(col.id, 'max', e.target.value)} />
                                 </>
                             )}
                             {col.type === 'randomFloat' && (
                                 <>
-                                    <input type="number" placeholder="Min" className="border rounded p-1 text-sm" value={col.params.min ?? 0} onChange={e => updateParams(col.id, 'min', e.target.value)} />
-                                    <input type="number" placeholder="Max" className="border rounded p-1 text-sm" value={col.params.max ?? 1} onChange={e => updateParams(col.id, 'max', e.target.value)} />
-                                    <input type="number" placeholder="Precision" className="col-span-2 border rounded p-1 text-sm" value={col.params.precision ?? 2} onChange={e => updateParams(col.id, 'precision', e.target.value)} />
+                                    <ParamInput label="Min" type="number" value={col.params.min ?? 0} onChange={(e: any) => updateParams(col.id, 'min', e.target.value)} />
+                                    <ParamInput label="Max" type="number" value={col.params.max ?? 1} onChange={(e: any) => updateParams(col.id, 'max', e.target.value)} />
+                                    <div className="col-span-2">
+                                        <ParamInput label="Precision" type="number" value={col.params.precision ?? 2} onChange={(e: any) => updateParams(col.id, 'precision', e.target.value)} />
+                                    </div>
                                 </>
                             )}
                             {(col.type === 'sin' || col.type === 'cos') && (
                                 <>
-                                    <input type="number" placeholder="Period (ms)" className="border rounded p-1 text-sm" value={col.params.period ?? 10000} onChange={e => updateParams(col.id, 'period', e.target.value)} />
-                                    <input type="number" placeholder="Amplitude" className="border rounded p-1 text-sm" value={col.params.amplitude ?? 1} onChange={e => updateParams(col.id, 'amplitude', e.target.value)} />
-                                    <input type="number" placeholder="Offset" className="col-span-2 border rounded p-1 text-sm" value={col.params.offset ?? 0} onChange={e => updateParams(col.id, 'offset', e.target.value)} />
+                                    <ParamInput label="Period (ms)" type="number" value={col.params.period ?? 10000} onChange={(e: any) => updateParams(col.id, 'period', e.target.value)} />
+                                    <ParamInput label="Amplitude" type="number" value={col.params.amplitude ?? 1} onChange={(e: any) => updateParams(col.id, 'amplitude', e.target.value)} />
+                                    <div className="col-span-2">
+                                        <ParamInput label="Offset" type="number" value={col.params.offset ?? 0} onChange={(e: any) => updateParams(col.id, 'offset', e.target.value)} />
+                                    </div>
                                 </>
                             )}
                              {col.type === 'sequence' && (
                                 <>
-                                    <input type="number" placeholder="Start" className="border rounded p-1 text-sm" value={col.params.start ?? 1} onChange={e => updateParams(col.id, 'start', e.target.value)} />
-                                    <input type="number" placeholder="Step" className="border rounded p-1 text-sm" value={col.params.step ?? 1} onChange={e => updateParams(col.id, 'step', e.target.value)} />
+                                    <ParamInput label="Start" type="number" value={col.params.start ?? 1} onChange={(e: any) => updateParams(col.id, 'start', e.target.value)} />
+                                    <ParamInput label="Step" type="number" value={col.params.step ?? 1} onChange={(e: any) => updateParams(col.id, 'step', e.target.value)} />
                                 </>
                             )}
                              {col.type === 'list' && (
-                                <input type="text" placeholder="Values (comma separated)" className="col-span-2 border rounded p-1 text-sm" value={col.params.values || ''} onChange={e => updateParams(col.id, 'values', e.target.value)} />
+                                <div className="col-span-2">
+                                    <ParamInput label="Values (comma separated)" type="text" value={col.params.values || ''} onChange={(e: any) => updateParams(col.id, 'values', e.target.value)} />
+                                </div>
                             )}
                              {col.type === 'uuid' && (
-                                <span className="col-span-2 text-xs text-gray-400 italic flex items-center">Generates unique ID</span>
+                                <span className="col-span-2 text-xs text-gray-400 italic flex items-center h-full pt-4">Generates unique ID</span>
+                            )}
+                             {col.type === 'timestamp' && (
+                                <span className="col-span-2 text-xs text-gray-400 italic flex items-center h-full pt-4">Current ISO Timestamp</span>
                             )}
                         </div>
                     </div>

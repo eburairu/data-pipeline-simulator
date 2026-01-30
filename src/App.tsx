@@ -68,6 +68,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const mappingStates = useRef<Record<string, ExecutionState>>({});
   const mappingLocks = useRef<Record<string, boolean>>({});
   const fileLocks = useRef<Set<string>>(new Set());
+  const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
   // ... Update refs on render ...
   useEffect(() => { listFilesRef.current = listFiles; }, [listFiles]);
@@ -389,7 +390,14 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         const ctx = { hostname: def.host, timestamp: new Date() };
         let content = '';
         if (job.mode === 'schema' && job.schema) {
-          content = generateDataFromSchema(job.schema, job.rowCount || 1, ctx);
+          const { content: newContent, nextSequenceState } = generateDataFromSchema(
+            job.schema,
+            job.rowCount || 1,
+            ctx,
+            sequenceStates.current[job.id] || {}
+          );
+          content = newContent;
+          sequenceStates.current[job.id] = nextSequenceState;
         } else {
           content = processTemplate(job.fileContent, ctx);
         }
@@ -453,7 +461,14 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         const ctx = { hostname: d.host, timestamp: new Date() };
         let content = '';
         if (job.mode === 'schema' && job.schema) {
-          content = generateDataFromSchema(job.schema, job.rowCount || 1, ctx);
+          const { content: newContent, nextSequenceState } = generateDataFromSchema(
+            job.schema,
+            job.rowCount || 1,
+            ctx,
+            sequenceStates.current[job.id] || {}
+          );
+          content = newContent;
+          sequenceStates.current[job.id] = nextSequenceState;
         } else {
           content = processTemplate(job.fileContent, ctx);
         }
