@@ -331,25 +331,23 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
       mappingStates.current[task.id] = newState;
 
-      const totalInput = Object.values(stats).reduce((acc, s) => acc + s.input, 0);
-      const totalOutput = Object.values(stats).reduce((acc, s) => acc + s.output, 0);
-      const totalErrors = Object.values(stats).reduce((acc, s) => acc + s.errors, 0);
+      const totalInput = Object.values(stats.transformations).reduce((acc, s) => acc + s.input, 0);
+      const totalOutput = Object.values(stats.transformations).reduce((acc, s) => acc + s.output, 0);
+      const totalErrors = Object.values(stats.transformations).reduce((acc, s) => acc + s.errors, 0);
 
-      if (totalInput > 0 || totalOutput > 0) {
-        addLog({
-          jobId: task.id,
-          jobName: task.name,
-          jobType: 'mapping',
-          status: totalErrors > 0 ? 'failed' : 'success',
-          startTime: startTime,
-          endTime: Date.now(),
-          recordsInput: totalInput,
-          recordsOutput: totalOutput,
-          details: `Processed via mapping ${mapping.name}`,
-          errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : undefined,
-          extendedDetails: stats
-        });
-      }
+      addLog({
+        jobId: task.id,
+        jobName: task.name,
+        jobType: 'mapping',
+        status: totalErrors > 0 ? 'failed' : 'success',
+        startTime: startTime,
+        endTime: Date.now(),
+        recordsInput: totalInput,
+        recordsOutput: totalOutput,
+        details: `Processed via mapping ${mapping.name}`,
+        errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : undefined,
+        extendedDetails: stats
+      });
 
       if (totalErrors > 0) {
         setErrors(prev => [...prev, `Task ${task.name}: ${totalErrors} errors`]);
