@@ -10,7 +10,7 @@ export interface DataSourceDefinition {
   path: string;
 }
 
-export type GeneratorType = 'static' | 'randomInt' | 'randomFloat' | 'sin' | 'cos' | 'sequence' | 'uuid' | 'list';
+export type GeneratorType = 'static' | 'randomInt' | 'randomFloat' | 'sin' | 'cos' | 'sequence' | 'uuid' | 'list' | 'timestamp';
 
 export interface ColumnSchema {
   id: string;
