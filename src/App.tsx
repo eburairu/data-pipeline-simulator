@@ -11,7 +11,8 @@ import { processTemplate } from './lib/templateUtils';
 import { generateDataFromSchema } from './lib/DataGenerator';
 import { executeMappingTaskRecursive, type ExecutionState } from './lib/MappingEngine';
 import 'reactflow/dist/style.css';
-import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3, MonitorPlay } from 'lucide-react';
+import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3, MonitorPlay, Book } from 'lucide-react';
+import Documentation from './components/Documentation';
 
 // eslint-disable-next-line react-refresh/only-export-components
 const StorageView = React.memo(({ name, host, path, type, files }: { name?: string, host: string, path: string, type: string, files: VFile[] }) => {
@@ -655,7 +656,7 @@ const DatabaseView: React.FC<DatabaseViewProps> = ({ tables, select }) => {
 function App() {
   const retryHandlerRef = useRef<(id: string, type: JobType) => void>(() => { });
   const retryWrapper = useCallback((id: string, type: JobType) => retryHandlerRef.current(id, type), []);
-  const [activeTab, setActiveTab] = useState<'simulation' | 'dashboard' | 'monitor' | 'settings'>('simulation');
+  const [activeTab, setActiveTab] = useState<'simulation' | 'dashboard' | 'monitor' | 'settings' | 'documentation'>('simulation');
   const { saveSettings } = useSettings();
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -675,6 +676,7 @@ function App() {
             <button onClick={() => setActiveTab('dashboard')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Grid3X3 size={16} /> <span className="hidden xs:inline">Dashboard</span></button>
             <button onClick={() => setActiveTab('monitor')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'monitor' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><MonitorPlay size={16} /> <span className="hidden xs:inline">Monitor</span></button>
             <button onClick={() => setActiveTab('settings')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Settings size={16} /> <span className="hidden xs:inline">Settings</span></button>
+            <button onClick={() => setActiveTab('documentation')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'documentation' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Book size={16} /> <span className="hidden xs:inline">Docs</span></button>
           </div>
         </div>
 
@@ -698,6 +700,12 @@ function App() {
             </div>
             {saveMessage && <div className="mb-4 p-3 rounded bg-blue-50 text-blue-700">{saveMessage}</div>}
             <SettingsPanel />
+          </div>
+        )}
+
+        {activeTab === 'documentation' && (
+          <div className="h-[calc(100vh-140px)]">
+            <Documentation />
           </div>
         )}
       </div>
