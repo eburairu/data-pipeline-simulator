@@ -57,7 +57,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select, update, remove } = useVirtualDB();
-  const { dataSource, collection, delivery, topics, mappings, mappingTasks, connections, tables } = useSettings();
+  const { dataSource, collection, delivery, topics, mappings, mappingTasks, connections, tables, visualization } = useSettings();
   const { addLog } = useJobMonitor(); // Now valid because we are inside JobMonitorProvider
 
   const listFilesRef = useRef(listFiles);
@@ -472,7 +472,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
   return (
     <>
-      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8 h-full`}>
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-8`}>
         <div className="flex flex-col gap-4">
           <div className="p-4 bg-white rounded shadow space-y-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
@@ -517,9 +517,11 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           </div>
         </div>
         <div className="flex flex-col gap-4">
-          <div className="h-[400px]">
-            <BiDashboard />
-          </div>
+          {visualization.showDashboard && (
+            <div className="h-[400px]">
+              <BiDashboard />
+            </div>
+          )}
           <div className="h-[500px] bg-white rounded shadow border border-gray-200 overflow-hidden">
             <PipelineFlow activeSteps={activeSteps} />
           </div>

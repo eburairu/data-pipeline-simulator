@@ -101,6 +101,11 @@ export interface EtlSettings {
   executionInterval: number;
 }
 
+export interface VisualizationSettings {
+  showDashboard: boolean;
+  defaultTableId?: string;
+}
+
 export interface Host {
   name: string;
   directories: string[];
@@ -144,6 +149,9 @@ interface SettingsContextType {
   setDelivery: (settings: DeliverySettings) => void;
   etl: EtlSettings;
   setEtl: (settings: EtlSettings) => void;
+
+  visualization: VisualizationSettings;
+  setVisualization: (settings: VisualizationSettings) => void;
 
   hosts: Host[];
   addHost: (name: string) => void;
@@ -261,6 +269,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     summaryTableName: 'summary_data',
     processingTime: 1000,
     executionInterval: 1000,
+  });
+
+  const [visualization, setVisualization] = useState<VisualizationSettings>({
+    showDashboard: true
   });
 
   const [hosts, setHosts] = useState<Host[]>([
@@ -419,6 +431,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setDelivery({ ...parsed.delivery, jobs: migratedJobs });
         }
         if (parsed.etl) setEtl(parsed.etl);
+        if (parsed.visualization) setVisualization(parsed.visualization);
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);
@@ -443,6 +456,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       collection,
       delivery,
       etl,
+      visualization,
       hosts,
       topics,
       tables,
@@ -457,7 +471,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error("Failed to save settings", e);
       return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
     }
-  }, [dataSource, collection, delivery, etl, hosts, topics, connections, mappings, mappingTasks]);
+  }, [dataSource, collection, delivery, etl, visualization, hosts, topics, connections, mappings, mappingTasks]);
 
   const addHost = useCallback((name: string) => {
     setHosts(prev => {
@@ -604,6 +618,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         setDelivery,
         etl,
         setEtl,
+        visualization,
+        setVisualization,
         hosts,
         addHost,
         removeHost,

@@ -8,18 +8,21 @@ import DeliverySettings from './DeliverySettings';
 import ConnectionSettings from './ConnectionSettings';
 import MappingDesigner from './MappingDesigner';
 import MappingTaskSettings from './MappingTaskSettings';
-import { Database, ArrowLeftRight, Workflow, Server } from 'lucide-react';
+import { useSettings } from '../../lib/SettingsContext';
+import { Database, ArrowLeftRight, Workflow, Server, LayoutDashboard } from 'lucide-react';
 
-type SettingsTab = 'datasource' | 'transfer' | 'processing' | 'database';
+type SettingsTab = 'datasource' | 'transfer' | 'processing' | 'database' | 'visualization';
 
 const SettingsPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('datasource');
+  const { visualization, setVisualization } = useSettings();
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'datasource', label: 'データソース', icon: <Server size={16} /> },
     { id: 'transfer', label: '集配信', icon: <ArrowLeftRight size={16} /> },
     { id: 'processing', label: '加工処理', icon: <Workflow size={16} /> },
     { id: 'database', label: 'データベース', icon: <Database size={16} /> },
+    { id: 'visualization', label: 'ビジュアライゼーション', icon: <LayoutDashboard size={16} /> },
   ];
 
   return (
@@ -71,6 +74,31 @@ const SettingsPanel: React.FC = () => {
         {activeTab === 'database' && (
           <div className="space-y-6">
             <DatabaseSettings />
+          </div>
+        )}
+
+        {activeTab === 'visualization' && (
+          <div className="space-y-6">
+            <div className="bg-white border rounded p-4 shadow-sm">
+                <h3 className="font-bold border-b pb-2 mb-4 text-gray-700 flex items-center gap-2">
+                    <LayoutDashboard size={18} /> ダッシュボード設定
+                </h3>
+                <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            id="showDashboard"
+                            checked={visualization.showDashboard}
+                            onChange={(e) => setVisualization({...visualization, showDashboard: e.target.checked})}
+                            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                        />
+                        <div className="flex flex-col">
+                            <label htmlFor="showDashboard" className="text-sm font-medium text-gray-700 cursor-pointer">BIダッシュボードを表示する</label>
+                            <span className="text-xs text-gray-500">シミュレーション画面にチャートとデータ分析ツールを表示します。</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
           </div>
         )}
       </div>
