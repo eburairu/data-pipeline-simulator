@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# データパイプライン シミュレータ (Data Pipeline Simulator)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+このアプリケーションは、ブラウザ上でETL（Extract, Transform, Load）ワークフロー全体をモデル化、実行、可視化できるシミュレーションツールです。
+データの生成から転送、加工、そして最終的なデータベースへの格納までの一連のライフサイクルをシミュレートし、マッピングロジックのテストやデータフローの学習、ジョブ実行の監視を行うことができます。
 
-Currently, two official plugins are available:
+## 主な機能
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+*   **データ生成 (Data Generation)**
+    *   カスタマイズ可能なスキーマやテンプレートを使用して、テスト用のCSVデータを自動生成します。
+    *   外部システムからのファイル受信をシミュレートします。
+*   **データ転送 (Data Transport)**
+    *   「収集 (Collection)」および「配信 (Delivery)」ジョブを通じて、システム間のファイル転送をシミュレートします。
+    *   帯域幅やレイテンシの設定により、実際のネットワーク環境のような挙動を再現可能です。
+*   **ETL処理 (Data Processing)**
+    *   GUIベースのマッピングデザイナーを使用して、データの結合 (Join)、集計 (Aggregate)、フィルタリング (Filter) などの変換処理を定義できます。
+    *   定義したマッピングを実行し、データを仮想データベースにロードします。
+*   **可視化とモニタリング (Visualization & Monitoring)**
+    *   BIダッシュボードで処理結果をグラフや表で可視化できます。
+    *   ジョブモニターで実行履歴やエラーログを確認できます。
 
-## React Compiler
+## セットアップと起動方法
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+このプロジェクトは React + TypeScript + Vite で構築されています。以下の手順でローカル環境で起動できます。
 
-## Expanding the ESLint configuration
+### 前提条件
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+*   Node.js (推奨バージョン: v18以降)
+*   npm
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### インストール
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+リポジトリをクローンし、依存関係をインストールします。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### アプリケーションの起動
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+開発サーバーを起動します。
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+ブラウザで `http://localhost:5173` (またはコンソールに表示されるURL) にアクセスしてください。
+
+## 使い方
+
+1.  **シミュレーション (Simulation) タブ**: データ生成、転送、マッピングの各ジョブの実行状況をリアルタイムで確認・制御できます。
+2.  **設定 (Settings) タブ**:
+    *   **データソース**: 生成するデータの定義を行います。
+    *   **集配信**: ファイルの移動ルールを定義します。
+    *   **加工処理**: ソースとターゲットのマッピング、変換ロジックを作成します。
+    *   **データベース**: 格納先の仮想テーブルを定義します。
+3.  **モニタ (Monitor) タブ**: 過去のジョブ実行履歴を確認します。
+4.  **ダッシュボード (Dashboard) タブ**: データベース内のデータを可視化します。
+5.  **ドキュメント (Docs) タブ**: アプリケーション内の詳細な機能説明や関数リファレンスを参照できます。
+
+## 技術スタック
+
+*   React
+*   TypeScript
+*   Vite
+*   Tailwind CSS
+*   React Flow (パイプライン表示・マッピングデザイナー)
+*   Recharts (データ可視化)
