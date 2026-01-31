@@ -10,7 +10,7 @@ import SettingsPanel from './components/settings/SettingsPanel';
 import JobMonitor from './components/JobMonitor';
 import { processTemplate } from './lib/templateUtils';
 import { generateDataFromSchema } from './lib/DataGenerator';
-import { executeMappingTaskRecursive, type ExecutionState } from './lib/MappingEngine';
+import { executeMappingTaskRecursive, type ExecutionState, type ExecutionStats } from './lib/MappingEngine';
 import 'reactflow/dist/style.css';
 import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, List, Grid3X3, MonitorPlay, Book } from 'lucide-react';
 import Documentation from './components/Documentation';
@@ -63,7 +63,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select, update, remove } = useVirtualDB();
   const { dataSource, collection, delivery, topics, mappings, mappingTasks, connections, tables, biDashboard } = useSettings();
-  const { addLog } = useJobMonitor(); // Now valid because we are inside JobMonitorProvider
+  const { addLog, updateLog } = useJobMonitor(); // Now valid because we are inside JobMonitorProvider
 
   const listFilesRef = useRef(listFiles);
   const selectRef = useRef(select);
@@ -159,6 +159,17 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       toggleStep(`transfer_1_${job.id}`, true);
       const startTime = Date.now();
 
+      const logId = addLog({
+        jobId: job.id,
+        jobName: job.name,
+        jobType: 'collection',
+        status: 'running',
+        startTime: startTime,
+        recordsInput: 1,
+        recordsOutput: 0,
+        details: `Moving ${file.name}...`
+      });
+
       try {
         const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
         await delay(processingTime);
@@ -177,14 +188,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath, newFileName);
           setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
 
-          addLog({
-            jobId: job.id,
-            jobName: job.name,
-            jobType: 'collection',
+          updateLog(logId, {
             status: 'success',
-            startTime: startTime,
             endTime: Date.now(),
-            recordsInput: 1,
             recordsOutput: 1,
             details: `Moved ${file.name} to ${targetHost}:${targetPath}`,
             extendedDetails: {
@@ -197,14 +203,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         } catch (e) {
           const errMsg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
           setErrors(prev => prev.includes(errMsg) ? prev : [...prev, errMsg]);
-          addLog({
-            jobId: job.id,
-            jobName: job.name,
-            jobType: 'collection',
+          updateLog(logId, {
             status: 'failed',
-            startTime: startTime,
             endTime: Date.now(),
-            recordsInput: 1,
             recordsOutput: 0,
             errorMessage: errMsg,
             details: `File: ${file.name}`
@@ -218,7 +219,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     } catch (e) {
       collectionLocks.current[job.id] = false;
     }
-  }, [collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile, addLog, connections]);
+  }, [collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile, addLog, updateLog, connections]);
 
   const executeDeliveryJob = useCallback(async (jobId: string) => {
     const job = delivery.jobs.find(j => j.id === jobId);
@@ -281,6 +282,17 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       toggleStep(`transfer_2_${job.id}`, true);
       const startTime = Date.now();
 
+      const logId = addLog({
+        jobId: job.id,
+        jobName: job.name,
+        jobType: 'delivery',
+        status: 'running',
+        startTime: startTime,
+        recordsInput: 1,
+        recordsOutput: 0,
+        details: `Delivering ${file.name}...`
+      });
+
       try {
         const processingTime = calculateProcessingTime(file.content, job.bandwidth, job.processingTime);
         await delay(processingTime);
@@ -294,14 +306,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           }
           setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
 
-          addLog({
-            jobId: job.id,
-            jobName: job.name,
-            jobType: 'delivery',
+          updateLog(logId, {
             status: 'success',
-            startTime: startTime,
             endTime: Date.now(),
-            recordsInput: 1,
             recordsOutput: 1,
             details: `Delivered ${file.name} to ${targetHost}:${targetPath}`,
             extendedDetails: {
@@ -314,14 +321,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         } catch (e) {
           const errMsg = `Delivery Job ${job.name}: Failed to move/copy to '${targetHost}:${targetPath}'`;
           setErrors(prev => prev.includes(errMsg) ? prev : [...prev, errMsg]);
-          addLog({
-            jobId: job.id,
-            jobName: job.name,
-            jobType: 'delivery',
+          updateLog(logId, {
             status: 'failed',
-            startTime: startTime,
             endTime: Date.now(),
-            recordsInput: 1,
             recordsOutput: 0,
             errorMessage: errMsg,
             details: `File: ${file.name}`
@@ -335,7 +337,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     } catch (e) {
       deliveryLocks.current[job.id] = false;
     }
-  }, [delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog, connections]);
+  }, [delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog, updateLog, connections]);
 
   const executeMappingJob = useCallback(async (taskId: string) => {
     const task = mappingTasks.find(t => t.id === taskId);
@@ -353,8 +355,32 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     toggleStep(`mapping_task_${task.id}`, true);
     const startTime = Date.now();
 
+    // Initial Log
+    const logId = addLog({
+        jobId: task.id,
+        jobName: task.name,
+        jobType: 'mapping',
+        status: 'running',
+        startTime: startTime,
+        recordsInput: 0,
+        recordsOutput: 0,
+        details: `Initializing mapping ${mapping.name}...`
+    });
+
     try {
       if (!mappingStates.current[task.id]) mappingStates.current[task.id] = {};
+
+      // Define Observer
+      const observer = (stats: ExecutionStats) => {
+          const totalInput = Object.values(stats.transformations).reduce((acc, s) => acc + s.input, 0);
+          const totalOutput = Object.values(stats.transformations).reduce((acc, s) => acc + s.output, 0);
+          updateLog(logId, {
+              recordsInput: totalInput,
+              recordsOutput: totalOutput,
+              extendedDetails: stats,
+              details: `Processing... (${totalInput} rows)`
+          });
+      };
 
       const { stats, newState } = await executeMappingTaskRecursive(
         task,
@@ -371,7 +397,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           writeFile: writeFile
         },
         { select: selectRef.current, insert: insert, update: update, delete: remove },
-        mappingStates.current[task.id]
+        mappingStates.current[task.id],
+        observer
       );
 
       mappingStates.current[task.id] = newState;
@@ -380,12 +407,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       const totalOutput = Object.values(stats.transformations).reduce((acc, s) => acc + s.output, 0);
       const totalErrors = Object.values(stats.transformations).reduce((acc, s) => acc + s.errors, 0);
 
-      addLog({
-        jobId: task.id,
-        jobName: task.name,
-        jobType: 'mapping',
+      updateLog(logId, {
         status: totalErrors > 0 ? 'failed' : 'success',
-        startTime: startTime,
         endTime: Date.now(),
         recordsInput: totalInput,
         recordsOutput: totalOutput,
@@ -409,15 +432,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : 'Unknown error';
-      addLog({
-        jobId: task.id,
-        jobName: task.name,
-        jobType: 'mapping',
+      updateLog(logId, {
         status: 'failed',
-        startTime: startTime,
         endTime: Date.now(),
-        recordsInput: 0,
-        recordsOutput: 0,
         errorMessage: errMsg,
         details: `Fatal error in mapping execution`
       });
@@ -426,7 +443,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       toggleStep(`mapping_task_${task.id}`, false);
       mappingLocks.current[task.id] = false;
     }
-  }, [mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile, addLog]);
+  }, [mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile, addLog, updateLog]);
 
   // --- Register Retry Handler ---
   useEffect(() => {
