@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
 import { validateAllSettings, type ValidationError } from './validation';
 import { type Mapping, type MappingTask } from './MappingTypes';
+import { type DBFilter } from './VirtualDB';
 
 export interface DataSourceDefinition {
   id: string;
@@ -9,12 +10,27 @@ export interface DataSourceDefinition {
   path: string;
 }
 
+export type GeneratorType = 'static' | 'randomInt' | 'randomFloat' | 'sin' | 'cos' | 'sequence' | 'uuid' | 'list' | 'timestamp';
+
+export interface ColumnSchema {
+  id: string;
+  name: string;
+  type: GeneratorType;
+  params: Record<string, any>;
+}
+
 export interface GenerationJob {
   id: string;
   name: string;
   dataSourceId: string; // Refers to DataSourceDefinition.id
   fileNamePattern: string;
+  // Template mode
   fileContent: string;
+  // Schema mode
+  mode?: 'template' | 'schema';
+  rowCount?: number;
+  schema?: ColumnSchema[];
+
   executionInterval: number;
   enabled: boolean;
 }
@@ -24,22 +40,22 @@ export interface DataSourceSettings {
   jobs: GenerationJob[];
 }
 
-export interface Topic {
+export interface TopicDefinition {
   id: string;
   name: string;
   retentionPeriod: number; // ms
 }
 
+export type Topic = TopicDefinition; // Alias for backward compatibility if needed, or replace usages
+
 export interface CollectionJob {
   id: string;
   name: string;
-  sourceHost: string;
-  sourcePath: string;
+  sourceConnectionId: string; // ConnectionDefinition.id (type='file')
   filterRegex: string;
 
   targetType?: 'host' | 'topic'; // Default: 'host'
-  targetHost: string; // Used when targetType is 'host'
-  targetPath: string; // Used when targetType is 'host'
+  targetConnectionId?: string; // Used when targetType is 'host'
   targetTopicId?: string; // Used when targetType is 'topic'
 
   bandwidth: number; // 帯域幅 (文字数/秒)
@@ -58,12 +74,11 @@ export interface DeliveryJob {
   name: string;
 
   sourceType?: 'host' | 'topic'; // Default: 'host'
-  sourceHost: string; // Used when sourceType is 'host'
-  sourcePath: string; // Used when sourceType is 'host'
+  sourceConnectionId?: string; // Used when sourceType is 'host'
   sourceTopicId?: string; // Used when sourceType is 'topic'
 
-  targetHost: string;
-  targetPath: string;
+  targetConnectionId: string; // ConnectionDefinition.id (type='file')
+
   filterRegex: string;
   bandwidth: number; // 帯域幅 (文字数/秒)
   processingTime: number; // レイテンシ/オーバーヘッド (ms)
@@ -100,7 +115,7 @@ export interface TableDefinition {
   columns: ColumnDefinition[];
 }
 
-// --- IDMC Features ---
+// ... (existing interfaces)
 
 export type ConnectionType = 'file' | 'database';
 
@@ -116,6 +131,24 @@ export interface ConnectionDefinition {
   tableName?: string;    // Default table
 }
 
+export interface DashboardItem {
+  id: string;
+  title?: string;
+  tableId: string;
+  viewType: 'table' | 'chart';
+  filters: DBFilter[];
+  chartConfig?: {
+    xAxis: string;
+    yAxis: string;
+  };
+  refreshInterval: number;
+}
+
+export interface BiDashboardSettings {
+  showDashboard: boolean;
+  items: DashboardItem[];
+}
+
 // ---------------------
 
 interface SettingsContextType {
@@ -127,8 +160,11 @@ interface SettingsContextType {
   setDelivery: (settings: DeliverySettings) => void;
   etl: EtlSettings;
   setEtl: (settings: EtlSettings) => void;
+  biDashboard: BiDashboardSettings;
+  setBiDashboard: (settings: BiDashboardSettings) => void;
 
   hosts: Host[];
+// ... (rest of the interface)
   addHost: (name: string) => void;
   removeHost: (name: string) => void;
   addDirectory: (hostName: string, path: string) => void;
@@ -136,7 +172,7 @@ interface SettingsContextType {
   isHostInUse: (hostName: string) => boolean;
   isDirectoryInUse: (hostName: string, path: string) => boolean;
 
-  topics: Topic[];
+  topics: TopicDefinition[];
   addTopic: (name: string, retentionPeriod: number) => void;
   removeTopic: (id: string) => void;
   updateTopic: (id: string, name: string, retentionPeriod: number) => void;
@@ -185,6 +221,13 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         dataSourceId: 'ds_def_1',
         fileNamePattern: '${host}_data_${timestamp}.csv',
         fileContent: 'col1,col2,col3\nsample,data,123',
+        mode: 'schema',
+        rowCount: 1,
+        schema: [
+          { id: 'c_1', name: 'id', type: 'sequence', params: { start: 1, step: 1 } },
+          { id: 'c_2', name: 'value', type: 'randomInt', params: { min: 0, max: 100 } },
+          { id: 'c_3', name: 'ts', type: 'static', params: { value: '${timestamp}' } }
+        ],
         executionInterval: 1000,
         enabled: true,
       }
@@ -196,12 +239,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       {
         id: 'col_job_1',
         name: 'Default Collection',
-        sourceHost: 'host1',
-        sourcePath: '/source',
+        sourceConnectionId: 'conn_src_host1',
         filterRegex: '.*',
         targetType: 'host',
-        targetHost: 'localhost',
-        targetPath: '/incoming',
+        targetConnectionId: 'conn_incoming',
         bandwidth: 100,
         renamePattern: '${fileName}',
         executionInterval: 1000,
@@ -217,10 +258,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         id: 'del_job_1',
         name: 'Default Delivery',
         sourceType: 'host',
-        sourceHost: 'localhost',
-        sourcePath: '/incoming',
-        targetHost: 'localhost',
-        targetPath: '/internal',
+        sourceConnectionId: 'conn_incoming',
+        targetConnectionId: 'conn_internal',
         filterRegex: '.*',
         bandwidth: 100,
         processingTime: 1000,
@@ -239,13 +278,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     executionInterval: 1000,
   });
 
+  const [biDashboard, setBiDashboard] = useState<BiDashboardSettings>({
+    showDashboard: true,
+    items: [],
+  });
+
   const [hosts, setHosts] = useState<Host[]>([
     { name: 'host1', directories: ['/source'] },
     { name: 'host2', directories: ['/source'] },
     { name: 'localhost', directories: ['/incoming', '/internal'] },
   ]);
 
-  const [topics, setTopics] = useState<Topic[]>([
+  const [topics, setTopics] = useState<TopicDefinition[]>([
     { id: 'topic_1', name: 'SalesData', retentionPeriod: 60000 } // Default 1 min
   ]);
 
@@ -290,6 +334,27 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       name: 'Summary Database',
       type: 'database',
       tableName: 'summary_data'
+    },
+    {
+        id: 'conn_src_host1',
+        name: 'Source (Host1)',
+        type: 'file',
+        host: 'host1',
+        path: '/source'
+    },
+    {
+        id: 'conn_incoming',
+        name: 'Incoming Folder',
+        type: 'file',
+        host: 'localhost',
+        path: '/incoming'
+    },
+    {
+        id: 'conn_internal',
+        name: 'Internal Folder',
+        type: 'file',
+        host: 'localhost',
+        path: '/internal'
     }
   ]);
 
@@ -344,6 +409,24 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+
+        let loadedConnections = parsed.connections || connections;
+
+        const findOrCreateConnection = (host: string, path: string) => {
+            const existing = loadedConnections.find((c: ConnectionDefinition) => c.type === 'file' && c.host === host && c.path === path);
+            if (existing) return existing;
+
+            const newConn: ConnectionDefinition = {
+                id: `conn_${Date.now()}_auto_${Math.floor(Math.random() * 1000)}`,
+                name: `Auto ${host}:${path}`,
+                type: 'file',
+                host,
+                path
+            };
+            loadedConnections = [...loadedConnections, newConn];
+            return newConn;
+        };
+
         if (parsed.dataSource) {
           // Check if it's the new structure
           if (parsed.dataSource.definitions && parsed.dataSource.jobs) {
@@ -368,6 +451,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
                   dataSourceId: defId,
                   fileNamePattern: oldJob.fileNamePattern,
                   fileContent: oldJob.fileContent,
+                  mode: oldJob.mode || 'template', // Default to template for migrated jobs
+                  rowCount: oldJob.rowCount || 1,
+                  schema: oldJob.schema || [],
                   executionInterval: oldJob.executionInterval,
                   enabled: oldJob.enabled
                 });
@@ -375,29 +461,91 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
              setDataSource({ definitions: newDefinitions, jobs: newJobs });
           }
         }
+
         if (parsed.collection) {
-            // Migration for new targetType fields
-            const migratedJobs = parsed.collection.jobs.map((job: any) => ({
-                ...job,
-                targetType: job.targetType || 'host',
-            }));
+            // Migration for new targetType fields AND connection migration
+            const migratedJobs = parsed.collection.jobs.map((job: any) => {
+                let newJob = { ...job, targetType: job.targetType || 'host' };
+
+                // Migrate Source Host/Path -> Connection
+                if (job.sourceHost) {
+                   const conn = findOrCreateConnection(job.sourceHost, job.sourcePath);
+                   newJob.sourceConnectionId = conn.id;
+                   delete newJob.sourceHost;
+                   delete newJob.sourcePath;
+                }
+
+                // Migrate Target Host/Path -> Connection
+                if (newJob.targetType === 'host' && job.targetHost) {
+                   const conn = findOrCreateConnection(job.targetHost, job.targetPath);
+                   newJob.targetConnectionId = conn.id;
+                   delete newJob.targetHost;
+                   delete newJob.targetPath;
+                }
+                return newJob;
+            });
             setCollection({ ...parsed.collection, jobs: migratedJobs });
         }
+
         if (parsed.delivery) {
              // Migration for new sourceType fields
-            const migratedJobs = parsed.delivery.jobs.map((job: any) => ({
-                ...job,
-                sourceType: job.sourceType || 'host',
-            }));
+            const migratedJobs = parsed.delivery.jobs.map((job: any) => {
+                let newJob = { ...job, sourceType: job.sourceType || 'host' };
+
+                // Migrate Source Host/Path -> Connection
+                if (newJob.sourceType === 'host' && job.sourceHost) {
+                   const conn = findOrCreateConnection(job.sourceHost, job.sourcePath);
+                   newJob.sourceConnectionId = conn.id;
+                   delete newJob.sourceHost;
+                   delete newJob.sourcePath;
+                }
+
+                // Migrate Target Host/Path -> Connection
+                if (job.targetHost) {
+                   const conn = findOrCreateConnection(job.targetHost, job.targetPath);
+                   newJob.targetConnectionId = conn.id;
+                   delete newJob.targetHost;
+                   delete newJob.targetPath;
+                }
+
+                return newJob;
+            });
             setDelivery({ ...parsed.delivery, jobs: migratedJobs });
         }
+
         if (parsed.etl) setEtl(parsed.etl);
+        if (parsed.biDashboard) {
+          // Migration for old structure (flat properties to items array)
+          if ('defaultTableId' in parsed.biDashboard) {
+            const old = parsed.biDashboard;
+            const newItem: DashboardItem = {
+              id: 'dashboard_item_1',
+              title: 'Default View',
+              tableId: old.defaultTableId || '',
+              viewType: old.defaultViewType || 'table',
+              filters: [],
+              refreshInterval: old.refreshInterval || 0,
+            };
+            setBiDashboard({
+              showDashboard: old.showDashboard,
+              items: newItem.tableId ? [newItem] : [],
+            });
+          } else {
+            setBiDashboard(parsed.biDashboard);
+          }
+        } else if (parsed.visualization) {
+          // Migration
+          setBiDashboard(prev => ({ ...prev, showDashboard: parsed.visualization.showDashboard }));
+        }
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);
-        if (parsed.connections) setConnections(parsed.connections);
         if (parsed.mappings) setMappings(parsed.mappings);
         if (parsed.mappingTasks) setMappingTasks(parsed.mappingTasks);
+
+        // Finally set connections (which might have been updated during migration)
+        setConnections(loadedConnections);
+
       } catch (e) {
         console.error('Failed to parse settings', e);
       }
@@ -406,7 +554,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const saveSettings = useCallback(() => {
     // Note: We need to update validation logic for Topics and Connections
-    const errors = validateAllSettings(dataSource, collection, delivery, etl, topics);
+    const errors = validateAllSettings(dataSource, collection, delivery, etl, topics, connections);
     if (errors.length > 0) {
       return { success: false, errors };
     }
@@ -416,6 +564,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       collection,
       delivery,
       etl,
+      biDashboard,
       hosts,
       topics,
       tables,
@@ -430,7 +579,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
       console.error("Failed to save settings", e);
       return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
     }
-  }, [dataSource, collection, delivery, etl, hosts, topics, connections, mappings, mappingTasks]);
+  }, [dataSource, collection, delivery, etl, biDashboard, hosts, topics, connections, mappings, mappingTasks]);
 
   const addHost = useCallback((name: string) => {
     setHosts(prev => {
@@ -538,32 +687,42 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const isHostInUse = useCallback((hostName: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName);
+
+    // Check connections first
+    const connectionsUsingHost = connections.filter(c => c.type === 'file' && c.host === hostName).map(c => c.id);
+
     const inCollection = collection.jobs.some(j =>
-        j.sourceHost === hostName || (j.targetType === 'host' && j.targetHost === hostName)
+        (connectionsUsingHost.includes(j.sourceConnectionId)) ||
+        (j.targetType === 'host' && j.targetConnectionId && connectionsUsingHost.includes(j.targetConnectionId))
     );
     const inDelivery = delivery.jobs.some(j =>
-        (j.sourceType === 'host' && j.sourceHost === hostName) || j.targetHost === hostName
+        (j.sourceType === 'host' && j.sourceConnectionId && connectionsUsingHost.includes(j.sourceConnectionId)) ||
+        (j.targetConnectionId && connectionsUsingHost.includes(j.targetConnectionId))
     );
-    const inEtl = etl.sourceHost === hostName;
-    const inConnections = connections.some(c => c.type === 'file' && c.host === hostName);
 
-    return inDataSource || inCollection || inDelivery || inEtl || inConnections;
+    const inEtl = etl.sourceHost === hostName;
+    // const inConnections = connections.some(c => c.type === 'file' && c.host === hostName); // Already checked via connections usage
+
+    return inDataSource || inCollection || inDelivery || inEtl || connectionsUsingHost.length > 0;
   }, [dataSource, collection, delivery, etl, connections]);
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
+
+    const connectionsUsingDir = connections.filter(c => c.type === 'file' && c.host === hostName && c.path === path).map(c => c.id);
+
     const inCollection = collection.jobs.some(j =>
-      (j.sourceHost === hostName && j.sourcePath === path) ||
-      (j.targetType === 'host' && j.targetHost === hostName && j.targetPath === path)
+      (connectionsUsingDir.includes(j.sourceConnectionId)) ||
+      (j.targetType === 'host' && j.targetConnectionId && connectionsUsingDir.includes(j.targetConnectionId))
     );
     const inDelivery = delivery.jobs.some(j =>
-      (j.sourceType === 'host' && j.sourceHost === hostName && j.sourcePath === path) ||
-      (j.targetHost === hostName && j.targetPath === path)
+      (j.sourceType === 'host' && j.sourceConnectionId && connectionsUsingDir.includes(j.sourceConnectionId)) ||
+      (j.targetConnectionId && connectionsUsingDir.includes(j.targetConnectionId))
     );
     const inEtl = etl.sourceHost === hostName && etl.sourcePath === path;
-    const inConnections = connections.some(c => c.type === 'file' && c.host === hostName && c.path === path);
+    // const inConnections = connections.some(c => c.type === 'file' && c.host === hostName && c.path === path);
 
-    return inDataSource || inCollection || inDelivery || inEtl || inConnections;
+    return inDataSource || inCollection || inDelivery || inEtl || connectionsUsingDir.length > 0;
   }, [dataSource, collection, delivery, etl, connections]);
 
   return (
@@ -577,6 +736,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         setDelivery,
         etl,
         setEtl,
+        biDashboard,
+        setBiDashboard,
         hosts,
         addHost,
         removeHost,

@@ -1,4 +1,4 @@
-import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob, Topic } from './SettingsContext';
+import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, DataSourceDefinition, GenerationJob, CollectionJob, DeliveryJob, Topic, ConnectionDefinition } from './SettingsContext';
 
 export interface ValidationError {
   id?: string; // Job ID if applicable
@@ -34,20 +34,35 @@ export const validateGenerationJob = (job: GenerationJob, definitions: DataSourc
 
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (!job.fileNamePattern.trim()) errors.push({ id: job.id, field: 'fileNamePattern', message: 'File Name Pattern is required' });
+
+  if (job.mode === 'schema') {
+    if ((job.rowCount ?? 0) <= 0) {
+      errors.push({ id: job.id, field: 'rowCount', message: 'Row Count must be > 0' });
+    }
+    if (!job.schema || job.schema.length === 0) {
+      errors.push({ id: job.id, field: 'schema', message: 'At least one column is required' });
+    } else {
+      job.schema.forEach((col) => {
+        if (!col.name.trim()) {
+          errors.push({ id: job.id, field: `schema`, message: 'Column Name is required' });
+        }
+      });
+    }
+  }
+
   return errors;
 };
 
 export const validateCollectionJob = (job: CollectionJob): ValidationError[] => {
   const errors: ValidationError[] = [];
   if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
-  if (!job.sourceHost) errors.push({ id: job.id, field: 'sourceHost', message: 'Source Host is required' });
-  if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
+
+  if (!job.sourceConnectionId) errors.push({ id: job.id, field: 'sourceConnectionId', message: 'Source Connection is required' });
 
   if (job.targetType === 'topic') {
       if (!job.targetTopicId) errors.push({ id: job.id, field: 'targetTopicId', message: 'Target Topic is required' });
   } else {
-      if (!job.targetHost) errors.push({ id: job.id, field: 'targetHost', message: 'Target Host is required' });
-      if (!job.targetPath) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
+      if (!job.targetConnectionId) errors.push({ id: job.id, field: 'targetConnectionId', message: 'Target Connection is required' });
   }
 
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
@@ -63,12 +78,10 @@ export const validateDeliveryJob = (job: DeliveryJob): ValidationError[] => {
   if (job.sourceType === 'topic') {
       if (!job.sourceTopicId) errors.push({ id: job.id, field: 'sourceTopicId', message: 'Source Topic is required' });
   } else {
-      if (!job.sourceHost) errors.push({ id: job.id, field: 'sourceHost', message: 'Source Host is required' });
-      if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
+      if (!job.sourceConnectionId) errors.push({ id: job.id, field: 'sourceConnectionId', message: 'Source Connection is required' });
   }
 
-  if (!job.targetHost) errors.push({ id: job.id, field: 'targetHost', message: 'Target Host is required' });
-  if (!job.targetPath) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
+  if (!job.targetConnectionId) errors.push({ id: job.id, field: 'targetConnectionId', message: 'Target Connection is required' });
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (job.processingTime < 0) errors.push({ id: job.id, field: 'processingTime', message: 'Latency cannot be negative' });
@@ -94,12 +107,25 @@ export const validateTopic = (topic: Topic): ValidationError[] => {
     return errors;
 };
 
+export const validateConnection = (conn: ConnectionDefinition): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    if (!conn.name.trim()) errors.push({ id: conn.id, field: 'name', message: 'Connection Name is required' });
+    if (conn.type === 'file') {
+        if (!conn.host) errors.push({ id: conn.id, field: 'host', message: 'Host is required' });
+        if (!conn.path) errors.push({ id: conn.id, field: 'path', message: 'Path is required' });
+    } else if (conn.type === 'database') {
+        if (!conn.tableName) errors.push({ id: conn.id, field: 'tableName', message: 'Table Name is required' });
+    }
+    return errors;
+};
+
 export const validateAllSettings = (
   dataSource: DataSourceSettings,
   collection: CollectionSettings,
   delivery: DeliverySettings,
   etl: EtlSettings,
-  topics: Topic[]
+  topics: Topic[],
+  connections: ConnectionDefinition[] = [] // Optional for backward compatibility if needed, but we pass it
 ): ValidationError[] => {
   let errors: ValidationError[] = [];
 
@@ -126,6 +152,10 @@ export const validateAllSettings = (
 
   topics.forEach(topic => {
       errors = [...errors, ...validateTopic(topic)];
+  });
+
+  connections.forEach(conn => {
+      errors = [...errors, ...validateConnection(conn)];
   });
 
   return errors;

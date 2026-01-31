@@ -1,7 +1,143 @@
 import React from 'react';
-import { useSettings, type DataSourceDefinition, type GenerationJob } from '../../lib/SettingsContext';
-import { validateDataSourceDefinition, validateGenerationJob } from '../../lib/validation';
-import { Trash2, Plus, FolderOpen, FileText } from 'lucide-react';
+import { useSettings, type DataSourceDefinition, type GenerationJob, type ColumnSchema, type GeneratorType } from '../../lib/SettingsContext';
+import { validateDataSourceDefinition, validateGenerationJob, type ValidationError } from '../../lib/validation';
+import { Trash2, Plus, FolderOpen, FileText, AlignJustify, List } from 'lucide-react';
+
+const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list', 'timestamp'];
+
+const ParamInput = ({ label, ...props }: any) => (
+    <div className="flex flex-col">
+        <label className="text-[10px] text-gray-500 font-medium ml-1 mb-0.5">{label}</label>
+        <input className="border rounded p-1 text-sm w-full" {...props} />
+    </div>
+);
+
+const SchemaEditor: React.FC<{
+    schema: ColumnSchema[];
+    onChange: (schema: ColumnSchema[]) => void;
+    errors: ValidationError[];
+    jobId: string;
+}> = ({ schema, onChange }) => {
+
+    const addColumn = () => {
+        const newCol: ColumnSchema = {
+            id: `col_${Date.now()}`,
+            name: `column${schema.length + 1}`,
+            type: 'static',
+            params: { value: '' }
+        };
+        onChange([...schema, newCol]);
+    };
+
+    const removeColumn = (id: string) => {
+        onChange(schema.filter(c => c.id !== id));
+    };
+
+    const updateColumn = (id: string, updates: Partial<ColumnSchema>) => {
+        onChange(schema.map(c => c.id === id ? { ...c, ...updates } : c));
+    };
+
+    const updateParams = (id: string, key: string, value: any) => {
+        const col = schema.find(c => c.id === id);
+        if (!col) return;
+        updateColumn(id, { params: { ...col.params, [key]: value } });
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 border-b pb-1 mb-2">
+                <div className="col-span-3">Column Name</div>
+                <div className="col-span-3">Type</div>
+                <div className="col-span-5">Parameters</div>
+                <div className="col-span-1"></div>
+            </div>
+            {schema.map((col) => (
+                <div key={col.id} className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-3">
+                        <input
+                            type="text"
+                            value={col.name}
+                            onChange={(e) => updateColumn(col.id, { name: e.target.value })}
+                            className="w-full border rounded p-1 text-sm"
+                            placeholder="Name"
+                        />
+                    </div>
+                    <div className="col-span-3">
+                        <select
+                            value={col.type}
+                            onChange={(e) => updateColumn(col.id, { type: e.target.value as GeneratorType, params: {} })}
+                            className="w-full border rounded p-1 text-sm bg-white"
+                        >
+                            {GENERATOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+                    <div className="col-span-5">
+                        {/* Dynamic Params Inputs */}
+                        <div className="grid grid-cols-2 gap-1 items-end">
+                            {col.type === 'static' && (
+                                <div className="col-span-2">
+                                    <ParamInput label="Value (Template)" type="text" value={col.params.value || ''} onChange={(e: any) => updateParams(col.id, 'value', e.target.value)} />
+                                </div>
+                            )}
+                            {col.type === 'randomInt' && (
+                                <>
+                                    <ParamInput label="Min" type="number" value={col.params.min ?? 0} onChange={(e: any) => updateParams(col.id, 'min', e.target.value)} />
+                                    <ParamInput label="Max" type="number" value={col.params.max ?? 100} onChange={(e: any) => updateParams(col.id, 'max', e.target.value)} />
+                                </>
+                            )}
+                            {col.type === 'randomFloat' && (
+                                <>
+                                    <ParamInput label="Min" type="number" value={col.params.min ?? 0} onChange={(e: any) => updateParams(col.id, 'min', e.target.value)} />
+                                    <ParamInput label="Max" type="number" value={col.params.max ?? 1} onChange={(e: any) => updateParams(col.id, 'max', e.target.value)} />
+                                    <div className="col-span-2">
+                                        <ParamInput label="Precision" type="number" value={col.params.precision ?? 2} onChange={(e: any) => updateParams(col.id, 'precision', e.target.value)} />
+                                    </div>
+                                </>
+                            )}
+                            {(col.type === 'sin' || col.type === 'cos') && (
+                                <>
+                                    <ParamInput label="Period (ms)" type="number" value={col.params.period ?? 10000} onChange={(e: any) => updateParams(col.id, 'period', e.target.value)} />
+                                    <ParamInput label="Amplitude" type="number" value={col.params.amplitude ?? 1} onChange={(e: any) => updateParams(col.id, 'amplitude', e.target.value)} />
+                                    <div className="col-span-2">
+                                        <ParamInput label="Offset" type="number" value={col.params.offset ?? 0} onChange={(e: any) => updateParams(col.id, 'offset', e.target.value)} />
+                                    </div>
+                                </>
+                            )}
+                             {col.type === 'sequence' && (
+                                <>
+                                    <ParamInput label="Start" type="number" value={col.params.start ?? 1} onChange={(e: any) => updateParams(col.id, 'start', e.target.value)} />
+                                    <ParamInput label="Step" type="number" value={col.params.step ?? 1} onChange={(e: any) => updateParams(col.id, 'step', e.target.value)} />
+                                </>
+                            )}
+                             {col.type === 'list' && (
+                                <div className="col-span-2">
+                                    <ParamInput label="Values (comma separated)" type="text" value={col.params.values || ''} onChange={(e: any) => updateParams(col.id, 'values', e.target.value)} />
+                                </div>
+                            )}
+                             {col.type === 'uuid' && (
+                                <span className="col-span-2 text-xs text-gray-400 italic flex items-center h-full pt-4">Generates unique ID</span>
+                            )}
+                             {col.type === 'timestamp' && (
+                                <span className="col-span-2 text-xs text-gray-400 italic flex items-center h-full pt-4">Current ISO Timestamp</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                        <button onClick={() => removeColumn(col.id)} className="text-gray-400 hover:text-red-500">
+                            <Trash2 size={16} />
+                        </button>
+                    </div>
+                </div>
+            ))}
+            <button
+                onClick={addColumn}
+                className="w-full flex items-center justify-center gap-2 py-1 border border-dashed border-gray-300 rounded-md text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors text-xs"
+            >
+                <Plus size={14} /> Add Column
+            </button>
+        </div>
+    );
+};
 
 const DataSourceSettings: React.FC = () => {
   const { dataSource, setDataSource, hosts } = useSettings();
@@ -43,8 +179,6 @@ const DataSourceSettings: React.FC = () => {
   };
 
   const removeDefinition = (id: string) => {
-    // Note: We might want to warn if jobs are using this definition, but for now just allow delete.
-    // Validation will flag jobs with missing definitions.
     setDataSource({
       ...dataSource,
       definitions: dataSource.definitions.filter(d => d.id !== id)
@@ -71,6 +205,12 @@ const DataSourceSettings: React.FC = () => {
       dataSourceId: defaultDefId,
       fileNamePattern: '${host}_data_${timestamp}.csv',
       fileContent: 'sample,data,123',
+      mode: 'schema',
+      rowCount: 1,
+      schema: [
+          { id: `c_${Date.now()}_1`, name: 'id', type: 'sequence', params: { start: 1, step: 1 } },
+          { id: `c_${Date.now()}_2`, name: 'value', type: 'randomInt', params: { min: 0, max: 100 } }
+      ],
       executionInterval: 1000,
       enabled: true,
     };
@@ -162,6 +302,7 @@ const DataSourceSettings: React.FC = () => {
           const errors = validateGenerationJob(job, dataSource.definitions);
           const hasError = (field: string) => errors.some(e => e.field === field);
           const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+          const currentMode = job.mode || 'template';
 
           return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
@@ -220,15 +361,59 @@ const DataSourceSettings: React.FC = () => {
                      />
                    </div>
                 </div>
-                <div>
-                     <label className="block text-xs font-medium text-gray-500">File Content Template</label>
-                     <textarea
-                        value={job.fileContent}
-                        onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
-                        className="w-full border rounded p-1 text-sm font-mono h-24"
-                        placeholder="col1,col2,col3&#10;data1,data2,data3"
-                     />
+
+                {/* Mode Selector */}
+                <div className="flex items-center gap-4 border-t pt-3 mt-1">
+                    <label className="text-xs font-medium text-gray-500">Generation Mode:</label>
+                    <div className="flex bg-gray-100 rounded p-1">
+                        <button
+                            onClick={() => handleJobChange(job.id, 'mode', 'template')}
+                            className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'template' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <AlignJustify size={14} /> Template Text
+                        </button>
+                        <button
+                            onClick={() => handleJobChange(job.id, 'mode', 'schema')}
+                            className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'schema' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            <List size={14} /> Schema List
+                        </button>
+                    </div>
                 </div>
+
+                {currentMode === 'template' ? (
+                     <div>
+                         <label className="block text-xs font-medium text-gray-500">File Content Template</label>
+                         <textarea
+                            value={job.fileContent}
+                            onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
+                            className="w-full border rounded p-1 text-sm font-mono h-32"
+                            placeholder="col1,col2,col3&#10;data1,data2,data3"
+                         />
+                    </div>
+                ) : (
+                    <div>
+                         <div className="mb-2">
+                             <label className="block text-xs font-medium text-gray-500 mb-1">Rows per Execution</label>
+                             <input
+                                type="number"
+                                value={job.rowCount || 1}
+                                onChange={(e) => handleJobChange(job.id, 'rowCount', parseInt(e.target.value) || 1)}
+                                className={`w-32 border rounded p-1 text-sm ${hasError('rowCount') ? 'border-red-500' : ''}`}
+                             />
+                         </div>
+                         <label className="block text-xs font-medium text-gray-500 mb-1">Column Definitions</label>
+                         {hasError('schema') && <p className="text-xs text-red-500 mb-1">{getErrorMsg('schema')}</p>}
+                         <div className="border rounded p-2 bg-gray-50">
+                             <SchemaEditor
+                                schema={job.schema || []}
+                                onChange={(newSchema) => handleJobChange(job.id, 'schema', newSchema)}
+                                errors={errors}
+                                jobId={job.id}
+                             />
+                         </div>
+                    </div>
+                )}
              </div>
           </div>
         );

@@ -10,6 +10,12 @@
 
 ## Functional Requirements
 
+### FR4.1: 冪等性担保 (Idempotency)
+- ターゲットノードにて、データの重複登録を防ぐ設定を追加
+- 重複判定キー（Deduplication Keys）の指定
+- 重複時のアクション設定（Ignore, Update, Error）
+
+
 ### FR1: データソース生成
 - ユーザーが定義したパターンでソースファイルを自動生成
 - タイムスタンプ付きファイル名（ミリ秒精度で一意性保証）
@@ -30,6 +36,9 @@
 - Expression による計算フィールド追加
 - Filter による行選択
 - ファイル名列追加機能（IDMC CDI 類似）
+- 冪等性担保（Idempotency）のシミュレーション
+  - ターゲットへの書き込み時に重複チェックを実施
+  - 重複時の挙動（Ignore/Update/Error）を選択可能
 
 ### FR5: 仮想データベース
 - テーブル定義とスキーマ管理
@@ -39,6 +48,17 @@
 ### FR6: 実行制御
 - ジョブ種別ごとの独立制御（生成/収集配信/マッピング）
 - 個別および一括開始・停止
+
+### FR7: 運用監視 (Job Monitoring)
+- 全ジョブ（Collection, Delivery, Mapping）の実行履歴を記録
+- ステータス（Success/Failed/Running）、処理時間、処理件数の可視化
+- エラー発生時の詳細メッセージ表示
+- ジョブ履歴のフィルタリングと閲覧機能
+- **詳細ドリルダウン機能**:
+  - 各実行ログをクリックすることで詳細ビューを表示
+  - マッピング処理: 各変換ノード（Transformation）ごとの入力/出力/エラー/除外件数を表示
+  - 転送処理（Collection/Delivery）: 処理ファイル名、サイズ、理論上のスループットを表示
+  - エラー詳細: リジェクトされた行データや、スタックトレース/エラーメッセージの構造化表示
 
 ---
 
@@ -57,6 +77,12 @@
 3. マッピング設定を編集
 4. 「Mapping」を再開して処理確認
 
+### US3: 運用状況のモニタリング
+1. ユーザーが「Monitor」タブを開く
+2. 最近実行されたジョブの一覧とステータスを確認
+3. エラーになったジョブ（赤色表示）をクリックして詳細を確認
+4. 問題を特定し、設定を修正して再実行
+
 ---
 
 ## Success Criteria
@@ -65,6 +91,7 @@
 - ファイル処理状況がリアルタイムでUI反映
 - 各ジョブタイプを独立して制御可能
 - コンソールログで処理統計を確認可能
+- 実行履歴がUI上で確認でき、エラー特定が容易であること
 
 ---
 
@@ -85,6 +112,13 @@
 ### MappingTask
 - mappingId, executionInterval
 - enabled flag
+
+### JobExecutionLog
+- jobId, jobName, jobType
+- status (Success/Failed)
+- startTime, endTime
+- recordCount (input/output)
+- errorMessage
 
 ---
 

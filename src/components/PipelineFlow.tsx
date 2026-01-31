@@ -122,11 +122,22 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     // Collection/Delivery targets
     const otherKeys = new Set<string>();
     collection.jobs.forEach(j => {
-      if (j.targetType === 'topic' && j.targetTopicId) otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
-      else otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
+      if (j.targetType === 'topic' && j.targetTopicId) {
+          otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
+      } else if (j.targetConnectionId) {
+          const conn = connections.find(c => c.id === j.targetConnectionId);
+          if (conn && conn.type === 'file' && conn.host && conn.path) {
+              otherKeys.add(getLegacyKey(conn.host, conn.path));
+          }
+      }
     });
     delivery.jobs.forEach(j => {
-      otherKeys.add(getLegacyKey(j.targetHost, j.targetPath));
+      if (j.targetConnectionId) {
+          const conn = connections.find(c => c.id === j.targetConnectionId);
+          if (conn && conn.type === 'file' && conn.host && conn.path) {
+              otherKeys.add(getLegacyKey(conn.host, conn.path));
+          }
+      }
     });
 
     let rowIndex = 0;
@@ -156,10 +167,19 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     collection.jobs.forEach((job) => {
       if (!job.enabled) return;
-      let targetHost = job.targetHost, targetPath = job.targetPath;
-      if (job.targetType === 'topic' && job.targetTopicId) { targetHost = 'localhost'; targetPath = `/topics/${job.targetTopicId}`; }
+      let targetHost = '', targetPath = '';
+      if (job.targetType === 'topic' && job.targetTopicId) {
+          targetHost = 'localhost'; targetPath = `/topics/${job.targetTopicId}`;
+      } else {
+          const conn = connections.find(c => c.id === job.targetConnectionId);
+          if (conn && conn.type === 'file') { targetHost = conn.host!; targetPath = conn.path!; }
+      }
 
-      const srcNode = keyNodeMap.get(getLegacyKey(job.sourceHost, job.sourcePath));
+      let sourceHost = '', sourcePath = '';
+      const srcConn = connections.find(c => c.id === job.sourceConnectionId);
+      if (srcConn && srcConn.type === 'file') { sourceHost = srcConn.host!; sourcePath = srcConn.path!; }
+
+      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
       const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
       if (srcNode && tgtNode) {
         const id = `process-col-${job.id}`;
@@ -175,11 +195,20 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     delivery.jobs.forEach((job) => {
       if (!job.enabled) return;
-      let sourceHost = job.sourceHost, sourcePath = job.sourcePath;
-      if (job.sourceType === 'topic' && job.sourceTopicId) { sourceHost = 'localhost'; sourcePath = `/topics/${job.sourceTopicId}`; }
+      let sourceHost = '', sourcePath = '';
+      if (job.sourceType === 'topic' && job.sourceTopicId) {
+          sourceHost = 'localhost'; sourcePath = `/topics/${job.sourceTopicId}`;
+      } else {
+          const conn = connections.find(c => c.id === job.sourceConnectionId);
+          if (conn && conn.type === 'file') { sourceHost = conn.host!; sourcePath = conn.path!; }
+      }
+
+      let targetHost = '', targetPath = '';
+      const tgtConn = connections.find(c => c.id === job.targetConnectionId);
+      if (tgtConn && tgtConn.type === 'file') { targetHost = tgtConn.host!; targetPath = tgtConn.path!; }
 
       const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
-      const tgtNode = keyNodeMap.get(getLegacyKey(job.targetHost, job.targetPath));
+      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
       if (srcNode && tgtNode) {
         const id = `process-del-${job.id}`;
         calculatedNodes.push({

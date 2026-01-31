@@ -26,9 +26,48 @@ import {
     type TargetConfig,
     type FilterConfig,
     type ExpressionConfig,
-    type AggregatorConfig
+    type AggregatorConfig,
+    type ValidatorConfig,
+    type JoinerConfig,
+    type LookupConfig,
+    type RouterConfig,
+    type SorterConfig,
+    type UnionConfig,
+    type NormalizerConfig,
+    type RankConfig,
+    type SequenceConfig,
+    type UpdateStrategyConfig,
+    type CleansingConfig,
+    type DeduplicatorConfig,
+    type PivotConfig,
+    type UnpivotConfig,
+    type SqlConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles, Copy, Table, Columns, Database } from 'lucide-react';
+
+// --- Constants ---
+const TRANSFORMATION_TYPES = [
+    { type: 'source', label: 'Source', short: 'SRC', bg: 'bg-green-100', border: 'border-green-500', icon: null },
+    { type: 'filter', label: 'Filter', short: 'FLT', bg: 'bg-yellow-100', border: 'border-yellow-500', icon: null },
+    { type: 'expression', label: 'Expression', short: 'EXP', bg: 'bg-purple-100', border: 'border-purple-500', icon: null },
+    { type: 'aggregator', label: 'Aggregator', short: 'AGG', bg: 'bg-orange-100', border: 'border-orange-500', icon: null },
+    { type: 'validator', label: 'Validator', short: null, bg: 'bg-pink-100', border: 'border-pink-500', icon: CheckSquare },
+    { type: 'joiner', label: 'Joiner', short: 'JOIN', bg: 'bg-blue-100', border: 'border-blue-500', icon: null },
+    { type: 'lookup', label: 'Lookup', short: null, bg: 'bg-cyan-100', border: 'border-cyan-500', icon: Search },
+    { type: 'router', label: 'Router', short: null, bg: 'bg-lime-100', border: 'border-lime-500', icon: GitFork },
+    { type: 'sorter', label: 'Sorter', short: null, bg: 'bg-amber-100', border: 'border-amber-500', icon: ArrowUpDown },
+    { type: 'union', label: 'Union', short: null, bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Merge },
+    { type: 'normalizer', label: 'Normalizer', short: null, bg: 'bg-violet-100', border: 'border-violet-500', icon: Repeat },
+    { type: 'rank', label: 'Rank', short: null, bg: 'bg-rose-100', border: 'border-rose-500', icon: Award },
+    { type: 'sequence', label: 'Sequence', short: null, bg: 'bg-sky-100', border: 'border-sky-500', icon: Hash },
+    { type: 'updateStrategy', label: 'Update Strategy', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Flag },
+    { type: 'cleansing', label: 'Cleansing', short: null, bg: 'bg-teal-100', border: 'border-teal-500', icon: Sparkles },
+    { type: 'deduplicator', label: 'Deduplicator', short: null, bg: 'bg-orange-100', border: 'border-orange-500', icon: Copy },
+    { type: 'pivot', label: 'Pivot', short: null, bg: 'bg-purple-100', border: 'border-purple-500', icon: Table },
+    { type: 'unpivot', label: 'Unpivot', short: null, bg: 'bg-fuchsia-100', border: 'border-fuchsia-500', icon: Columns },
+    { type: 'sql', label: 'SQL', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Database },
+    { type: 'target', label: 'Target', short: 'TGT', bg: 'bg-red-100', border: 'border-red-500', icon: null },
+];
 
 // --- Custom Nodes for Designer ---
 const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean } }) => {
@@ -136,6 +175,21 @@ const MappingDesigner: React.FC = () => {
         if (type === 'filter') newTrans.config = { condition: 'true' } as FilterConfig;
         if (type === 'expression') newTrans.config = { fields: [] } as ExpressionConfig;
         if (type === 'aggregator') newTrans.config = { groupBy: [], aggregates: [] } as AggregatorConfig;
+        if (type === 'validator') newTrans.config = { rules: [], errorBehavior: 'skip' } as ValidatorConfig;
+        if (type === 'joiner') newTrans.config = { joinType: 'inner', masterKeys: [], detailKeys: [] } as JoinerConfig;
+        if (type === 'lookup') newTrans.config = { connectionId: '', lookupKeys: [], referenceKeys: [], returnFields: [], defaultValue: '' } as LookupConfig;
+        if (type === 'router') newTrans.config = { routes: [], defaultGroup: 'default' } as RouterConfig;
+        if (type === 'sorter') newTrans.config = { sortFields: [] } as SorterConfig;
+        if (type === 'union') newTrans.config = {} as UnionConfig;
+        if (type === 'normalizer') newTrans.config = { arrayField: '', outputFields: [], keepOriginalFields: true } as NormalizerConfig;
+        if (type === 'rank') newTrans.config = { partitionBy: [], orderBy: [], rankField: 'rank', rankType: 'rowNumber' } as RankConfig;
+        if (type === 'sequence') newTrans.config = { sequenceField: 'seq', startValue: 1, incrementBy: 1 } as SequenceConfig;
+        if (type === 'updateStrategy') newTrans.config = { strategyField: '_strategy', defaultStrategy: 'insert', conditions: [] } as UpdateStrategyConfig;
+        if (type === 'cleansing') newTrans.config = { rules: [] } as CleansingConfig;
+        if (type === 'deduplicator') newTrans.config = { keys: [], caseInsensitive: false } as DeduplicatorConfig;
+        if (type === 'pivot') newTrans.config = { groupByFields: [], pivotField: '', valueField: '' } as PivotConfig;
+        if (type === 'unpivot') newTrans.config = { fieldsToUnpivot: [], newHeaderFieldName: 'Metric', newValueFieldName: 'Value' } as UnpivotConfig;
+        if (type === 'sql') newTrans.config = { sqlQuery: '', mode: 'query' } as SqlConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -437,16 +491,69 @@ const MappingDesigner: React.FC = () => {
                 )}
 
                 {node.type === 'target' && (
-                    <div>
-                        <label className="block text-xs text-gray-500">Connection</label>
-                        <select
-                            className="w-full border rounded p-1 text-sm"
-                            value={(node.config as TargetConfig).connectionId}
-                            onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
-                        >
-                            <option value="">Select Connection</option>
-                            {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Connection</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as TargetConfig).connectionId}
+                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                            >
+                                <option value="">Select Connection</option>
+                                {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Update Columns (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id, key_col"
+                                value={(node.config as TargetConfig).updateColumns?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    updateColumns: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Required for Update/Delete strategies</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id={`truncate-${node.id}`}
+                                checked={(node.config as TargetConfig).truncate || false}
+                                onChange={e => updateTransformationConfig(node.id, { truncate: e.target.checked })}
+                            />
+                            <label htmlFor={`truncate-${node.id}`} className="text-xs text-gray-700">Truncate Table before load</label>
+                        </div>
+                        <div className="border-t pt-2 mt-2">
+                            <h4 className="text-xs font-semibold mb-2 text-gray-700">Idempotency Settings</h4>
+                            <div className="space-y-2">
+                                <div>
+                                    <label className="block text-xs text-gray-500">Deduplication Keys (comma-separated)</label>
+                                    <input
+                                        className="w-full border rounded p-1 text-sm font-mono"
+                                        placeholder="e.g. id, key"
+                                        value={(node.config as TargetConfig).deduplicationKeys?.join(', ') || ''}
+                                        onChange={e => updateTransformationConfig(node.id, {
+                                            deduplicationKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                        })}
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Keys to check for duplicates before insert</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500">Duplicate Behavior</label>
+                                    <select
+                                        className="w-full border rounded p-1 text-sm"
+                                        value={(node.config as TargetConfig).duplicateBehavior || ''}
+                                        onChange={e => updateTransformationConfig(node.id, { duplicateBehavior: e.target.value })}
+                                    >
+                                        <option value="">None (Insert Always)</option>
+                                        <option value="error">Error</option>
+                                        <option value="ignore">Ignore (Skip)</option>
+                                        <option value="update">Update</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -527,6 +634,719 @@ const MappingDesigner: React.FC = () => {
                         </p>
                     </div>
                 )}
+
+                {/* Validator Editor */}
+                {node.type === 'validator' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Error Behavior</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as ValidatorConfig).errorBehavior}
+                                onChange={e => updateTransformationConfig(node.id, { errorBehavior: e.target.value })}
+                            >
+                                <option value="skip">Skip Row</option>
+                                <option value="error">Fail Job</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Validation Rules</label>
+                            <button
+                                onClick={() => {
+                                    const currentRules = (node.config as ValidatorConfig).rules || [];
+                                    updateTransformationConfig(node.id, {
+                                        rules: [...currentRules, { field: '', type: 'string', required: false }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Rule
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as ValidatorConfig).rules || []).map((rule, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-2">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Field name"
+                                            value={rule.field}
+                                            onChange={e => {
+                                                const rules = [...(node.config as ValidatorConfig).rules];
+                                                rules[idx] = { ...rules[idx], field: e.target.value };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const rules = (node.config as ValidatorConfig).rules.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <label className="flex items-center gap-1 text-xs cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.required}
+                                                onChange={e => {
+                                                    const rules = [...(node.config as ValidatorConfig).rules];
+                                                    rules[idx] = { ...rules[idx], required: e.target.checked };
+                                                    updateTransformationConfig(node.id, { rules });
+                                                }}
+                                            />
+                                            Req
+                                        </label>
+                                        <select
+                                            className="border rounded p-0.5 text-xs flex-grow"
+                                            value={rule.type}
+                                            onChange={e => {
+                                                const rules = [...(node.config as ValidatorConfig).rules];
+                                                rules[idx] = { ...rules[idx], type: e.target.value as any };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        >
+                                            <option value="string">String</option>
+                                            <option value="number">Number</option>
+                                            <option value="boolean">Boolean</option>
+                                        </select>
+                                    </div>
+                                    <input
+                                        className="w-full border rounded p-1 text-xs font-mono"
+                                        placeholder="Regex (optional)"
+                                        value={rule.regex || ''}
+                                        onChange={e => {
+                                            const rules = [...(node.config as ValidatorConfig).rules];
+                                            rules[idx] = { ...rules[idx], regex: e.target.value };
+                                            updateTransformationConfig(node.id, { rules });
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                            {((node.config as ValidatorConfig).rules || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No validation rules defined.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Joiner Editor */}
+                {node.type === 'joiner' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Join Type</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as JoinerConfig).joinType}
+                                onChange={e => updateTransformationConfig(node.id, { joinType: e.target.value })}
+                            >
+                                <option value="inner">Inner Join</option>
+                                <option value="left">Left Outer Join</option>
+                                <option value="right">Right Outer Join</option>
+                                <option value="full">Full Outer Join</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Master Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id, customer_id"
+                                value={(node.config as JoinerConfig).masterKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    masterKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys from the first (master) input</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Detail Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id, cust_id"
+                                value={(node.config as JoinerConfig).detailKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    detailKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys from the second (detail) input</p>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded p-2 text-[10px] text-blue-700">
+                            <strong>Note:</strong> Joiner requires 2 source connections. The first connected source is the master, the second is the detail.
+                        </div>
+                    </div>
+                )}
+
+                {/* Lookup Editor */}
+                {node.type === 'lookup' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Lookup Connection (Database)</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as LookupConfig).connectionId}
+                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                            >
+                                <option value="">Select Connection</option>
+                                {connections.filter(c => c.type === 'database').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Lookup Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. customer_id"
+                                value={(node.config as LookupConfig).lookupKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    lookupKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys from input data</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Reference Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. id"
+                                value={(node.config as LookupConfig).referenceKeys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    referenceKeys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Keys in lookup table</p>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Return Fields (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. name, category"
+                                value={(node.config as LookupConfig).returnFields?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    returnFields: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Default Value (if no match)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm"
+                                placeholder="e.g. Unknown"
+                                value={(node.config as LookupConfig).defaultValue || ''}
+                                onChange={e => updateTransformationConfig(node.id, { defaultValue: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Router Editor */}
+                {node.type === 'router' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Default Group</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm"
+                                placeholder="default"
+                                value={(node.config as RouterConfig).defaultGroup || 'default'}
+                                onChange={e => updateTransformationConfig(node.id, { defaultGroup: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Routes</label>
+                            <button
+                                onClick={() => {
+                                    const currentRoutes = (node.config as RouterConfig).routes || [];
+                                    updateTransformationConfig(node.id, {
+                                        routes: [...currentRoutes, { condition: '', groupName: `group_${currentRoutes.length + 1}` }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Route
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as RouterConfig).routes || []).map((route, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Group name"
+                                            value={route.groupName}
+                                            onChange={e => {
+                                                const routes = [...(node.config as RouterConfig).routes];
+                                                routes[idx] = { ...routes[idx], groupName: e.target.value };
+                                                updateTransformationConfig(node.id, { routes });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const routes = (node.config as RouterConfig).routes.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { routes });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <input
+                                        className="w-full border rounded p-1 text-xs font-mono"
+                                        placeholder="Condition (e.g. amount > 1000)"
+                                        value={route.condition}
+                                        onChange={e => {
+                                            const routes = [...(node.config as RouterConfig).routes];
+                                            routes[idx] = { ...routes[idx], condition: e.target.value };
+                                            updateTransformationConfig(node.id, { routes });
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                            {((node.config as RouterConfig).routes || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No routes defined. All rows go to default group.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Sorter Editor */}
+                {node.type === 'sorter' && (
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Sort Fields</label>
+                            <button
+                                onClick={() => {
+                                    const currentFields = (node.config as SorterConfig).sortFields || [];
+                                    updateTransformationConfig(node.id, {
+                                        sortFields: [...currentFields, { field: '', direction: 'asc' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Field
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as SorterConfig).sortFields || []).map((sf, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 flex gap-2 items-center">
+                                    <input
+                                        className="flex-1 border rounded p-1 text-xs"
+                                        placeholder="Field name"
+                                        value={sf.field}
+                                        onChange={e => {
+                                            const sortFields = [...(node.config as SorterConfig).sortFields];
+                                            sortFields[idx] = { ...sortFields[idx], field: e.target.value };
+                                            updateTransformationConfig(node.id, { sortFields });
+                                        }}
+                                    />
+                                    <select
+                                        className="border rounded p-1 text-xs"
+                                        value={sf.direction}
+                                        onChange={e => {
+                                            const sortFields = [...(node.config as SorterConfig).sortFields];
+                                            sortFields[idx] = { ...sortFields[idx], direction: e.target.value as 'asc' | 'desc' };
+                                            updateTransformationConfig(node.id, { sortFields });
+                                        }}
+                                    >
+                                        <option value="asc">ASC</option>
+                                        <option value="desc">DESC</option>
+                                    </select>
+                                    <button
+                                        onClick={() => {
+                                            const sortFields = (node.config as SorterConfig).sortFields.filter((_, i) => i !== idx);
+                                            updateTransformationConfig(node.id, { sortFields });
+                                        }}
+                                        className="text-red-500 hover:text-red-700 text-xs"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {((node.config as SorterConfig).sortFields || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No sort fields defined.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Union Info */}
+                {node.type === 'union' && (
+                    <div className="space-y-3">
+                        <div className="bg-indigo-50 border border-indigo-200 rounded p-2 text-[10px] text-indigo-700">
+                            <strong>Union:</strong> Merges multiple input streams into one.
+                            Connect 2+ sources to this node. All rows from all inputs will be combined.
+                        </div>
+                        <p className="text-xs text-gray-500">No additional configuration required.</p>
+                    </div>
+                )}
+
+                {/* Normalizer Editor */}
+                {node.type === 'normalizer' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Array Field (to expand)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. items"
+                                value={(node.config as NormalizerConfig).arrayField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { arrayField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Output Fields (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. item_name, item_value"
+                                value={(node.config as NormalizerConfig).outputFields?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    outputFields: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={(node.config as NormalizerConfig).keepOriginalFields !== false}
+                                onChange={e => updateTransformationConfig(node.id, { keepOriginalFields: e.target.checked })}
+                            />
+                            <label className="text-xs text-gray-500">Keep original fields</label>
+                        </div>
+                    </div>
+                )}
+
+                {/* Rank Editor */}
+                {node.type === 'rank' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Rank Field Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="rank"
+                                value={(node.config as RankConfig).rankField || 'rank'}
+                                onChange={e => updateTransformationConfig(node.id, { rankField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Rank Type</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as RankConfig).rankType || 'rowNumber'}
+                                onChange={e => updateTransformationConfig(node.id, { rankType: e.target.value })}
+                            >
+                                <option value="rowNumber">Row Number</option>
+                                <option value="rank">Rank (gaps)</option>
+                                <option value="denseRank">Dense Rank (no gaps)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Partition By (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. department"
+                                value={(node.config as RankConfig).partitionBy?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    partitionBy: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Order By (field:asc/desc, comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. salary:desc"
+                                value={(node.config as RankConfig).orderBy?.map(o => `${o.field}:${o.direction}`).join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    orderBy: e.target.value.split(',').map(s => {
+                                        const [field, dir] = s.trim().split(':');
+                                        return { field, direction: (dir === 'desc' ? 'desc' : 'asc') as 'asc' | 'desc' };
+                                    }).filter(o => o.field)
+                                })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Sequence Editor */}
+                {node.type === 'sequence' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Sequence Field Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="seq"
+                                value={(node.config as SequenceConfig).sequenceField || 'seq'}
+                                onChange={e => updateTransformationConfig(node.id, { sequenceField: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs text-gray-500">Start Value</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded p-1 text-sm"
+                                    value={(node.config as SequenceConfig).startValue ?? 1}
+                                    onChange={e => updateTransformationConfig(node.id, { startValue: parseInt(e.target.value) || 1 })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500">Increment By</label>
+                                <input
+                                    type="number"
+                                    className="w-full border rounded p-1 text-sm"
+                                    value={(node.config as SequenceConfig).incrementBy ?? 1}
+                                    onChange={e => updateTransformationConfig(node.id, { incrementBy: parseInt(e.target.value) || 1 })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* UpdateStrategy Editor */}
+                {node.type === 'updateStrategy' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Strategy Field Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="_strategy"
+                                value={(node.config as UpdateStrategyConfig).strategyField || '_strategy'}
+                                onChange={e => updateTransformationConfig(node.id, { strategyField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Default Strategy</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as UpdateStrategyConfig).defaultStrategy || 'insert'}
+                                onChange={e => updateTransformationConfig(node.id, { defaultStrategy: e.target.value })}
+                            >
+                                <option value="insert">Insert</option>
+                                <option value="update">Update</option>
+                                <option value="delete">Delete</option>
+                                <option value="reject">Reject</option>
+                            </select>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded p-2 text-[10px] text-slate-600">
+                            <strong>Tip:</strong> Rows will have the strategy field set based on conditions or default.
+                        </div>
+                    </div>
+                )}
+
+                {/* Cleansing Editor */}
+                {node.type === 'cleansing' && (
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Cleansing Rules</label>
+                            <button
+                                onClick={() => {
+                                    const currentRules = (node.config as CleansingConfig).rules || [];
+                                    updateTransformationConfig(node.id, {
+                                        rules: [...currentRules, { field: '', operation: 'trim' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Rule
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as CleansingConfig).rules || []).map((rule, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Field name"
+                                            value={rule.field}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                rules[idx] = { ...rules[idx], field: e.target.value };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                        <select
+                                            className="border rounded p-1 text-xs"
+                                            value={rule.operation}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                rules[idx] = { ...rules[idx], operation: e.target.value as any };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        >
+                                            <option value="trim">Trim</option>
+                                            <option value="upper">Uppercase</option>
+                                            <option value="lower">Lowercase</option>
+                                            <option value="nullToDefault">Null to Default</option>
+                                            <option value="replace">Replace</option>
+                                        </select>
+                                        <button
+                                            onClick={() => {
+                                                const rules = (node.config as CleansingConfig).rules.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    {(rule.operation === 'nullToDefault' || rule.operation === 'replace') && (
+                                        <input
+                                            className="w-full border rounded p-1 text-xs"
+                                            placeholder="Default/Replace value"
+                                            value={rule.defaultValue || rule.replaceWith || ''}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                if (rule.operation === 'nullToDefault') {
+                                                    rules[idx] = { ...rules[idx], defaultValue: e.target.value };
+                                                } else {
+                                                    rules[idx] = { ...rules[idx], replaceWith: e.target.value };
+                                                }
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                    )}
+                                    {rule.operation === 'replace' && (
+                                        <input
+                                            className="w-full border rounded p-1 text-xs"
+                                            placeholder="Pattern (regex)"
+                                            value={rule.replacePattern || ''}
+                                            onChange={e => {
+                                                const rules = [...(node.config as CleansingConfig).rules];
+                                                rules[idx] = { ...rules[idx], replacePattern: e.target.value };
+                                                updateTransformationConfig(node.id, { rules });
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                            {((node.config as CleansingConfig).rules || []).length === 0 && (
+                                <p className="text-xs text-gray-400 italic">No rules defined.</p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Deduplicator Editor */}
+                {node.type === 'deduplicator' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Unique Keys (comma-separated)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. email, date"
+                                value={(node.config as DeduplicatorConfig).keys?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    keys: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">Leave empty to use all fields</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={(node.config as DeduplicatorConfig).caseInsensitive || false}
+                                onChange={e => updateTransformationConfig(node.id, { caseInsensitive: e.target.checked })}
+                            />
+                            <label className="text-xs text-gray-500">Case Insensitive</label>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pivot Editor */}
+                {node.type === 'pivot' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Group By Fields</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. region, year"
+                                value={(node.config as PivotConfig).groupByFields?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    groupByFields: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Pivot Field (Column Header Source)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. month"
+                                value={(node.config as PivotConfig).pivotField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { pivotField: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Value Field</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. sales"
+                                value={(node.config as PivotConfig).valueField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { valueField: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Unpivot Editor */}
+                {node.type === 'unpivot' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Fields to Unpivot</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. jan_sales, feb_sales, mar_sales"
+                                value={(node.config as UnpivotConfig).fieldsToUnpivot?.join(', ') || ''}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    fieldsToUnpivot: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                                })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">New Header Column Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. month"
+                                value={(node.config as UnpivotConfig).newHeaderFieldName || 'Metric'}
+                                onChange={e => updateTransformationConfig(node.id, { newHeaderFieldName: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">New Value Column Name</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. sales_amount"
+                                value={(node.config as UnpivotConfig).newValueFieldName || 'Value'}
+                                onChange={e => updateTransformationConfig(node.id, { newValueFieldName: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* SQL Editor */}
+                {node.type === 'sql' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">SQL Query (Simulation Only)</label>
+                            <textarea
+                                className="w-full border rounded p-1 text-sm font-mono h-24"
+                                placeholder="SELECT * FROM table WHERE ..."
+                                value={(node.config as SqlConfig).sqlQuery || ''}
+                                onChange={e => updateTransformationConfig(node.id, { sqlQuery: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Mode</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as SqlConfig).mode || 'query'}
+                                onChange={e => updateTransformationConfig(node.id, { mode: e.target.value as any })}
+                            >
+                                <option value="query">Query</option>
+                                <option value="procedure">Procedure</option>
+                                <option value="script">Script</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     };
@@ -552,12 +1372,20 @@ const MappingDesigner: React.FC = () => {
 
                 <div className="flex-grow flex flex-col md:flex-row overflow-hidden relative">
                     {/* Toolbar */}
-                    <div className="w-full md:w-12 h-auto md:h-full bg-gray-100 border-t md:border-t-0 md:border-r flex flex-row md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-4 order-last md:order-first shrink-0">
-                        <button title="Add Source" onClick={() => addTransformation('source')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-green-100 border-green-500 border rounded flex items-center justify-center text-[10px]">SRC</div></button>
-                        <button title="Add Filter" onClick={() => addTransformation('filter')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-yellow-100 border-yellow-500 border rounded flex items-center justify-center text-[10px]">FLT</div></button>
-                        <button title="Add Expression" onClick={() => addTransformation('expression')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-purple-100 border-purple-500 border rounded flex items-center justify-center text-[10px]">EXP</div></button>
-                        <button title="Add Aggregator" onClick={() => addTransformation('aggregator')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-orange-100 border-orange-500 border rounded flex items-center justify-center text-[10px]">AGG</div></button>
-                        <button title="Add Target" onClick={() => addTransformation('target')} className="p-1 rounded hover:bg-gray-200"><div className="w-8 h-8 bg-red-100 border-red-500 border rounded flex items-center justify-center text-[10px]">TGT</div></button>
+                    <div className="w-full md:w-48 h-auto md:h-full bg-gray-100 border-t md:border-t-0 md:border-r flex flex-row md:flex-col items-center md:items-stretch justify-start py-2 gap-2 overflow-x-auto md:overflow-y-auto order-last md:order-first shrink-0 px-2">
+                        {TRANSFORMATION_TYPES.map((t) => (
+                            <button
+                                key={t.type}
+                                title={`Add ${t.label}`}
+                                onClick={() => addTransformation(t.type as TransformationType)}
+                                className="flex items-center gap-2 p-1 rounded hover:bg-gray-200 group transition-colors"
+                            >
+                                <div className={`w-8 h-8 ${t.bg} ${t.border} border rounded flex items-center justify-center text-[10px] shrink-0`}>
+                                    {t.icon ? <t.icon size={12} /> : t.short}
+                                </div>
+                                <span className="text-sm text-gray-700 hidden md:block whitespace-nowrap">{t.label}</span>
+                            </button>
+                        ))}
                     </div>
 
                     {/* Canvas */}

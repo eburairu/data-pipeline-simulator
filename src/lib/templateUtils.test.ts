@@ -15,9 +15,9 @@ describe('templateUtils', () => {
   });
 
   it('should replace timestamp with default format', () => {
-    // Default format is YYYYMMDDHHmmss (local time)
+    // Default format is YYYYMMDDHHmmssSSS (local time with milliseconds)
     const result = processTemplate('file_${timestamp}.csv', context);
-    expect(result).toMatch(/file_\d{14}\.csv/);
+    expect(result).toMatch(/file_\d{17}\.csv/);
   });
 
   it('should replace timestamp with specified format', () => {
@@ -35,8 +35,8 @@ describe('templateUtils', () => {
   });
 
   it('should handle milliseconds', () => {
-     const result = processTemplate('${timestamp:SSS}', context);
-     expect(result).toBe('123');
+    const result = processTemplate('${timestamp:SSS}', context);
+    expect(result).toBe('123');
   });
 
   it('should replace collectionHost', () => {
