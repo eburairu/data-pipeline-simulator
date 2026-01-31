@@ -20,7 +20,9 @@ import {
     type DeduplicatorConfig,
     type PivotConfig,
     type UnpivotConfig,
-    type SqlConfig
+    type SqlConfig,
+    type WebServiceConfig,
+    type HierarchyParserConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 import { ExpressionFunctions } from './ExpressionFunctions';
@@ -81,6 +83,29 @@ const evaluateExpression = (record: any, expression: string, parameters: Record<
 const substituteParams = (str: string, params: Record<string, string>): string => {
     if (!str || typeof str !== 'string') return str;
     return str.replace(/\$\{(\w+)\}/g, (_, key) => params[key] || '');
+};
+
+// Helper to get nested value
+const getValueByPath = (obj: any, path: string): any => {
+    if (!path) return undefined;
+    // Simple split by dot, handling array index like "items[0]"
+    const parts = path.split('.');
+    let current = obj;
+    for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+        if (arrayMatch) {
+            current = current[arrayMatch[1]];
+            if (current && Array.isArray(current)) {
+                current = current[parseInt(arrayMatch[2])];
+            } else {
+                return undefined;
+            }
+        } else {
+            current = current[part];
+        }
+    }
+    return current;
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -715,6 +740,74 @@ const traverseAsync = async (
                         }
                     }
                     processedBatch = batch.map(row => ({ ...row, _sql_status: 'success' }));
+                    break;
+                }
+                case 'webService': {
+                    const conf = nextNode.config as WebServiceConfig;
+                    const url = substituteParams(conf.url, parameters);
+                    // Simulate network delay
+                    await delay(100);
+
+                    // Mock Response Logic
+                    processedBatch = batch.map(row => {
+                        const newRow = { ...row };
+                        // Mock Data based on URL
+                        let responseData: any = {};
+                        if (url.includes('/users')) {
+                            responseData = { id: 101, name: 'Simulated User', email: 'user@example.com', role: 'admin' };
+                        } else if (url.includes('/weather')) {
+                            responseData = { temp: 25, condition: 'Sunny', location: 'Tokyo' };
+                        } else if (url.includes('/products')) {
+                             responseData = { id: 'P001', name: 'Widget A', price: 19.99, stock: 50 };
+                        } else {
+                            responseData = { status: 'ok', timestamp: new Date().toISOString() };
+                        }
+
+                        // Map Response
+                        if (conf.responseMap) {
+                            conf.responseMap.forEach(mapping => {
+                                newRow[mapping.field] = getValueByPath(responseData, mapping.path);
+                            });
+                        }
+                        return newRow;
+                    });
+                    break;
+                }
+                case 'hierarchyParser': {
+                    const conf = nextNode.config as HierarchyParserConfig;
+                    const inputField = conf.inputField;
+                    const outputs = conf.outputFields || [];
+
+                    processedBatch = [];
+                    for (const row of batch) {
+                        const jsonStr = row[inputField];
+                        if (typeof jsonStr === 'string' || typeof jsonStr === 'object') {
+                            let data = jsonStr;
+                            if (typeof jsonStr === 'string') {
+                                try {
+                                    // Try to parse if it looks like JSON
+                                    if (jsonStr.trim().startsWith('{') || jsonStr.trim().startsWith('[')) {
+                                         data = JSON.parse(jsonStr);
+                                    }
+                                } catch (e) {
+                                    // Parse error
+                                }
+                            }
+
+                            // If root is array, flatten (explode). If object, just map.
+                            const items = Array.isArray(data) ? data : [data];
+
+                            items.forEach(item => {
+                                const newRow = { ...row };
+                                outputs.forEach(out => {
+                                    newRow[out.name] = getValueByPath(item, out.path);
+                                });
+                                processedBatch.push(newRow);
+                            });
+                        } else {
+                            processedBatch.push(row);
+                        }
+                    }
                     break;
                 }
                 default:
