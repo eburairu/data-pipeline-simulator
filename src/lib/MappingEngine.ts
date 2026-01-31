@@ -53,6 +53,8 @@ export interface ExecutionState {
     [key: string]: any;
 }
 
+export type ExecutionObserver = (stats: ExecutionStats) => void;
+
 // Helper to evaluate conditions/expressions safely-ish
 const evaluateExpression = (record: any, expression: string, parameters: Record<string, string> = {}): any => {
     try {
@@ -81,8 +83,10 @@ const substituteParams = (str: string, params: Record<string, string>): string =
     return str.replace(/\$\{(\w+)\}/g, (_, key) => params[key] || '');
 };
 
-// Re-implementing traverse properly
-const traverse = (
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Async Traverse with Observer
+const traverseAsync = async (
     currentNode: Transformation,
     batch: any[],
     mapping: Mapping,
@@ -91,16 +95,28 @@ const traverse = (
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats,
-    state: ExecutionState, // Added state for persistent sequences
-    parameters: Record<string, string> = {}
+    state: ExecutionState,
+    parameters: Record<string, string>,
+    observer?: ExecutionObserver
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
     const nextNodes = outgoingLinks.map(l => mapping.transformations.find(t => t.id === l.targetId)).filter(Boolean) as Transformation[];
 
     for (const nextNode of nextNodes) {
+        // Simulate processing delay for "Realism"
+        await delay(50); // 50ms per node step
+
         let processedBatch: any[] = [];
+
+        // Update Input Stats
+        if (!stats.transformations[nextNode.id]) {
+            stats.transformations[nextNode.id] = { name: nextNode.name, input: 0, output: 0, errors: 0, rejects: 0 };
+        }
         stats.transformations[nextNode.id].input += batch.length;
+
+        // Notify Observer (Input Phase)
+        if (observer) observer({ ...stats });
 
         try {
             switch (nextNode.type) {
@@ -213,14 +229,17 @@ const traverse = (
                             const tableDef = tables.find(t => t.name === tableName);
                             const updateCols = conf.updateColumns || [];
 
-                            batch.forEach(row => {
+                            // Simulate Database IO latency per chunk (simplified as one await here)
+                            await delay(20);
+
+                            for (const row of batch) {
                                 const strategy = row['_strategy'] || 'insert'; // Default to insert
                                 const rowToProcess = { ...row };
                                 delete rowToProcess['_strategy']; // Remove internal flag
 
                                 if (strategy === 'reject') {
                                     stats.transformations[nextNode.id].rejects++;
-                                    return; // Skip downstream
+                                    continue;
                                 }
 
                                 // Apply field mapping (simple: match names)
@@ -255,10 +274,10 @@ const traverse = (
                                             matchId = match.id;
                                             if (dupBehavior === 'error') {
                                                 stats.transformations[nextNode.id].errors++;
-                                                return;
+                                                continue;
                                             } else if (dupBehavior === 'ignore') {
                                                 processedBatch.push(row); // Treat as success
-                                                return;
+                                                continue;
                                             } else if (dupBehavior === 'update') {
                                                 shouldUpdate = true;
                                             }
@@ -293,7 +312,7 @@ const traverse = (
                                         }
                                     }
                                 }
-                            });
+                            }
                         } else if (targetConn.type === 'file') {
                             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                             const filename = `output_${timestamp}.json`;
@@ -381,6 +400,8 @@ const traverse = (
                         if (!stats.cache[cacheKey]) {
                             const rawData = db.select(lookupConn.tableName || '');
                             stats.cache[cacheKey] = rawData.map((r: any) => r.data || r); // Ensure pure data objects
+                            // Simulate lookup loading delay
+                            await delay(50);
                             console.log(`[MappingEngine] Lookup ${nextNode.name}: Cached ${stats.cache[cacheKey].length} rows`);
                         }
 
@@ -573,7 +594,6 @@ const traverse = (
 
                     // Update state
                     state.sequences[nextNode.id] = currentVal;
-                    console.log(`[MappingEngine] Sequence ${nextNode.name}: updated next value to ${currentVal}`);
                     break;
                 }
                 case 'updateStrategy': {
@@ -712,13 +732,16 @@ const traverse = (
         }
 
         stats.transformations[nextNode.id].output += processedBatch.length;
+
+        // Notify Observer (Output Phase)
+        if (observer) observer({ ...stats });
+
         if (processedBatch.length > 0) {
-            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters);
+            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, observer);
         }
     }
 };
 
-// Refactor executeMappingTask to use recursive traverse
 export const executeMappingTaskRecursive = async (
     task: MappingTask,
     mapping: Mapping,
@@ -726,7 +749,8 @@ export const executeMappingTaskRecursive = async (
     tables: TableDefinition[],
     fs: FileSystemOps,
     db: DbOps,
-    state: ExecutionState
+    state: ExecutionState,
+    observer?: ExecutionObserver
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
     const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
@@ -757,6 +781,9 @@ export const executeMappingTaskRecursive = async (
         if (!conn) continue;
 
         let records: any[] = [];
+
+        // Simulate reading delay
+        await delay(100);
 
         if (conn.type === 'file') {
             const files = fs.listFiles(conn.host!, conn.path!);
@@ -822,9 +849,12 @@ export const executeMappingTaskRecursive = async (
         stats.transformations[sourceNode.id].input = records.length;
         stats.transformations[sourceNode.id].output = records.length;
 
+        // Notify initial stats
+        if (observer) observer({ ...stats });
+
         if (records.length > 0) {
             // Pass newState to traverse so it can update sequences
-            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters);
+            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, observer);
         }
     }
 

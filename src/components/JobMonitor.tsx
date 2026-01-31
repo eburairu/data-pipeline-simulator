@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useJobMonitor, type JobType, type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../lib/JobMonitorContext';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2 } from 'lucide-react';
 
 const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = ({ log, onClose }) => {
   const isMapping = log.jobType === 'mapping';
@@ -14,6 +14,14 @@ const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = 
       case 'collection': return <Truck size={20} className="text-orange-600" />;
       case 'delivery': return <Truck size={20} className="text-blue-600" />;
       case 'mapping': return <Database size={20} className="text-purple-600" />;
+    }
+  };
+
+  const getStatusBadge = (status: JobStatus) => {
+    switch (status) {
+      case 'success': return <span className="font-bold flex items-center gap-1 text-green-600"><CheckCircle size={14} /> SUCCESS</span>;
+      case 'failed': return <span className="font-bold flex items-center gap-1 text-red-600"><XCircle size={14} /> FAILED</span>;
+      case 'running': return <span className="font-bold flex items-center gap-1 text-blue-600"><Loader2 size={14} className="animate-spin" /> RUNNING</span>;
     }
   };
 
@@ -36,15 +44,12 @@ const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 p-3 rounded border border-gray-100">
               <span className="block text-xs text-gray-500 uppercase">Status</span>
-              <span className={`font-bold flex items-center gap-1 ${log.status === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                {log.status === 'success' ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                {log.status.toUpperCase()}
-              </span>
+              {getStatusBadge(log.status)}
             </div>
             <div className="bg-gray-50 p-3 rounded border border-gray-100">
               <span className="block text-xs text-gray-500 uppercase">Duration</span>
               <span className="font-mono font-medium text-gray-700">
-                {((log.endTime - log.startTime) / 1000).toFixed(2)}s
+                {log.endTime ? ((log.endTime - log.startTime) / 1000).toFixed(2) + 's' : 'Running...'}
               </span>
             </div>
             <div className="bg-gray-50 p-3 rounded border border-gray-100">
@@ -184,6 +189,13 @@ const JobMonitor: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | JobType>('all');
   const [selectedLog, setSelectedLog] = useState<JobExecutionLog | null>(null);
 
+  // Force re-render to update running times
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
       const statusMatch = statusFilter === 'all' || log.status === statusFilter;
@@ -204,8 +216,9 @@ const JobMonitor: React.FC = () => {
     return new Date(timestamp).toLocaleTimeString();
   };
 
-  const formatDuration = (start: number, end: number) => {
-    const diff = end - start;
+  const formatDuration = (start: number, end?: number) => {
+    const e = end || Date.now();
+    const diff = e - start;
     if (diff < 1000) return `${diff}ms`;
     return `${(diff / 1000).toFixed(2)}s`;
   };
@@ -230,6 +243,7 @@ const JobMonitor: React.FC = () => {
                   className="border border-gray-300 rounded px-2 py-1 text-gray-700 focus:outline-none focus:border-blue-500"
                 >
                   <option value="all">All Status</option>
+                  <option value="running">Running</option>
                   <option value="success">Success</option>
                   <option value="failed">Failed</option>
                 </select>
@@ -305,9 +319,13 @@ const JobMonitor: React.FC = () => {
                         <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                           <CheckCircle size={12} /> Success
                         </span>
-                      ) : (
+                      ) : log.status === 'failed' ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
                           <XCircle size={12} /> Failed
+                        </span>
+                      ) : (
+                         <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          <Loader2 size={12} className="animate-spin" /> Running
                         </span>
                       )}
                     </td>
