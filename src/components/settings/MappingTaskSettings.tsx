@@ -90,16 +90,40 @@ const MappingTaskSettings: React.FC = () => {
                             </div>
 
                             {/* Advanced Settings: Dependencies & Parameters */}
-                            <div className="mt-3">
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Bad File Directory (Optional)</label>
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Bad File Directory (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={task.badFileDir || ''}
+                                        placeholder="/bad_files/"
+                                        onChange={(e) => handleChange(task.id, { badFileDir: e.target.value })}
+                                        className="w-full border rounded p-1 text-sm font-mono"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Directory to store rejected rows as CSV files.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Stop on Errors (Threshold)</label>
+                                    <input
+                                        type="number"
+                                        value={task.stopOnErrors || 0}
+                                        onChange={(e) => handleChange(task.id, { stopOnErrors: parseInt(e.target.value) || 0 })}
+                                        className="w-full border rounded p-1 text-sm"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Stop execution if errors exceed this count (0 = disabled).</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-2">
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Parameter File Path (Optional)</label>
                                 <input
                                     type="text"
-                                    value={task.badFileDir || ''}
-                                    placeholder="/bad_files/"
-                                    onChange={(e) => handleChange(task.id, { badFileDir: e.target.value })}
+                                    value={task.parameterFileName || ''}
+                                    placeholder="host1:/config/params.txt"
+                                    onChange={(e) => handleChange(task.id, { parameterFileName: e.target.value })}
                                     className="w-full border rounded p-1 text-sm font-mono"
                                 />
-                                <p className="text-[10px] text-gray-400 mt-1">Directory to store rejected rows as CSV files.</p>
+                                <p className="text-[10px] text-gray-400 mt-1">Path to external parameter file (key=value format).</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 border-t pt-3 mt-1">

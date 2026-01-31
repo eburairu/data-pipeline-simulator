@@ -85,6 +85,16 @@ const substituteParams = (str: string, params: Record<string, string>): string =
     return str.replace(/\$\{(\w+)\}/g, (_, key) => params[key] || '');
 };
 
+// Helper to check stop on errors
+const checkStopOnErrors = (stats: ExecutionStats, task: MappingTask) => {
+    if (task.stopOnErrors && task.stopOnErrors > 0) {
+        const totalErrors = Object.values(stats.transformations).reduce((acc, t) => acc + t.errors, 0);
+        if (totalErrors > task.stopOnErrors) {
+            throw new Error(`Execution halted: Total errors (${totalErrors}) exceeded limit (${task.stopOnErrors}).`);
+        }
+    }
+};
+
 // Helper to get nested value
 const getValueByPath = (obj: any, path: string): any => {
     if (!path) return undefined;
@@ -122,6 +132,7 @@ const traverseAsync = async (
     stats: ExecutionStats,
     state: ExecutionState,
     parameters: Record<string, string>,
+    task: MappingTask,
     observer?: ExecutionObserver
 ) => {
     // Find next nodes
@@ -237,6 +248,7 @@ const traverseAsync = async (
                                     transformationName: nextNode.name
                                 });
                                 stats.transformations[nextNode.id].errors++;
+                                checkStopOnErrors(stats, task);
                             }
                         }
                     }
@@ -822,6 +834,8 @@ const traverseAsync = async (
                 error: e instanceof Error ? e.message : String(e),
                 transformationName: nextNode.name
             });
+
+            checkStopOnErrors(stats, task);
         }
 
         stats.transformations[nextNode.id].output += processedBatch.length;
@@ -830,7 +844,7 @@ const traverseAsync = async (
         if (observer) observer({ ...stats });
 
         if (processedBatch.length > 0) {
-            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, observer);
+            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, task, observer);
         }
     }
 };
@@ -851,12 +865,54 @@ export const executeMappingTaskRecursive = async (
     // We want to return a fresh state object that includes updates
     const newState = { ...state, sequences: { ...(state.sequences || {}) } };
 
+    // Resolve Parameter File
+    let fileParameters: Record<string, string> = {};
+    if (task.parameterFileName) {
+        try {
+            const parts = task.parameterFileName.split(':');
+            let host = 'localhost';
+            let path = task.parameterFileName;
+            if (parts.length > 1) {
+                host = parts[0];
+                path = parts.slice(1).join(':');
+            }
+            // Need to find filename from path
+            const pathParts = path.split('/');
+            const filename = pathParts.pop();
+            const dir = pathParts.join('/');
+
+            if (filename) {
+               const content = fs.readFile(host, dir || '/', filename);
+               if (content) {
+                   content.split(/\r?\n/).forEach(line => {
+                       const idx = line.indexOf('=');
+                       if (idx > 0) {
+                           const key = line.substring(0, idx).trim();
+                           const val = line.substring(idx+1).trim();
+                           if (key && !key.startsWith('#')) {
+                               fileParameters[key] = val;
+                           }
+                       }
+                   });
+               }
+            }
+        } catch (e) {
+             if (!stats.rejectRows) stats.rejectRows = [];
+             stats.rejectRows.push({
+                row: { file: task.parameterFileName },
+                error: `Failed to load parameter file: ${e instanceof Error ? e.message : String(e)}`,
+                transformationName: 'ParameterInit'
+             });
+        }
+    }
+
     // Resolve Parameters
     const startTime = new Date();
     const parameters = {
         'SYSDATE': startTime.toISOString(),
         'SESSSTARTTIME': startTime.toISOString(),
         ...(mapping.parameters || {}),
+        ...fileParameters,
         ...(task.parameters || {})
     };
 
@@ -947,7 +1003,7 @@ export const executeMappingTaskRecursive = async (
 
         if (records.length > 0) {
             // Pass newState to traverse so it can update sequences
-            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, observer);
+            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer);
         }
     }
 
