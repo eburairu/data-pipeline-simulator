@@ -261,7 +261,10 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       if (currentFiles.length === 0) return;
 
       if (job.sourceType === 'topic') {
-        currentFiles = currentFiles.filter(f => !processedFilesRef.current.has(`${job.id}:${f.name}`));
+        // Use Persistent DB State instead of memory ref
+        const processedRecords = selectRef.current('_sys_subscription_state');
+        const processedSet = new Set(processedRecords.filter((r: any) => r.data.jobId === job.id).map((r: any) => r.data.fileName));
+        currentFiles = currentFiles.filter(f => !processedSet.has(f.name));
       }
       if (currentFiles.length === 0) return;
 
@@ -300,7 +303,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         try {
           if (job.sourceType === 'topic') {
             writeFile(targetHost, targetPath, file.name, file.content);
-            processedFilesRef.current.add(`${job.id}:${file.name}`);
+            // Persist state
+            insert('_sys_subscription_state', { jobId: job.id, fileName: file.name, timestamp: Date.now() });
           } else {
             moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath);
           }
