@@ -1,4 +1,6 @@
-# Specification: Data Pipeline Simulator
+# [DEPRECATED] Specification: Data Pipeline Simulator
+
+> **注意**: このドキュメントは非推奨です。最新の仕様は [`.specify/specs/`](../.specify/specs/) ディレクトリ配下のドキュメントを参照してください。
 
 ## Overview
 

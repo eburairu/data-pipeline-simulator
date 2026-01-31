@@ -1,4 +1,6 @@
-# Constitution: Data Pipeline Simulator
+# [DEPRECATED] Constitution: Data Pipeline Simulator
+
+> **注意**: このドキュメントは非推奨です。最新のプロジェクト原則は [`.specify/memory/constitution.md`](../.specify/memory/constitution.md) を参照してください。
 
 ## Project Vision
 
