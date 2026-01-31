@@ -1,5 +1,5 @@
 
-export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' | 'cleansing' | 'deduplicator' | 'pivot' | 'unpivot' | 'sql';
+export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' | 'cleansing' | 'deduplicator' | 'pivot' | 'unpivot' | 'sql' | 'webService' | 'hierarchyParser';
 
 export interface TransformationConfig {
   // Common
@@ -169,12 +169,27 @@ export interface SqlConfig extends TransformationConfig {
   mode: 'query' | 'procedure' | 'script';
 }
 
+// Web Service Consumer: REST API呼び出し
+export interface WebServiceConfig extends TransformationConfig {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers: { key: string; value: string }[];
+  requestBody?: string; // POST/PUT用 (Template supported)
+  responseMap?: { path: string; field: string }[]; // JSONレスポンスのマッピング
+}
+
+// Hierarchy Parser: 階層データ解析
+export interface HierarchyParserConfig extends TransformationConfig {
+  inputField: string; // JSON文字列フィールド
+  outputFields: { path: string; name: string; type: 'string' | 'number' | 'boolean' }[];
+}
+
 export interface Transformation {
   id: string;
   type: TransformationType;
   name: string;
   position: { x: number, y: number }; // For visual layout
-  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig | CleansingConfig | DeduplicatorConfig | PivotConfig | UnpivotConfig | SqlConfig;
+  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig | CleansingConfig | DeduplicatorConfig | PivotConfig | UnpivotConfig | SqlConfig | WebServiceConfig | HierarchyParserConfig;
 }
 
 export interface MappingLink {

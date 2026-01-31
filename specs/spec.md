@@ -15,18 +15,20 @@
 - タイムスタンプ付きファイル名（ミリ秒精度で一意性保証）
 - CSV/JSON 形式をサポート
 
-### FR2: 収集処理（Collection）
-- ソースホストからファイルを取得
-- 正規表現フィルターでファイル選択
-- 取得時にファイル名リネーム対応
+### FR2: 出版処理（Publication / CIH）
+- 外部システムからデータを受信し、Informatica Cloud Integration Hub (CIH) の「トピック」へデータをパブリッシュする処理
+- ソース（ファイル）からトピックへのデータ転送
+- フィルタリング、リネーム機能
 
-### FR3: 配信処理（Delivery）
-- 中間ストレージからファイルを移動
-- ターゲットパスへの配置
-- 処理後ファイル削除オプション
+### FR3: 購読処理（Subscription / CIH）
+- CIHのトピックからデータをサブスクライブし、ターゲットシステムへ配信する処理
+- トピックからターゲット（ファイル/DB/マッピングタスク）へのデータ転送
+- 複数サブスクライバーへの同時配信シミュレーション
 
-### FR4: マッピング処理
+### FR4: マッピング処理 (CDI)
 - ソースからターゲットへのデータ変換
+- **Web Services Consumer**: REST API呼び出しのシミュレーション（モックレスポンス）
+- **Hierarchy Parser**: JSON/XMLデータの階層構造解析とフラット化
 - Expression による計算フィールド追加
 - Filter による行選択
 - ファイル名列追加機能（IDMC CDI 類似）
@@ -102,6 +104,10 @@
 ### Connection
 - name, type (file/database)
 - host, directory/tableName
+
+### Topic (CIH)
+- name, retentionPeriod
+- associatedPublications, associatedSubscriptions
 
 ### Mapping
 - nodes: source, transform, target
