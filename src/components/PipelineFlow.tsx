@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
-import { LayoutGrid, GitBranch } from 'lucide-react';
+import { LayoutGrid, GitBranch, Workflow } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
