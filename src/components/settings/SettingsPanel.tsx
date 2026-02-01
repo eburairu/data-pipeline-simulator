@@ -8,6 +8,7 @@ import DeliverySettings from './DeliverySettings';
 import ConnectionSettings from './ConnectionSettings';
 import MappingDesigner from './MappingDesigner';
 import MappingTaskSettings from './MappingTaskSettings';
+import TaskFlowSettings from './TaskFlowSettings';
 import BiDashboardSettings from './BiDashboardSettings';
 import { Database, ArrowLeftRight, Workflow, Server, Activity } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
@@ -75,6 +76,7 @@ const SettingsPanel: React.FC = () => {
             <ConnectionSettings />
             <MappingDesigner />
             <MappingTaskSettings />
+            <TaskFlowSettings />
           </div>
         )}
 

@@ -9,7 +9,7 @@ import {
     type BiDashboardSettings, type Host, type TopicDefinition, type TableDefinition, 
     type ConnectionDefinition 
 } from './types';
-import { type Mapping, type MappingTask } from './MappingTypes';
+import { type Mapping, type MappingTask, type TaskFlow } from './MappingTypes';
 
 // Import new Context hooks and Providers
 import { InfrastructureProvider, useInfrastructure } from './context/InfrastructureContext';
@@ -62,6 +62,11 @@ interface SettingsContextType {
   removeMappingTask: (id: string) => void;
   updateMappingTask: (id: string, updates: Partial<MappingTask>) => void;
 
+  taskFlows: TaskFlow[];
+  addTaskFlow: (flow: TaskFlow) => void;
+  removeTaskFlow: (id: string) => void;
+  updateTaskFlow: (id: string, updates: Partial<TaskFlow>) => void;
+
   saveSettings: () => { success: boolean; errors?: ValidationError[] };
   availableTemplates: PipelineTemplate[];
   applyTemplate: (templateId: string) => void;
@@ -89,7 +94,8 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
         delivery, setDelivery,
         etl, setEtl,
         mappings, addMapping, removeMapping, updateMapping, setMappings,
-        mappingTasks, addMappingTask, removeMappingTask, updateMappingTask, setMappingTasks
+        mappingTasks, addMappingTask, removeMappingTask, updateMappingTask, setMappingTasks,
+        taskFlows, addTaskFlow, removeTaskFlow, updateTaskFlow, setTaskFlows
     } = usePipeline();
 
     const isHostInUse = useCallback((hostName: string) => {
@@ -143,7 +149,8 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
           tables,
           connections,
           mappings,
-          mappingTasks
+          mappingTasks,
+          taskFlows
         };
         try {
           localStorage.setItem('pipeline-simulator-settings', JSON.stringify(settingsToSave));
@@ -152,7 +159,7 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
           console.error("Failed to save settings", e);
           return { success: false, errors: [{ field: 'storage', message: 'Failed to save to local storage' }] };
         }
-      }, [dataSource, collection, delivery, etl, biDashboard, hosts, topics, connections, mappings, mappingTasks]);
+      }, [dataSource, collection, delivery, etl, biDashboard, hosts, topics, connections, mappings, mappingTasks, taskFlows]);
 
     const applyTemplate = useCallback((templateId: string) => {
         const template = AVAILABLE_TEMPLATES.find(t => t.id === templateId);
@@ -167,11 +174,12 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
             setConnections,
             setMappings,
             setMappingTasks,
+            setTaskFlows,
             setHosts
         });
         
         alert(`Template "${template.name}" applied successfully! Check the Simulation tab and relevant settings.`);
-      }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setHosts]); // Add deps
+      }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setTaskFlows, setHosts]); // Add deps
     
       const cleanupTemplate = useCallback((templateId: string) => {
         const template = AVAILABLE_TEMPLATES.find(t => t.id === templateId);
@@ -183,11 +191,12 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
             setConnections,
             setMappings,
             setMappingTasks,
+            setTaskFlows,
             setHosts
         });
     
         alert(`Resources for template "${template.name}" have been removed.`);
-      }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setHosts]); // Add deps
+      }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setTaskFlows, setHosts]); // Add deps
 
     return (
         <SettingsContext.Provider value={{
@@ -202,12 +211,13 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
             connections, addConnection, removeConnection, updateConnection,
             mappings, addMapping, removeMapping, updateMapping,
             mappingTasks, addMappingTask, removeMappingTask, updateMappingTask,
+            taskFlows, addTaskFlow, removeTaskFlow, updateTaskFlow,
             saveSettings,
             availableTemplates: AVAILABLE_TEMPLATES,
             applyTemplate,
             cleanupTemplate,
             // Exposed setters for templates
-            setHosts, setConnections, setTables, setMappings, setMappingTasks
+            setHosts, setConnections, setTables, setMappings, setMappingTasks, setTaskFlows
         } as any}>
             {children}
         </SettingsContext.Provider>

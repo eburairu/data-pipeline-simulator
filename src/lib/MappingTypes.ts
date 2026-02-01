@@ -218,3 +218,13 @@ export interface MappingTask {
   parameterFileName?: string; // Path to parameter file
   stopOnErrors?: number; // Stop if error count exceeds this (0 = disabled)
 }
+
+export interface TaskFlow {
+  id: string;
+  name: string;
+  description?: string;
+  taskIds: string[]; // List of MappingTask IDs to execute
+  executionInterval: number; // Interval in ms
+  enabled: boolean;
+  parallelExecution?: boolean; // If true, tasks without dependencies run in parallel
+}

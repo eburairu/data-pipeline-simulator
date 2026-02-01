@@ -62,7 +62,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
   const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
   const { insert, select, update, remove } = useVirtualDB();
-  const { dataSource, collection, delivery, topics, mappings, mappingTasks, connections, tables, biDashboard } = useSettings();
+  const { dataSource, collection, delivery, topics, mappings, mappingTasks, taskFlows, connections, tables, biDashboard } = useSettings();
   const { addLog, updateLog } = useJobMonitor(); // Now valid because we are inside JobMonitorProvider
 
   const listFilesRef = useRef(listFiles);
@@ -449,6 +449,24 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     }
   }, [mappingTasks, mappings, connections, tables, toggleStep, insert, writeFile, deleteFile, addLog, updateLog]);
 
+  const executeTaskFlow = useCallback(async (flowId: string) => {
+    const flow = taskFlows.find(f => f.id === flowId);
+    if (!flow || !flow.enabled) return;
+
+    console.log(`[TaskFlow] Starting flow: ${flow.name}`);
+    
+    if (flow.parallelExecution) {
+        // Run all tasks in parallel
+        await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId)));
+    } else {
+        // Run tasks sequentially
+        for (const taskId of flow.taskIds) {
+            await executeMappingJob(taskId);
+        }
+    }
+    console.log(`[TaskFlow] Finished flow: ${flow.name}`);
+  }, [taskFlows, executeMappingJob]);
+
   // --- Register Retry Handler ---
   useEffect(() => {
     setRetryHandler((jobId, jobType) => {
@@ -510,13 +528,23 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     const timers = mappingTasks.map(task => {
       if (!task.enabled) return null;
       // Workflow: Only schedule tasks that have NO dependencies (Root tasks)
-      // Dependent tasks are triggered by their parents
+      // AND are NOT part of an enabled Task Flow (to avoid double execution)
       if (task.dependencies && task.dependencies.length > 0) return null;
+      if (taskFlows.some(f => f.enabled && f.taskIds.includes(task.id))) return null;
 
       return setInterval(() => executeMappingJob(task.id), task.executionInterval);
     }).filter(Boolean) as ReturnType<typeof setInterval>[];
     return () => timers.forEach(clearInterval);
-  }, [isMappingRunning, mappingTasks, executeMappingJob]);
+  }, [isMappingRunning, mappingTasks, taskFlows, executeMappingJob]);
+
+  useEffect(() => {
+    if (!isMappingRunning) return;
+    const timers = taskFlows.map(flow => {
+      if (!flow.enabled) return null;
+      return setInterval(() => executeTaskFlow(flow.id), flow.executionInterval);
+    }).filter(Boolean) as ReturnType<typeof setInterval>[];
+    return () => timers.forEach(clearInterval);
+  }, [isMappingRunning, taskFlows, executeTaskFlow]);
 
   // Topic Retention
   useEffect(() => {

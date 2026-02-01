@@ -6,7 +6,7 @@ import type {
     DataSourceDefinition,
     GenerationJob
 } from './SettingsContext';
-import type { Mapping, MappingTask } from './MappingTypes';
+import type { Mapping, MappingTask, TaskFlow } from './MappingTypes';
 
 export interface TemplateContextActions {
     setDataSource: React.Dispatch<React.SetStateAction<DataSourceSettings>>;
@@ -14,6 +14,7 @@ export interface TemplateContextActions {
     setConnections: React.Dispatch<React.SetStateAction<ConnectionDefinition[]>>;
     setMappings: React.Dispatch<React.SetStateAction<Mapping[]>>;
     setMappingTasks: React.Dispatch<React.SetStateAction<MappingTask[]>>;
+    setTaskFlows: React.Dispatch<React.SetStateAction<TaskFlow[]>>;
     setHosts: React.Dispatch<React.SetStateAction<Host[]>>;
 }
 

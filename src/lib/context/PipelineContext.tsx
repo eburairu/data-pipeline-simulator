@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
-import { type Mapping, type MappingTask } from '../MappingTypes';
+import { type Mapping, type MappingTask, type TaskFlow } from '../MappingTypes';
 import { type CollectionSettings, type DeliverySettings, type EtlSettings } from '../types';
 
 interface PipelineContextType {
@@ -21,6 +21,12 @@ interface PipelineContextType {
   removeMappingTask: (id: string) => void;
   updateMappingTask: (id: string, updates: Partial<MappingTask>) => void;
   setMappingTasks: React.Dispatch<React.SetStateAction<MappingTask[]>>;
+
+  taskFlows: TaskFlow[];
+  addTaskFlow: (flow: TaskFlow) => void;
+  removeTaskFlow: (id: string) => void;
+  updateTaskFlow: (id: string, updates: Partial<TaskFlow>) => void;
+  setTaskFlows: React.Dispatch<React.SetStateAction<TaskFlow[]>>;
 }
 
 const PipelineContext = createContext<PipelineContextType | undefined>(undefined);
@@ -115,6 +121,8 @@ export const PipelineProvider: React.FC<{ children: ReactNode }> = ({ children }
       { id: 'mt_agg', name: 'Run Aggregation', mappingId: 'm_agg_summary', executionInterval: 5000, enabled: true }
   ]);
 
+  const [taskFlows, setTaskFlows] = useState<TaskFlow[]>([]);
+
   useEffect(() => {
     const saved = localStorage.getItem('pipeline-simulator-settings');
     if (saved) {
@@ -142,6 +150,7 @@ export const PipelineProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (parsed.etl) setEtl(parsed.etl);
         if (parsed.mappings) setMappings(parsed.mappings);
         if (parsed.mappingTasks) setMappingTasks(parsed.mappingTasks);
+        if (parsed.taskFlows) setTaskFlows(parsed.taskFlows);
       } catch (e) {
         console.error('Failed to load pipeline settings', e);
       }
@@ -172,13 +181,26 @@ export const PipelineProvider: React.FC<{ children: ReactNode }> = ({ children }
     setMappingTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
 
+  const addTaskFlow = useCallback((flow: TaskFlow) => {
+    setTaskFlows(prev => [...prev, flow]);
+  }, []);
+
+  const removeTaskFlow = useCallback((id: string) => {
+    setTaskFlows(prev => prev.filter(f => f.id !== id));
+  }, []);
+
+  const updateTaskFlow = useCallback((id: string, updates: Partial<TaskFlow>) => {
+    setTaskFlows(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+  }, []);
+
   return (
     <PipelineContext.Provider value={{
       collection, setCollection,
       delivery, setDelivery,
       etl, setEtl,
       mappings, addMapping, removeMapping, updateMapping, setMappings,
-      mappingTasks, addMappingTask, removeMappingTask, updateMappingTask, setMappingTasks
+      mappingTasks, addMappingTask, removeMappingTask, updateMappingTask, setMappingTasks,
+      taskFlows, addTaskFlow, removeTaskFlow, updateTaskFlow, setTaskFlows
     }}>
       {children}
     </PipelineContext.Provider>
