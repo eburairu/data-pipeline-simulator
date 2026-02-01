@@ -172,6 +172,17 @@ const CollectionSettings: React.FC = () => {
                                     <option key={t.id} value={t.id}>{t.name}</option>
                                 ))}
                              </select>
+                             <div className="mt-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={job.triggerSubscriptions || false}
+                                        onChange={(e) => handleJobChange(job.id, 'triggerSubscriptions', e.target.checked)}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-xs text-gray-700">Trigger Subscriptions Immediately (Real-time)</span>
+                                </label>
+                             </div>
                          </div>
                     ) : (
                         <div>
