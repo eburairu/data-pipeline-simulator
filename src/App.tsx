@@ -453,19 +453,40 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     const flow = taskFlows.find(f => f.id === flowId);
     if (!flow || !flow.enabled) return;
 
-    console.log(`[TaskFlow] Starting flow: ${flow.name}`);
-    
-    if (flow.parallelExecution) {
-        // Run all tasks in parallel
-        await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId)));
-    } else {
-        // Run tasks sequentially
-        for (const taskId of flow.taskIds) {
-            await executeMappingJob(taskId);
+    const startTime = Date.now();
+    const logId = addLog({
+        jobId: flow.id,
+        jobName: flow.name,
+        jobType: 'taskflow',
+        status: 'running',
+        startTime: startTime,
+        recordsInput: 0,
+        recordsOutput: 0,
+        details: `Starting flow execution (${flow.parallelExecution ? 'Parallel' : 'Sequential'})...`
+    });
+
+    try {
+        if (flow.parallelExecution) {
+            await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId)));
+        } else {
+            for (const taskId of flow.taskIds) {
+                await executeMappingJob(taskId);
+            }
         }
+        
+        updateLog(logId, {
+            status: 'success',
+            endTime: Date.now(),
+            details: `Flow finished successfully.`
+        });
+    } catch (e) {
+        updateLog(logId, {
+            status: 'failed',
+            endTime: Date.now(),
+            errorMessage: e instanceof Error ? e.message : 'Unknown error during flow execution'
+        });
     }
-    console.log(`[TaskFlow] Finished flow: ${flow.name}`);
-  }, [taskFlows, executeMappingJob]);
+  }, [taskFlows, executeMappingJob, addLog, updateLog]);
 
   // --- Register Retry Handler ---
   useEffect(() => {

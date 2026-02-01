@@ -227,4 +227,7 @@ export interface TaskFlow {
   executionInterval: number; // Interval in ms
   enabled: boolean;
   parallelExecution?: boolean; // If true, tasks without dependencies run in parallel
+  // GUI specific
+  layoutNodes?: Array<{ id: string; position: { x: number; y: number } }>;
+  layoutLinks?: Array<{ id: string; source: string; target: string }>;
 }

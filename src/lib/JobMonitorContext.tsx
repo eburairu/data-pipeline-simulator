@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
-export type JobType = 'collection' | 'delivery' | 'mapping';
+export type JobType = 'collection' | 'delivery' | 'mapping' | 'taskflow';
 export type JobStatus = 'success' | 'failed' | 'running';
 
 export interface MappingExecutionDetails {

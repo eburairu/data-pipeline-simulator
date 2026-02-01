@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useJobMonitor, type JobType, type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../lib/JobMonitorContext';
 import { useSettings } from '../lib/SettingsContext';
 import MappingDesigner from './settings/MappingDesigner';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow } from 'lucide-react';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch } from 'lucide-react';
 
 const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = ({ log, onClose }) => {
   const isMapping = log.jobType === 'mapping';
@@ -26,6 +26,7 @@ const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = 
       case 'collection': return <Truck size={20} className="text-orange-600" />;
       case 'delivery': return <Truck size={20} className="text-blue-600" />;
       case 'mapping': return <Database size={20} className="text-purple-600" />;
+      case 'taskflow': return <GitBranch size={20} className="text-indigo-600" />;
     }
   };
 
@@ -244,6 +245,7 @@ const JobMonitor: React.FC = () => {
       case 'collection': return <Truck size={16} className="text-orange-600" />;
       case 'delivery': return <Truck size={16} className="text-blue-600" />;
       case 'mapping': return <Database size={16} className="text-purple-600" />;
+      case 'taskflow': return <GitBranch size={16} className="text-indigo-600" />;
     }
   };
 
@@ -294,6 +296,7 @@ const JobMonitor: React.FC = () => {
                   <option value="collection">Collection</option>
                   <option value="delivery">Delivery</option>
                   <option value="mapping">Mapping</option>
+                  <option value="taskflow">Task Flow</option>
                 </select>
               </div>
             </div>
