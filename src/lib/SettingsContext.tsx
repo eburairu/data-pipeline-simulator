@@ -200,7 +200,9 @@ interface SettingsContextType {
   updateMappingTask: (id: string, updates: Partial<MappingTask>) => void;
 
   saveSettings: () => { success: boolean; errors?: ValidationError[] };
-  applyIdempotencyTemplate: () => void;
+  availableTemplates: PipelineTemplate[];
+  applyTemplate: (templateId: string) => void;
+  cleanupTemplate: (templateId: string) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -582,143 +584,39 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [dataSource, collection, delivery, etl, biDashboard, hosts, topics, connections, mappings, mappingTasks]);
 
-  const applyIdempotencyTemplate = useCallback(() => {
-    const timestamp = Date.now();
+  const applyTemplate = useCallback((templateId: string) => {
+    const template = AVAILABLE_TEMPLATES.find(t => t.id === templateId);
+    if (!template) {
+        console.error(`Template ${templateId} not found`);
+        return;
+    }
+
+    template.apply({
+        setDataSource,
+        setTables,
+        setConnections,
+        setMappings,
+        setMappingTasks,
+        setHosts
+    });
     
-    // 1. Setup Data Source (Generates duplicates)
-    const hostName = 'localhost';
-    const sourcePath = '/idempotency_source';
-    
-    // Ensure directory exists
-    setHosts(prev => {
-        const host = prev.find(h => h.name === hostName);
-        if (!host) return prev; // Should exist
-        if (host.directories.includes(sourcePath)) return prev;
-        return prev.map(h => h.name === hostName ? { ...h, directories: [...h.directories, sourcePath] } : h);
+    alert(`Template "${template.name}" applied successfully! Check the Simulation tab and relevant settings.`);
+  }, []);
+
+  const cleanupTemplate = useCallback((templateId: string) => {
+    const template = AVAILABLE_TEMPLATES.find(t => t.id === templateId);
+    if (!template) return;
+
+    template.cleanup({
+        setDataSource,
+        setTables,
+        setConnections,
+        setMappings,
+        setMappingTasks,
+        setHosts
     });
 
-    const dsDefId = `ds_def_idem_${timestamp}`;
-    const newDsDef: DataSourceDefinition = {
-        id: dsDefId,
-        name: 'Idempotency Test Source',
-        host: hostName,
-        path: sourcePath
-    };
-
-    const newDsJob: GenerationJob = {
-        id: `gen_job_idem_${timestamp}`,
-        name: 'Generate Duplicates',
-        dataSourceId: dsDefId,
-        fileNamePattern: 'data_${timestamp}.csv',
-        fileContent: '',
-        mode: 'schema',
-        rowCount: 5,
-        schema: [
-            { id: `c_${timestamp}_1`, name: 'id', type: 'randomInt', params: { min: 1, max: 10 } }, // High collision chance
-            { id: `c_${timestamp}_2`, name: 'value', type: 'randomInt', params: { min: 100, max: 999 } },
-            { id: `c_${timestamp}_3`, name: 'updated_at', type: 'timestamp', params: {} }
-        ],
-        executionInterval: 5000,
-        enabled: true // Auto-enable for convenience
-    };
-
-    setDataSource(prev => ({
-        definitions: [...prev.definitions, newDsDef],
-        jobs: [...prev.jobs, newDsJob]
-    }));
-
-    // 2. Setup Target Table
-    const tableId = `tbl_idem_${timestamp}`;
-    const tableName = 'idempotency_target';
-    const newTable: TableDefinition = {
-        id: tableId,
-        name: tableName,
-        columns: [
-            { name: 'id', type: 'number' },
-            { name: 'value', type: 'number' },
-            { name: 'updated_at', type: 'string' }
-        ]
-    };
-    setTables(prev => [...prev, newTable]);
-
-    // 3. Setup Connections
-    const connSrcId = `conn_src_idem_${timestamp}`;
-    const connTgtId = `conn_tgt_idem_${timestamp}`;
-    
-    setConnections(prev => [
-        ...prev,
-        {
-            id: connSrcId,
-            name: 'Idempotency Source File',
-            type: 'file',
-            host: hostName,
-            path: sourcePath
-        },
-        {
-            id: connTgtId,
-            name: 'Idempotency Target DB',
-            type: 'database',
-            tableName: tableName
-        }
-    ]);
-
-    // 4. Setup Mapping (With Deduplication)
-    const mappingId = `m_idem_${timestamp}`;
-    const tSrcId = `t_src_${timestamp}`;
-    const tDedupId = `t_dedup_${timestamp}`;
-    const tTgtId = `t_tgt_${timestamp}`;
-
-    const newMapping: Mapping = {
-        id: mappingId,
-        name: 'Idempotency Load (Dedup)',
-        transformations: [
-            { 
-                id: tSrcId, 
-                type: 'source', 
-                name: 'Read CSV', 
-                position: { x: 50, y: 100 }, 
-                config: { connectionId: connSrcId, deleteAfterRead: true } 
-            },
-            { 
-                id: tDedupId, 
-                type: 'deduplicator', 
-                name: 'Deduplicate IDs', 
-                position: { x: 300, y: 100 }, 
-                config: { keys: ['id'] } 
-            },
-            { 
-                id: tTgtId, 
-                type: 'target', 
-                name: 'Upsert to DB', 
-                position: { x: 550, y: 100 }, 
-                config: { 
-                    connectionId: connTgtId,
-                    deduplicationKeys: ['id'], // DB level check
-                    duplicateBehavior: 'update',
-                    updateColumns: ['id'] // Key for update
-                } 
-            }
-        ],
-        links: [
-            { id: `l_1_${timestamp}`, sourceId: tSrcId, targetId: tDedupId },
-            { id: `l_2_${timestamp}`, sourceId: tDedupId, targetId: tTgtId }
-        ]
-    };
-    setMappings(prev => [...prev, newMapping]);
-
-    // 5. Setup Task
-    const taskId = `mt_idem_${timestamp}`;
-    setMappingTasks(prev => [...prev, {
-        id: taskId,
-        name: 'Run Idempotency Test',
-        mappingId: mappingId,
-        executionInterval: 5000,
-        enabled: true
-    }]);
-
-    // Switch to Data Integration tab or notify?
-    alert('Idempotency test resources created! Check Data Source (Generators), Database, and Data Integration tabs.');
-
+    alert(`Resources for template "${template.name}" have been removed.`);
   }, []);
 
   const addHost = useCallback((name: string) => {
@@ -907,7 +805,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         removeMappingTask,
         updateMappingTask,
         saveSettings,
-        applyIdempotencyTemplate,
+        availableTemplates: AVAILABLE_TEMPLATES,
+        applyTemplate,
+        cleanupTemplate,
       }}
     >
       {children}
