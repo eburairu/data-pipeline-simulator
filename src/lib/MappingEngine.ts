@@ -44,6 +44,7 @@ export interface DbOps {
 
 export interface ExecutionStats {
     transformations: { [transformationId: string]: { name: string; input: number; output: number; errors: number; rejects: number } };
+    links?: { [linkId: string]: number };
     rejectRows?: { row: any; error: string; transformationName: string }[];
     cache?: { [key: string]: any };
 }
@@ -137,9 +138,12 @@ const traverseAsync = async (
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
-    const nextNodes = outgoingLinks.map(l => mapping.transformations.find(t => t.id === l.targetId)).filter(Boolean) as Transformation[];
+    
+    // Group links by targetId to handle multiple links to same target (unlikely but possible)
+    for (const link of outgoingLinks) {
+        const nextNode = mapping.transformations.find(t => t.id === link.targetId);
+        if (!nextNode) continue;
 
-    for (const nextNode of nextNodes) {
         // Simulate processing delay for "Realism"
         await delay(50); // 50ms per node step
 
@@ -150,6 +154,11 @@ const traverseAsync = async (
             stats.transformations[nextNode.id] = { name: nextNode.name, input: 0, output: 0, errors: 0, rejects: 0 };
         }
         stats.transformations[nextNode.id].input += batch.length;
+        
+        // Update Link Stats
+        if (!stats.links) stats.links = {};
+        if (!stats.links[link.id]) stats.links[link.id] = 0;
+        stats.links[link.id] += batch.length;
 
         // Notify Observer (Input Phase)
         if (observer) observer({ ...stats });
