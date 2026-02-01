@@ -15,9 +15,19 @@ export const generateDataFromSchema = (
   // Create a mutable copy of the state to track changes during this batch
   const currentSequenceState = { ...sequenceState };
 
+  // Optimization: Pre-calculate static values to avoid redundant template processing in the loop
+  const generators = schema.map(col => {
+    if (col.type === 'static') {
+      const val = col.params.value !== undefined ? String(col.params.value) : '';
+      const processed = processTemplate(val, context);
+      return () => ({ value: processed });
+    }
+    return (rowIndex: number, lastSeq?: number) => generateValue(col, rowIndex, context, lastSeq);
+  });
+
   for (let i = 0; i < rowCount; i++) {
-    const rowValues = schema.map(col => {
-        const { value, nextSeq } = generateValue(col, i, context, currentSequenceState[col.id]);
+    const rowValues = schema.map((col, idx) => {
+        const { value, nextSeq } = generators[idx](i, currentSequenceState[col.id]);
         if (nextSeq !== undefined) {
             currentSequenceState[col.id] = nextSeq;
         }
