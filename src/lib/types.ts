@@ -57,6 +57,7 @@ export interface CollectionJob {
   executionInterval: number;
   enabled: boolean;
   processingTime?: number;
+  triggerSubscriptions?: boolean;
 }
 
 export interface CollectionSettings {

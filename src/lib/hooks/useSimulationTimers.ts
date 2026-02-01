@@ -11,6 +11,7 @@ export const useSimulationTimers = (
         executeDeliveryJob: (id: string) => Promise<void>;
         executeMappingJob: (id: string) => Promise<unknown>;
         executeTaskFlow: (id: string) => Promise<void>;
+        checkTopicRetention: () => void;
     }
 ) => {
     const { dataSource, collection, delivery, mappingTasks, taskFlows } = useSettings();
@@ -87,4 +88,13 @@ export const useSimulationTimers = (
         }).filter(Boolean) as ReturnType<typeof setInterval>[];
         return () => timers.forEach(clearInterval);
     }, [isRunning.mapping, taskFlows, engines.executeTaskFlow]);
+
+    // Retention Check Timer (Always active if transfer is active, or independent)
+    useEffect(() => {
+        // Run retention check every 5 seconds
+        const timer = setInterval(() => {
+            engines.checkTopicRetention();
+        }, 5000);
+        return () => clearInterval(timer);
+    }, [engines.checkTopicRetention]);
 };

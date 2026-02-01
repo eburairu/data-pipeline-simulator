@@ -12,7 +12,7 @@ export const useSimulationEngine = (
 ) => {
     const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
     const { insert, select, update, remove } = useVirtualDB();
-    const { connections, collection, delivery, mappings, mappingTasks, taskFlows, tables } = useSettings();
+    const { connections, collection, delivery, mappings, mappingTasks, taskFlows, tables, topics } = useSettings();
     const { addLog, updateLog } = useJobMonitor();
 
     const collectionLocks = useRef<Record<string, boolean>>({});
@@ -33,6 +33,21 @@ export const useSimulationEngine = (
         const transferTime = (content.length / safeBandwidth) * 1000;
         return transferTime + latency;
     };
+
+    const checkTopicRetention = useCallback(() => {
+        topics.forEach(topic => {
+            const topicPath = `/topics/${topic.id}`;
+            const files = listFiles('localhost', topicPath);
+            const now = Date.now();
+            files.forEach(file => {
+                if (now - file.createdAt > topic.retentionPeriod) {
+                    deleteFile('localhost', file.name, topicPath);
+                    // Optional: Log deletion (could be noisy)
+                    // console.log(`[Retention] Deleted expired file ${file.name} from topic ${topic.name}`);
+                }
+            });
+        });
+    }, [topics, listFiles, deleteFile]);
 
     const executeCollectionJob = useCallback(async (jobId: string) => {
         const job = collection.jobs.find(j => j.id === jobId);
@@ -122,6 +137,15 @@ export const useSimulationEngine = (
                         throughput: (file.content.length / ((Date.now() - startTime) / 1000))
                     }
                 });
+
+                // Trigger Subscriptions
+                if (job.targetType === 'topic' && job.targetTopicId && job.triggerSubscriptions) {
+                    const subscriberJobs = delivery.jobs.filter(dj => dj.sourceType === 'topic' && dj.sourceTopicId === job.targetTopicId && dj.enabled);
+                    subscriberJobs.forEach(dj => {
+                        // Trigger async without awaiting to not block collection job
+                        executeDeliveryJob(dj.id).catch(console.error);
+                    });
+                }
             } catch {
                 const errMsg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
                 setErrors(prev => [...new Set([...prev, errMsg])]);
@@ -421,6 +445,7 @@ export const useSimulationEngine = (
         executeCollectionJob,
         executeDeliveryJob,
         executeMappingJob,
-        executeTaskFlow
+        executeTaskFlow,
+        checkTopicRetention
     };
 };
