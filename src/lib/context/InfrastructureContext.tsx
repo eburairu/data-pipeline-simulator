@@ -80,8 +80,8 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
         const parsed = JSON.parse(saved);
         if (parsed.hosts) setHosts(parsed.hosts);
         if (parsed.connections) setConnections(parsed.connections);
-      } catch (e) {
-        console.error('Failed to load infrastructure settings', e);
+      } catch {
+        // console.error('Failed to load infrastructure settings', e);
       }
     }
   }, []);

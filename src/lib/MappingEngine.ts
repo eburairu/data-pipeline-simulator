@@ -2,12 +2,12 @@ import {
     type Mapping,
     type MappingTask,
     type Transformation,
-    type SourceConfig,
-    type TargetConfig,
     type FilterConfig,
     type ExpressionConfig,
     type AggregatorConfig,
     type ValidatorConfig,
+    type TargetConfig,
+    type SourceConfig,
     type JoinerConfig,
     type LookupConfig,
     type RouterConfig,
@@ -27,39 +27,54 @@ import {
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 import { ExpressionFunctions } from './ExpressionFunctions';
 
+export type DataRow = Record<string, unknown>;
+
+export interface DbRecord {
+    id: string;
+    data: DataRow;
+}
+
+// Helper to extract data from DB record or raw object
+const extractData = (record: unknown): DataRow => {
+    if (record && typeof record === 'object' && 'data' in record) {
+        return (record as DbRecord).data;
+    }
+    return record as DataRow;
+};
+
 // Interfaces for dependencies to decouple from Hooks
 export interface FileSystemOps {
-    listFiles: (host: string, path: string) => any[];
+    listFiles: (host: string, path: string) => { name: string, content: string }[];
     readFile: (host: string, path: string, filename: string) => string;
     deleteFile: (host: string, filename: string, path: string) => void;
     writeFile: (host: string, path: string, filename: string, content: string) => void;
 }
 
 export interface DbOps {
-    select: (tableName: string) => any[];
-    insert: (tableName: string, record: any) => void;
-    update: (tableName: string, id: string, record: any) => void;
+    select: (tableName: string) => (DbRecord | DataRow)[];
+    insert: (tableName: string, record: DataRow) => void;
+    update: (tableName: string, id: string, record: DataRow) => void;
     delete: (tableName: string, id: string) => void;
 }
 
 export interface ExecutionStats {
     transformations: { [transformationId: string]: { name: string; input: number; output: number; errors: number; rejects: number } };
     links?: { [linkId: string]: number };
-    rejectRows?: { row: any; error: string; transformationName: string }[];
-    cache?: { [key: string]: any };
+    rejectRows?: { row: DataRow; error: string; transformationName: string }[];
+    cache?: { [key: string]: unknown };
 }
 
 export interface ExecutionState {
     processedFiles?: Set<string>;
     lastProcessedTimestamp?: number;
     sequences?: Record<string, number>; // Persist sequence values by Node ID
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export type ExecutionObserver = (stats: ExecutionStats) => void;
 
 // Helper to evaluate conditions/expressions safely-ish
-const evaluateExpression = (record: any, expression: string, parameters: Record<string, string> = {}): any => {
+const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): any => {
     try {
         const recordKeys = Object.keys(record);
         const recordValues = Object.values(record);
@@ -74,7 +89,7 @@ const evaluateExpression = (record: any, expression: string, parameters: Record<
         // Order: Record Fields, Parameters, Functions
         const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
         return func(...recordValues, ...paramValues, ...funcValues);
-    } catch (e) {
+    } catch {
         // console.warn(`Expression evaluation failed: ${expression}`, e);
         return null;
     }
@@ -97,11 +112,11 @@ const checkStopOnErrors = (stats: ExecutionStats, task: MappingTask) => {
 };
 
 // Helper to get nested value
-const getValueByPath = (obj: any, path: string): any => {
+const getValueByPath = (obj: unknown, path: string): any => {
     if (!path) return undefined;
     // Simple split by dot, handling array index like "items[0]"
     const parts = path.split('.');
-    let current = obj;
+    let current: any = obj;
     for (const part of parts) {
         if (current === null || current === undefined) return undefined;
         const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
@@ -124,7 +139,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Async Traverse with Observer
 const traverseAsync = async (
     currentNode: Transformation,
-    batch: any[],
+    batch: DataRow[],
     mapping: Mapping,
     connections: ConnectionDefinition[],
     tables: TableDefinition[],
@@ -147,7 +162,7 @@ const traverseAsync = async (
         // Simulate processing delay for "Realism"
         await delay(50); // 50ms per node step
 
-        let processedBatch: any[] = [];
+        let processedBatch: DataRow[] = [];
 
         // Update Input Stats
         if (!stats.transformations[nextNode.id]) {
@@ -183,15 +198,15 @@ const traverseAsync = async (
                 }
                 case 'aggregator': {
                     const conf = nextNode.config as AggregatorConfig;
-                    const groups: Record<string, any[]> = {};
+                    const groups: Record<string, DataRow[]> = {};
                     batch.forEach(row => {
-                        const key = conf.groupBy.map(g => row[g]).join('::');
+                        const key = conf.groupBy.map(g => String(row[g])).join('::');
                         if (!groups[key]) groups[key] = [];
                         groups[key].push(row);
                     });
 
                     processedBatch = Object.entries(groups).map(([key, rows]) => {
-                        const res: any = {};
+                        const res: DataRow = {};
                         conf.groupBy.forEach((g, i) => res[g] = key.split('::')[i]);
                         conf.aggregates.forEach(agg => {
                             const values = rows.map(r => Number(r[agg.field]) || 0);
@@ -208,7 +223,7 @@ const traverseAsync = async (
                 case 'validator': {
                     const conf = nextNode.config as ValidatorConfig;
                     const rules = conf.rules || [];
-                    const validRows: any[] = [];
+                    const validRows: DataRow[] = [];
 
                     for (const row of batch) {
                         let isValid = true;
@@ -239,7 +254,7 @@ const traverseAsync = async (
                                         if (!re.test(String(val))) {
                                             isValid = false; break;
                                         }
-                                    } catch (e) {
+                                    } catch {
                                         console.warn(`[MappingEngine] Invalid regex in validator: ${rule.regex}`);
                                     }
                                 }
@@ -279,7 +294,7 @@ const traverseAsync = async (
                             await delay(20);
 
                             for (const row of batch) {
-                                const strategy = row['_strategy'] || 'insert'; // Default to insert
+                                const strategy = (row['_strategy'] as string) || 'insert'; // Default to insert
                                 const rowToProcess = { ...row };
                                 delete rowToProcess['_strategy']; // Remove internal flag
 
@@ -291,7 +306,7 @@ const traverseAsync = async (
                                 // Apply field mapping (simple: match names)
                                 let recordToDb = rowToProcess;
                                 if (tableDef) {
-                                    const filtered: any = {};
+                                    const filtered: DataRow = {};
                                     tableDef.columns.forEach(col => {
                                         if (Object.prototype.hasOwnProperty.call(rowToProcess, col.name)) {
                                             filtered[col.name] = rowToProcess[col.name];
@@ -300,20 +315,20 @@ const traverseAsync = async (
                                     recordToDb = filtered;
                                 }
 
+                                let shouldInsert = true;
+                                let shouldUpdate = false;
+                                let matchId: string | null = null;
+
                                 if (strategy === 'insert') {
+                                    const dupBehavior = conf.duplicateBehavior || 'error';
                                     const dedupKeys = conf.deduplicationKeys || [];
-                                    const dupBehavior = conf.duplicateBehavior;
 
-                                    let shouldInsert = true;
-                                    let shouldUpdate = false;
-                                    let matchId: string | null = null;
-
-                                    if (dedupKeys.length > 0 && dupBehavior) {
+                                    if (dedupKeys.length > 0) {
                                         const allRecords = db.select(tableName);
-                                        const match = allRecords.find((r: any) => {
-                                            const data = r.data || r;
+                                        const match = allRecords.find((r) => {
+                                            const data = extractData(r);
                                             return dedupKeys.every(k => String(data[k]) === String(row[k]));
-                                        });
+                                        }) as DbRecord | undefined;
 
                                         if (match) {
                                             shouldInsert = false;
@@ -340,10 +355,10 @@ const traverseAsync = async (
                                 } else if (strategy === 'update' || strategy === 'delete') {
                                     if (updateCols.length > 0) {
                                         const allRecords = db.select(tableName);
-                                        const match = allRecords.find((r: any) => {
-                                            const data = r.data || r;
+                                        const match = allRecords.find((r) => {
+                                            const data = extractData(r);
                                             return updateCols.every(col => String(data[col]) === String(row[col]));
-                                        });
+                                        }) as DbRecord | undefined;
 
                                         if (match) {
                                             if (strategy === 'update') {
@@ -353,8 +368,6 @@ const traverseAsync = async (
                                                 db.delete(tableName, match.id);
                                                 processedBatch.push(row);
                                             }
-                                        } else {
-                                            // Record not found for update/delete
                                         }
                                     }
                                 }
@@ -389,8 +402,8 @@ const traverseAsync = async (
                             stats.cache[joinerCacheKey] = { masterBatch: batch, received: 1 };
                             processedBatch = [];
                         } else {
-                            const cache = stats.cache[joinerCacheKey];
-                            const masterBatch = cache.masterBatch as any[];
+                            const cache = stats.cache[joinerCacheKey] as { masterBatch: DataRow[]; received: number };
+                            const masterBatch = cache.masterBatch;
                             const detailBatch = batch;
                             const masterKeys = conf.masterKeys || [];
                             const detailKeys = conf.detailKeys || [];
@@ -445,13 +458,14 @@ const traverseAsync = async (
                         // Build Cache if not exists
                         if (!stats.cache[cacheKey]) {
                             const rawData = db.select(lookupConn.tableName || '');
-                            stats.cache[cacheKey] = rawData.map((r: any) => r.data || r); // Ensure pure data objects
+                            stats.cache[cacheKey] = rawData.map((r) => extractData(r)); // Ensure pure data objects
                             // Simulate lookup loading delay
                             await delay(50);
-                            console.log(`[MappingEngine] Lookup ${nextNode.name}: Cached ${stats.cache[cacheKey].length} rows`);
+                            const cachedRows = stats.cache[cacheKey] as DataRow[];
+                            console.log(`[MappingEngine] Lookup ${nextNode.name}: Cached ${cachedRows.length} rows`);
                         }
 
-                        const lookupData = stats.cache[cacheKey] as any[];
+                        const lookupData = stats.cache[cacheKey] as DataRow[];
                         const lookupKeys = conf.lookupKeys || [];
                         const referenceKeys = conf.referenceKeys || [];
                         const returnFields = conf.returnFields || [];
@@ -536,11 +550,11 @@ const traverseAsync = async (
                     if (!stats.cache[unionCacheKey]) {
                         stats.cache[unionCacheKey] = { batches: [batch], received: 1 };
                     } else {
-                        const cache = stats.cache[unionCacheKey];
+                        const cache = stats.cache[unionCacheKey] as { batches: DataRow[][]; received: number };
                         cache.batches.push(batch);
                         cache.received++;
                     }
-                    const cache = stats.cache[unionCacheKey];
+                    const cache = stats.cache[unionCacheKey] as { batches: DataRow[][]; received: number };
                     if (cache.received >= incomingLinks.length) {
                         processedBatch = cache.batches.flat();
                         delete stats.cache[unionCacheKey];
@@ -711,12 +725,13 @@ const traverseAsync = async (
                     const pivotField = conf.pivotField || '';
                     const valueField = conf.valueField || '';
                     if (!pivotField || !valueField) { processedBatch = batch; break; }
-                    const groups: Record<string, any> = {};
+                    const groups: Record<string, DataRow> = {};
                     batch.forEach(row => {
-                        const groupKey = groupByFields.map(k => row[k]).join('::');
+                        const groupKey = groupByFields.map(k => String(row[k])).join('::');
                         if (!groups[groupKey]) {
-                            groups[groupKey] = {};
-                            groupByFields.forEach(k => groups[groupKey][k] = row[k]);
+                            const newGroup: DataRow = {};
+                            groupByFields.forEach(k => newGroup[k] = row[k]);
+                            groups[groupKey] = newGroup;
                         }
                         const pivotKey = row[pivotField];
                         if (pivotKey !== undefined && pivotKey !== null) {
@@ -754,9 +769,13 @@ const traverseAsync = async (
                         if (deleteMatch) {
                             const [, tableName, field, value] = deleteMatch;
                             const records = db.select(tableName);
-                            records.forEach((r: any) => {
-                                const data = r.data || r;
-                                if (String(data[field]) === String(value)) db.delete(tableName, r.id);
+                            records.forEach((r) => {
+                                const data = extractData(r);
+                                if (String(data[field]) === String(value)) {
+                                    if (typeof r === 'object' && r !== null && 'id' in r) {
+                                        db.delete(tableName, (r as { id: string }).id);
+                                    }
+                                }
                             });
                         }
                     }
@@ -773,7 +792,7 @@ const traverseAsync = async (
                     processedBatch = batch.map(row => {
                         const newRow = { ...row };
                         // Mock Data based on URL
-                        let responseData: any = {};
+                        let responseData: unknown = {};
                         if (url.includes('/users')) {
                             responseData = { id: 101, name: 'Simulated User', email: 'user@example.com', role: 'admin' };
                         } else if (url.includes('/weather')) {
@@ -802,15 +821,15 @@ const traverseAsync = async (
                     processedBatch = [];
                     for (const row of batch) {
                         const jsonStr = row[inputField];
-                        if (typeof jsonStr === 'string' || typeof jsonStr === 'object') {
-                            let data = jsonStr;
+                        if (typeof jsonStr === 'string' || (jsonStr && typeof jsonStr === 'object')) {
+                            let data: any = jsonStr;
                             if (typeof jsonStr === 'string') {
                                 try {
-                                    // Try to parse if it looks like JSON
-                                    if (jsonStr.trim().startsWith('{') || jsonStr.trim().startsWith('[')) {
-                                         data = JSON.parse(jsonStr);
+                                    const trimmed = jsonStr.trim();
+                                    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                                         data = JSON.parse(trimmed);
                                     }
-                                } catch (e) {
+                                } catch {
                                     // Parse error
                                 }
                             }
@@ -839,7 +858,7 @@ const traverseAsync = async (
             stats.transformations[nextNode.id].errors += 1;
             if (!stats.rejectRows) stats.rejectRows = [];
             stats.rejectRows.push({
-                row: { batchSize: batch.length, sample: batch[0] },
+                row: batch.length > 0 ? { batchSize: batch.length, sample: batch[0] } : {},
                 error: e instanceof Error ? e.message : String(e),
                 transformationName: nextNode.name
             });
@@ -870,12 +889,10 @@ export const executeMappingTaskRecursive = async (
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
     const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
-    // Clone state to avoid mutating the original reference directly, though strictly standard JS objects are mutable
-    // We want to return a fresh state object that includes updates
     const newState = { ...state, sequences: { ...(state.sequences || {}) } };
 
     // Resolve Parameter File
-    let fileParameters: Record<string, string> = {};
+    const fileParameters: Record<string, string> = {};
     if (task.parameterFileName) {
         try {
             const parts = task.parameterFileName.split(':');
@@ -885,7 +902,6 @@ export const executeMappingTaskRecursive = async (
                 host = parts[0];
                 path = parts.slice(1).join(':');
             }
-            // Need to find filename from path
             const pathParts = path.split('/');
             const filename = pathParts.pop();
             const dir = pathParts.join('/');
@@ -938,28 +954,30 @@ export const executeMappingTaskRecursive = async (
         const conn = connections.find(c => c.id === config.connectionId);
         if (!conn) continue;
 
-        let records: any[] = [];
+        let records: DataRow[] = [];
 
         // Simulate reading delay
         await delay(100);
 
         if (conn.type === 'file') {
             const files = fs.listFiles(conn.host!, conn.path!);
-            const processedSet = newState.processedFiles || new Set<string>();
+            const processedSet = newState.processedFiles as Set<string> | undefined || new Set<string>();
             const file = files.find(f => !processedSet.has(`${task.id}:${f.name}`));
 
             if (file) {
-                let content = fs.readFile(conn.host!, conn.path!, file.name);
+                const content = fs.readFile(conn.host!, conn.path!, file.name);
                 if (file.name.endsWith('.csv')) {
                     try {
                         const lines = content.split(/\r?\n/);
-                        const headers = lines[0].split(',');
-                        records = lines.slice(1).filter(l => l.trim()).map(line => {
-                            const vals = line.split(',');
-                            const rec: any = {};
-                            headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
-                            return rec;
-                        });
+                        if (lines.length > 0) {
+                            const headers = lines[0].split(',');
+                            records = lines.slice(1).filter(l => l.trim()).map(line => {
+                                const vals = line.split(',');
+                                const rec: DataRow = {};
+                                headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
+                                return rec;
+                            });
+                        }
                     } catch (e) {
                         console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
                         stats.transformations[sourceNode.id].errors++;
@@ -972,8 +990,8 @@ export const executeMappingTaskRecursive = async (
                     }
                 } else {
                     try {
-                        records = JSON.parse(content);
-                        if (!Array.isArray(records)) records = [records];
+                        const parsed = JSON.parse(content);
+                        records = Array.isArray(parsed) ? parsed : [parsed];
                     } catch {
                         records = [{ file: file.name, content: content }];
                     }
@@ -995,11 +1013,16 @@ export const executeMappingTaskRecursive = async (
             }
         } else if (conn.type === 'database') {
             const raw = db.select(conn.tableName || '');
-            const lastTs = newState.lastProcessedTimestamp || 0;
-            records = raw.filter(r => r.insertedAt > lastTs).map(r => ({ ...r.data, insertedAt: r.insertedAt }));
+            const lastTs = newState.lastProcessedTimestamp as number | undefined || 0;
+            
+            // Database records might have insertedAt
+            records = raw.filter((r: any) => (r.insertedAt || 0) > lastTs).map(r => ({ 
+                ...extractData(r), 
+                insertedAt: (r as any).insertedAt 
+            }));
 
             if (records.length > 0) {
-                const maxTs = Math.max(...records.map(r => r.insertedAt));
+                const maxTs = Math.max(...records.map(r => Number(r['insertedAt']) || 0));
                 newState.lastProcessedTimestamp = maxTs;
             }
         }
@@ -1011,7 +1034,6 @@ export const executeMappingTaskRecursive = async (
         if (observer) observer({ ...stats });
 
         if (records.length > 0) {
-            // Pass newState to traverse so it can update sequences
             await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer);
         }
     }
@@ -1034,6 +1056,6 @@ export const executeMappingTaskRecursive = async (
     }
 
     return { stats, newState };
-}
+};
 
 export const executeMappingTask = executeMappingTaskRecursive;

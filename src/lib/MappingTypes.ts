@@ -1,35 +1,34 @@
+export type TransformationType = 
+  | 'source' | 'target' | 'filter' | 'expression' | 'aggregator' 
+  | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' 
+  | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' 
+  | 'cleansing' | 'deduplicator' | 'pivot' | 'unpivot' | 'sql' 
+  | 'webService' | 'hierarchyParser';
 
-export type TransformationType = 'source' | 'target' | 'filter' | 'expression' | 'aggregator' | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' | 'union' | 'normalizer' | 'rank' | 'sequence' | 'updateStrategy' | 'cleansing' | 'deduplicator' | 'pivot' | 'unpivot' | 'sql' | 'webService' | 'hierarchyParser';
-
-export interface TransformationConfig {
-  // Common
-  [key: string]: any;
-}
-
-export interface SourceConfig extends TransformationConfig {
-  connectionId: string; // Refers to a ConnectionDefinition
+export interface SourceConfig {
+  connectionId: string;
   deleteAfterRead?: boolean;
-  filenameColumn?: string; // If set, adds the source filename as a column with this name (like standard ETL)
+  filenameColumn?: string;
 }
 
-export interface TargetConfig extends TransformationConfig {
+export interface TargetConfig {
   connectionId: string;
   truncate?: boolean;
-  updateColumns?: string[]; // Columns to use as keys for update/delete operations
+  updateColumns?: string[];
   deduplicationKeys?: string[];
   duplicateBehavior?: 'error' | 'ignore' | 'update';
 }
 
-export interface FilterConfig extends TransformationConfig {
-  condition: string; // e.g. "amount > 100" or "true"
+export interface FilterConfig {
+  condition: string;
 }
 
 export interface FieldExpression {
   name: string;
-  expression: string; // e.g. "price * quantity" or just "fieldname"
+  expression: string;
 }
 
-export interface ExpressionConfig extends TransformationConfig {
+export interface ExpressionConfig {
   fields: FieldExpression[];
 }
 
@@ -39,7 +38,7 @@ export interface AggregateField {
   field: string;
 }
 
-export interface AggregatorConfig extends TransformationConfig {
+export interface AggregatorConfig {
   groupBy: string[];
   aggregates: AggregateField[];
 }
@@ -51,151 +50,148 @@ export interface ValidatorRule {
   regex?: string;
 }
 
-export interface ValidatorConfig extends TransformationConfig {
+export interface ValidatorConfig {
   rules: ValidatorRule[];
   errorBehavior: 'skip' | 'error';
 }
 
-// Joiner: 2つのソースからのデータを結合キーで結合する（ETL機能）
-export interface JoinerConfig extends TransformationConfig {
+export interface JoinerConfig {
   joinType: 'inner' | 'left' | 'right' | 'full';
-  masterKeys: string[];  // マスター側の結合キー
-  detailKeys: string[];  // 詳細側の結合キー
+  masterKeys: string[];
+  detailKeys: string[];
 }
 
-// Lookup: 参照テーブルからデータを参照（ETL機能）
-export interface LookupConfig extends TransformationConfig {
-  connectionId: string;  // 参照テーブルの接続
-  lookupKeys: string[];  // 入力側のルックアップキー
-  referenceKeys: string[];  // 参照テーブル側のキー
-  returnFields: string[];  // 返すフィールド
-  defaultValue?: string;  // 一致なし時のデフォルト値
+export interface LookupConfig {
+  connectionId: string;
+  lookupKeys: string[];
+  referenceKeys: string[];
+  returnFields: string[];
+  defaultValue?: string;
 }
 
-// Router: 条件に基づいて行を振り分け（ETL機能）
 export interface RouterRoute {
-  condition: string;  // e.g. "amount > 1000"
-  groupName: string;  // e.g. "high_value"
+  condition: string;
+  groupName: string;
 }
 
-export interface RouterConfig extends TransformationConfig {
+export interface RouterConfig {
   routes: RouterRoute[];
-  defaultGroup: string;  // 条件にマッチしない行の行き先
+  defaultGroup: string;
 }
 
-// Sorter: 指定フィールドでソート（ETL機能）
 export interface SortField {
   field: string;
   direction: 'asc' | 'desc';
 }
 
-export interface SorterConfig extends TransformationConfig {
+export interface SorterConfig {
   sortFields: SortField[];
 }
 
-// Union: 複数ソースをマージ（ETL機能）
-export interface UnionConfig extends TransformationConfig {
-  // Union は複数の入力を単純にマージするため設定は最小限
-  // 入力はリンクで接続される
+export interface UnionConfig {}
+
+export interface NormalizerConfig {
+  arrayField: string;
+  outputFields: string[];
+  keepOriginalFields: boolean;
 }
 
-// Normalizer: 1行を複数行に展開（ETL機能）
-export interface NormalizerConfig extends TransformationConfig {
-  arrayField: string;  // 展開する配列フィールド
-  outputFields: string[];  // 出力フィールド名（配列の各要素に対応）
-  keepOriginalFields: boolean;  // 元のフィールドを保持するか
+export interface RankConfig {
+  partitionBy: string[];
+  orderBy: { field: string; direction: 'asc' | 'desc' }[];
+  rankField: string;
+  rankType: 'rank' | 'denseRank' | 'rowNumber';
 }
 
-// Rank: ランキング付与（ETL機能）
-export interface RankConfig extends TransformationConfig {
-  partitionBy: string[];  // パーティションキー
-  orderBy: { field: string; direction: 'asc' | 'desc' }[];  // ソート順
-  rankField: string;  // ランク値を格納するフィールド名
-  rankType: 'rank' | 'denseRank' | 'rowNumber';  // ランクタイプ
+export interface SequenceConfig {
+  sequenceField: string;
+  startValue: number;
+  incrementBy: number;
 }
 
-// Sequence: 連番生成（ETL機能）
-export interface SequenceConfig extends TransformationConfig {
-  sequenceField: string;  // 連番を格納するフィールド名
-  startValue: number;  // 開始値
-  incrementBy: number;  // 増分
+export interface UpdateStrategyConfig {
+  strategyField: string;
+  defaultStrategy: 'insert' | 'update' | 'delete' | 'reject';
+  conditions: { condition: string; strategy: 'insert' | 'update' | 'delete' | 'reject' }[];
 }
 
-// UpdateStrategy: Insert/Update/Delete フラグ設定（ETL機能）
-export interface UpdateStrategyConfig extends TransformationConfig {
-  strategyField: string;  // 戦略フラグを格納するフィールド名
-  defaultStrategy: 'insert' | 'update' | 'delete' | 'reject';  // デフォルト戦略
-  conditions: { condition: string; strategy: 'insert' | 'update' | 'delete' | 'reject' }[];  // 条件付き戦略
-}
-
-// Cleansing: データクレンジング（ETL機能）
 export interface CleansingRule {
   field: string;
   operation: 'trim' | 'upper' | 'lower' | 'nullToDefault' | 'replace';
-  defaultValue?: string;  // nullToDefault, replace用
-  replacePattern?: string;  // replace用
-  replaceWith?: string;  // replace用
+  defaultValue?: string;
+  replacePattern?: string;
+  replaceWith?: string;
 }
 
-export interface CleansingConfig extends TransformationConfig {
+export interface CleansingConfig {
   rules: CleansingRule[];
 }
 
-// Deduplicator: 重複行削除（ETL機能）
-export interface DeduplicatorConfig extends TransformationConfig {
-  keys: string[]; // 重複判定キー（空の場合は全フィールド）
+export interface DeduplicatorConfig {
+  keys: string[];
   caseInsensitive: boolean;
 }
 
-// Pivot: 行→列変換（ETL機能）
-export interface PivotConfig extends TransformationConfig {
-  groupByFields: string[]; // グループ化キー
-  pivotField: string; // 列名になる値を持つフィールド
-  valueField: string; // 値になるフィールド
-  aggregates?: string[]; // ピボット後の集計（sum, max等 - 簡易実装ではoptional）
+export interface PivotConfig {
+  groupByFields: string[];
+  pivotField: string;
+  valueField: string;
+  aggregates?: string[];
 }
 
-// Unpivot: 列→行変換（ETL機能）
-export interface UnpivotConfig extends TransformationConfig {
-  fieldsToUnpivot: string[]; // 行に展開するフィールド群
-  newHeaderFieldName: string; // 元のフィールド名を格納する列名
-  newValueFieldName: string; // 値を格納する列名
+export interface UnpivotConfig {
+  fieldsToUnpivot: string[];
+  newHeaderFieldName: string;
+  newValueFieldName: string;
 }
 
-// SQL: SQL実行（ETL機能 - 簡易シミュレーション）
-export interface SqlConfig extends TransformationConfig {
-  sqlQuery: string; // 実行するSQL
-  dbConnectionId?: string; // 接続先（あれば）
+export interface SqlConfig {
+  sqlQuery: string;
+  dbConnectionId?: string;
   mode: 'query' | 'procedure' | 'script';
 }
 
-// Web Service Consumer: REST API呼び出し
-export interface WebServiceConfig extends TransformationConfig {
+export interface WebServiceConfig {
   url: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   headers: { key: string; value: string }[];
-  requestBody?: string; // POST/PUT用 (Template supported)
-  responseMap?: { path: string; field: string }[]; // JSONレスポンスのマッピング
+  requestBody?: string;
+  responseMap?: { path: string; field: string }[];
 }
 
-// Hierarchy Parser: 階層データ解析
-export interface HierarchyParserConfig extends TransformationConfig {
-  inputField: string; // JSON文字列フィールド
+export interface HierarchyParserConfig {
+  inputField: string;
   outputFields: { path: string; name: string; type: 'string' | 'number' | 'boolean' }[];
 }
 
-export interface Transformation {
-  id: string;
-  type: TransformationType;
-  name: string;
-  position: { x: number, y: number }; // For visual layout
-  config: SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig | CleansingConfig | DeduplicatorConfig | PivotConfig | UnpivotConfig | SqlConfig | WebServiceConfig | HierarchyParserConfig;
-}
+export type Transformation = 
+  | { id: string; type: 'source'; name: string; position: { x: number, y: number }; config: SourceConfig }
+  | { id: string; type: 'target'; name: string; position: { x: number, y: number }; config: TargetConfig }
+  | { id: string; type: 'filter'; name: string; position: { x: number, y: number }; config: FilterConfig }
+  | { id: string; type: 'expression'; name: string; position: { x: number, y: number }; config: ExpressionConfig }
+  | { id: string; type: 'aggregator'; name: string; position: { x: number, y: number }; config: AggregatorConfig }
+  | { id: string; type: 'validator'; name: string; position: { x: number, y: number }; config: ValidatorConfig }
+  | { id: string; type: 'joiner'; name: string; position: { x: number, y: number }; config: JoinerConfig }
+  | { id: string; type: 'lookup'; name: string; position: { x: number, y: number }; config: LookupConfig }
+  | { id: string; type: 'router'; name: string; position: { x: number, y: number }; config: RouterConfig }
+  | { id: string; type: 'sorter'; name: string; position: { x: number, y: number }; config: SorterConfig }
+  | { id: string; type: 'union'; name: string; position: { x: number, y: number }; config: UnionConfig }
+  | { id: string; type: 'normalizer'; name: string; position: { x: number, y: number }; config: NormalizerConfig }
+  | { id: string; type: 'rank'; name: string; position: { x: number, y: number }; config: RankConfig }
+  | { id: string; type: 'sequence'; name: string; position: { x: number, y: number }; config: SequenceConfig }
+  | { id: string; type: 'updateStrategy'; name: string; position: { x: number, y: number }; config: UpdateStrategyConfig }
+  | { id: string; type: 'cleansing'; name: string; position: { x: number, y: number }; config: CleansingConfig }
+  | { id: string; type: 'deduplicator'; name: string; position: { x: number, y: number }; config: DeduplicatorConfig }
+  | { id: string; type: 'pivot'; name: string; position: { x: number, y: number }; config: PivotConfig }
+  | { id: string; type: 'unpivot'; name: string; position: { x: number, y: number }; config: UnpivotConfig }
+  | { id: string; type: 'sql'; name: string; position: { x: number, y: number }; config: SqlConfig }
+  | { id: string; type: 'webService'; name: string; position: { x: number, y: number }; config: WebServiceConfig }
+  | { id: string; type: 'hierarchyParser'; name: string; position: { x: number, y: number }; config: HierarchyParserConfig };
 
 export interface MappingLink {
   id: string;
-  sourceId: string; // Transformation ID
-  targetId: string; // Transformation ID
+  sourceId: string;
+  targetId: string;
 }
 
 export interface Mapping {
@@ -203,31 +199,30 @@ export interface Mapping {
   name: string;
   transformations: Transformation[];
   links: MappingLink[];
-  parameters?: Record<string, string>; // Default values for parameters
+  parameters?: Record<string, string>;
 }
 
 export interface MappingTask {
   id: string;
   name: string;
   mappingId: string;
-  executionInterval: number; // ms
+  executionInterval: number;
   enabled: boolean;
-  dependencies?: string[]; // Task IDs that this task depends on
-  parameters?: Record<string, string>; // Override parameters for execution
-  badFileDir?: string; // Directory to store bad/rejected rows
-  parameterFileName?: string; // Path to parameter file
-  stopOnErrors?: number; // Stop if error count exceeds this (0 = disabled)
+  dependencies?: string[];
+  parameters?: Record<string, string>;
+  badFileDir?: string;
+  parameterFileName?: string;
+  stopOnErrors?: number;
 }
 
 export interface TaskFlow {
   id: string;
   name: string;
   description?: string;
-  taskIds: string[]; // List of MappingTask IDs to execute
-  executionInterval: number; // Interval in ms
+  taskIds: string[];
+  executionInterval: number;
   enabled: boolean;
-  parallelExecution?: boolean; // If true, tasks without dependencies run in parallel
-  // GUI specific
+  parallelExecution?: boolean;
   layoutNodes?: Array<{ id: string; position: { x: number; y: number } }>;
   layoutLinks?: Array<{ id: string; source: string; target: string }>;
 }

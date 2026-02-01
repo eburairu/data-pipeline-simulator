@@ -18,35 +18,15 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
 import { useSettings } from '../../lib/SettingsContext';
-import { type ExecutionStats } from '../../lib/MappingEngine'; // Import ExecutionStats
-import MetricEdge from '../MetricEdge'; // Import MetricEdge
 import {
     type Mapping,
     type Transformation,
     type TransformationType,
     type SourceConfig,
-    type TargetConfig,
     type FilterConfig,
-    type ExpressionConfig,
-    type AggregatorConfig,
-    type ValidatorConfig,
-    type JoinerConfig,
-    type LookupConfig,
-    type RouterConfig,
-    type SorterConfig,
-    type UnionConfig,
-    type NormalizerConfig,
-    type RankConfig,
-    type SequenceConfig,
-    type UpdateStrategyConfig,
-    type CleansingConfig,
-    type DeduplicatorConfig,
-    type PivotConfig,
-    type UnpivotConfig,
-    type SqlConfig,
-    type WebServiceConfig,
-    type HierarchyParserConfig
 } from '../../lib/MappingTypes';
+import { type ExecutionStats } from '../../lib/MappingEngine';
+import MetricEdge from '../MetricEdge';
 import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles, Copy, Table, Columns, Database, Globe, FileJson } from 'lucide-react';
 
 // --- Constants ---
@@ -155,16 +135,16 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
     useEffect(() => {
         if (initialMappingId) {
             const m = mappings.find(m => m.id === initialMappingId);
-            if (m) {
+            if (m && (!editingMapping || editingMapping.id !== initialMappingId)) {
                 setEditingMapping(JSON.parse(JSON.stringify(m)));
             }
         }
-    }, [initialMappingId, mappings]);
+    }, [initialMappingId, mappings, editingMapping]);
 
     const handleCreate = () => {
         if (readOnly) return;
         const newMapping: Mapping = {
-            id: `map_${Date.now()}`,
+            id: `map_${crypto.randomUUID().substring(0, 8)}`,
             name: 'New Mapping',
             transformations: [],
             links: []
@@ -195,42 +175,46 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
     const addTransformation = (type: TransformationType) => {
         if (readOnly || !editingMapping) return;
 
-        const id = `t_${Date.now()}`;
-        const newTrans: Transformation = {
+        const id = `t_${crypto.randomUUID().substring(0, 8)}`;
+        let newTrans: Transformation;
+
+        const base = {
             id,
             type,
             name: `${type}_${editingMapping.transformations.length + 1}`,
-            position: { x: 0, y: 0 },
-            config: {} as any
+            position: { x: 0, y: 0 }
         };
 
-        if (type === 'source') newTrans.config = { connectionId: '' } as SourceConfig;
-        if (type === 'target') newTrans.config = { connectionId: '' } as TargetConfig;
-        if (type === 'filter') newTrans.config = { condition: 'true' } as FilterConfig;
-        if (type === 'expression') newTrans.config = { fields: [] } as ExpressionConfig;
-        if (type === 'aggregator') newTrans.config = { groupBy: [], aggregates: [] } as AggregatorConfig;
-        if (type === 'validator') newTrans.config = { rules: [], errorBehavior: 'skip' } as ValidatorConfig;
-        if (type === 'joiner') newTrans.config = { joinType: 'inner', masterKeys: [], detailKeys: [] } as JoinerConfig;
-        if (type === 'lookup') newTrans.config = { connectionId: '', lookupKeys: [], referenceKeys: [], returnFields: [], defaultValue: '' } as LookupConfig;
-        if (type === 'router') newTrans.config = { routes: [], defaultGroup: 'default' } as RouterConfig;
-        if (type === 'sorter') newTrans.config = { sortFields: [] } as SorterConfig;
-        if (type === 'union') newTrans.config = {} as UnionConfig;
-        if (type === 'normalizer') newTrans.config = { arrayField: '', outputFields: [], keepOriginalFields: true } as NormalizerConfig;
-        if (type === 'rank') newTrans.config = { partitionBy: [], orderBy: [], rankField: 'rank', rankType: 'rowNumber' } as RankConfig;
-        if (type === 'sequence') newTrans.config = { sequenceField: 'seq', startValue: 1, incrementBy: 1 } as SequenceConfig;
-        if (type === 'updateStrategy') newTrans.config = { strategyField: '_strategy', defaultStrategy: 'insert', conditions: [] } as UpdateStrategyConfig;
-        if (type === 'cleansing') newTrans.config = { rules: [] } as CleansingConfig;
-        if (type === 'deduplicator') newTrans.config = { keys: [], caseInsensitive: false } as DeduplicatorConfig;
-        if (type === 'pivot') newTrans.config = { groupByFields: [], pivotField: '', valueField: '' } as PivotConfig;
-        if (type === 'unpivot') newTrans.config = { fieldsToUnpivot: [], newHeaderFieldName: 'Metric', newValueFieldName: 'Value' } as UnpivotConfig;
-        if (type === 'sql') newTrans.config = { sqlQuery: '', mode: 'query' } as SqlConfig;
-        if (type === 'webService') newTrans.config = { url: 'http://api.example.com/data', method: 'GET', headers: [], responseMap: [] } as WebServiceConfig;
-        if (type === 'hierarchyParser') newTrans.config = { inputField: '', outputFields: [] } as HierarchyParserConfig;
+        switch (type) {
+            case 'source': newTrans = { ...base, type: 'source', config: { connectionId: '' } }; break;
+            case 'target': newTrans = { ...base, type: 'target', config: { connectionId: '' } }; break;
+            case 'filter': newTrans = { ...base, type: 'filter', config: { condition: 'true' } }; break;
+            case 'expression': newTrans = { ...base, type: 'expression', config: { fields: [] } }; break;
+            case 'aggregator': newTrans = { ...base, type: 'aggregator', config: { groupBy: [], aggregates: [] } }; break;
+            case 'validator': newTrans = { ...base, type: 'validator', config: { rules: [], errorBehavior: 'skip' } }; break;
+            case 'joiner': newTrans = { ...base, type: 'joiner', config: { joinType: 'inner', masterKeys: [], detailKeys: [] } }; break;
+            case 'lookup': newTrans = { ...base, type: 'lookup', config: { connectionId: '', lookupKeys: [], referenceKeys: [], returnFields: [], defaultValue: '' } }; break;
+            case 'router': newTrans = { ...base, type: 'router', config: { routes: [], defaultGroup: 'default' } }; break;
+            case 'sorter': newTrans = { ...base, type: 'sorter', config: { sortFields: [] } }; break;
+            case 'union': newTrans = { ...base, type: 'union', config: {} }; break;
+            case 'normalizer': newTrans = { ...base, type: 'normalizer', config: { arrayField: '', outputFields: [], keepOriginalFields: true } }; break;
+            case 'rank': newTrans = { ...base, type: 'rank', config: { partitionBy: [], orderBy: [], rankField: 'rank', rankType: 'rowNumber' } }; break;
+            case 'sequence': newTrans = { ...base, type: 'sequence', config: { sequenceField: 'seq', startValue: 1, incrementBy: 1 } }; break;
+            case 'updateStrategy': newTrans = { ...base, type: 'updateStrategy', config: { strategyField: '_strategy', defaultStrategy: 'insert', conditions: [] } }; break;
+            case 'cleansing': newTrans = { ...base, type: 'cleansing', config: { rules: [] } }; break;
+            case 'deduplicator': newTrans = { ...base, type: 'deduplicator', config: { keys: [], caseInsensitive: false } }; break;
+            case 'pivot': newTrans = { ...base, type: 'pivot', config: { groupByFields: [], pivotField: '', valueField: '' } }; break;
+            case 'unpivot': newTrans = { ...base, type: 'unpivot', config: { fieldsToUnpivot: [], newHeaderFieldName: 'Metric', newValueFieldName: 'Value' } }; break;
+            case 'sql': newTrans = { ...base, type: 'sql', config: { sqlQuery: '', mode: 'query' } }; break;
+            case 'webService': newTrans = { ...base, type: 'webService', config: { url: 'http://api.example.com/data', method: 'GET', headers: [], responseMap: [] } }; break;
+            case 'hierarchyParser': newTrans = { ...base, type: 'hierarchyParser', config: { inputField: '', outputFields: [] } }; break;
+            default: return;
+        }
 
-        let newLinks = [...editingMapping.links];
+        const newLinks = [...editingMapping.links];
         if (selectedNodeId) {
             newLinks.push({
-                id: `l_${Date.now()}`,
+                id: `l_${crypto.randomUUID().substring(0, 8)}`,
                 sourceId: selectedNodeId,
                 targetId: id
             });
@@ -279,7 +263,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
             if (params.source === params.target) return;
 
             const newLink = {
-                id: `l_${Date.now()}`,
+                id: `l_${crypto.randomUUID().substring(0, 8)}`,
                 sourceId: params.source,
                 targetId: params.target,
             };

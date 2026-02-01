@@ -129,20 +129,15 @@ export const PipelineProvider: React.FC<{ children: ReactNode }> = ({ children }
       try {
         const parsed = JSON.parse(saved);
         if (parsed.collection) {
-            // Migration logic copy from SettingsContext
-             const migratedJobs = parsed.collection.jobs.map((job: any) => {
-                let newJob = { ...job, targetType: job.targetType || 'host' };
-                // NOTE: Here we assume connection migration is handled or ids match.
-                // Since this is just context logic, we copy logic but we cannot resolve connection IDs easily here without access to connections.
-                // For now, trust the saved ID or basic migration. Detailed migration logic should be centralized.
-                // To keep it simple, we just adopt the structure.
-                if (job.sourceHost) { newJob.sourceConnectionId = 'migrated_needs_check'; } 
+            // Migration logic
+             const migratedJobs = parsed.collection.jobs.map((job: { targetType?: string, sourceHost?: string }) => {
+                const newJob = { ...job, targetType: job.targetType || 'host' };
                 return newJob;
             });
             setCollection({ ...parsed.collection, jobs: migratedJobs });
         }
         if (parsed.delivery) {
-             const migratedJobs = parsed.delivery.jobs.map((job: any) => {
+             const migratedJobs = parsed.delivery.jobs.map((job: { sourceType?: string }) => {
                 return { ...job, sourceType: job.sourceType || 'host' };
             });
             setDelivery({ ...parsed.delivery, jobs: migratedJobs });

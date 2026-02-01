@@ -132,7 +132,8 @@ export const IdempotencyTemplate: PipelineTemplate = {
                     type: 'deduplicator', 
                     name: 'Deduplicate IDs', 
                     position: { x: 300, y: 100 }, 
-                    config: { keys: ['id'] } 
+                                        config: { keys: ['id'], caseInsensitive: false }
+                     
                 },
                 { 
                     id: tTgtId, 

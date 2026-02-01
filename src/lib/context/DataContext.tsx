@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
-import { type DataSourceSettings, type TopicDefinition, type TableDefinition, type BiDashboardSettings } from '../types';
+import { type DataSourceSettings, type TopicDefinition, type TableDefinition, type BiDashboardSettings, type DataSourceDefinition, type GenerationJob } from '../types';
 
 interface DataContextType {
   dataSource: DataSourceSettings;
@@ -94,8 +94,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setDataSource(parsed.dataSource);
              } else if (Array.isArray(parsed.dataSource.jobs)) {
                  // Simple migration logic
-                 const newDefinitions: any[] = [];
-                 const newJobs: any[] = [];
+                 const newDefinitions: DataSourceDefinition[] = [];
+                 const newJobs: GenerationJob[] = [];
                  parsed.dataSource.jobs.forEach((oldJob: any) => {
                     const defId = `ds_def_${oldJob.id}`;
                     newDefinitions.push({
@@ -104,7 +104,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                       host: oldJob.host,
                       path: oldJob.sourcePath
                     });
-                    newJobs.push({ ...oldJob, dataSourceId: defId, mode: oldJob.mode || 'template', rowCount: oldJob.rowCount || 1 });
+                    newJobs.push({ 
+                        ...oldJob, 
+                        dataSourceId: defId, 
+                        mode: oldJob.mode || 'template', 
+                        rowCount: oldJob.rowCount || 1 
+                    });
                  });
                  setDataSource({ definitions: newDefinitions, jobs: newJobs });
              }

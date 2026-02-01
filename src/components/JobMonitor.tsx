@@ -69,7 +69,7 @@ const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = 
                   <MappingDesigner
                       readOnly={true}
                       initialMappingId={mappingId || undefined}
-                      executionStats={mappingDetails as any}
+                      executionStats={mappingDetails}
                   />
               </div>
           ) : (
@@ -225,7 +225,7 @@ const JobMonitor: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | JobType>('all');
   const [selectedLog, setSelectedLog] = useState<JobExecutionLog | null>(null);
   const [expandedFlows, setExpandedFlows] = useState<Set<string>>(new Set());
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   // Force re-render to update running times
   useEffect(() => {

@@ -15,7 +15,7 @@ export interface ColumnSchema {
   id: string;
   name: string;
   type: GeneratorType;
-  params: Record<string, any>;
+  params: Record<string, string | number | boolean | string[] | number[]>;
 }
 
 export interface GenerationJob {
@@ -56,7 +56,7 @@ export interface CollectionJob {
   renamePattern: string;
   executionInterval: number;
   enabled: boolean;
-  processingTime?: number; // Optional in job or global setting
+  processingTime?: number;
 }
 
 export interface CollectionSettings {
