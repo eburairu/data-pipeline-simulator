@@ -23,6 +23,7 @@ const SettingsPanel: React.FC = () => {
   const handleApplyTemplate = () => {
     if (window.confirm('This will create new resources (Data Source, DB Table, Mapping) for idempotency testing. Continue?')) {
         applyIdempotencyTemplate();
+        alert('Resources created! \n\n1. Go to the "Simulation" tab.\n2. Ensure the "Gen" (Generator) and "Map" (Mapping) buttons are active (or press "All").\n3. Watch the "idempotency_target" table in the Database view.');
     }
   };
 

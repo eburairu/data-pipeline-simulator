@@ -619,7 +619,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             { id: `c_${timestamp}_3`, name: 'updated_at', type: 'timestamp', params: {} }
         ],
         executionInterval: 5000,
-        enabled: false // User should enable manually
+        enabled: true // Auto-enable for convenience
     };
 
     setDataSource(prev => ({
@@ -713,7 +713,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         name: 'Run Idempotency Test',
         mappingId: mappingId,
         executionInterval: 5000,
-        enabled: false
+        enabled: true
     }]);
 
     // Switch to Data Integration tab or notify?
