@@ -12,13 +12,12 @@ import ReactFlow, {
     type ReactFlowInstance,
     useNodesState,
     useEdgesState,
-    type NodeChange,
-    type EdgeChange
+    type NodeChange
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
 import { useSettings } from '../../lib/SettingsContext';
-import { type TaskFlow, type MappingTask } from '../../lib/MappingTypes';
+import { type TaskFlow } from '../../lib/MappingTypes';
 import { Trash2, Plus, Save, X, GitBranch, LayoutGrid, PlayCircle, Settings, Clock, Zap } from 'lucide-react';
 
 // --- Custom Nodes ---
@@ -78,7 +77,6 @@ const TaskFlowDesigner: React.FC = () => {
     const [editingFlow, setEditingFlow] = useState<TaskFlow | null>(null);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
-    const [hasAutoAligned, setHasAutoAligned] = useState(false);
 
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);

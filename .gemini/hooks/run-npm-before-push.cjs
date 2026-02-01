@@ -14,21 +14,21 @@ async function main() {
 
     // Check if the command is 'git push' executed via 'run_shell_command'
     if (toolName === 'run_shell_command' && command && command.includes('git push')) {
-      console.error('\n🤖 Gemini Hook: Detected git push. Running npm build and test to verify changes...\n');
+      console.error('\n🤖 Gemini Hook: Detected git push. Running strict verification (Type Check, Build, and Tests)...\n');
 
       try {
-        // Run build
-        console.error('Building project...');
-        execSync('npm run build', { stdio: 'inherit' });
+        // 1. Strict Type Check
+        console.error('🔍 Step 1: Running TypeScript type check...');
+        execSync('npm run build', { stdio: 'inherit' }); // Note: build includes tsc -b
         
-        // Run tests
-        console.error('\nRunning tests...');
+        // 2. Unit Tests
+        console.error('\n🔍 Step 2: Running unit tests...');
         execSync('npm test', { stdio: 'inherit' });
 
-        console.error('\n✅ Gemini Hook: Build and tests passed. Allowing git push.\n');
+        console.error('\n✅ Gemini Hook: All checks passed. Allowing git push.\n');
         process.exit(0);
       } catch (error) {
-        console.error('\n❌ Gemini Hook: Verification failed. Blocking git push.\n');
+        console.error('\n❌ Gemini Hook: Verification failed. Please fix the errors above before pushing.\n');
         process.exit(1);
       }
     }
