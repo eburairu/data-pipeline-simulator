@@ -1,3 +1,19 @@
+# [1.1.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.0.0...v1.1.0) (2026-02-01)
+
+
+### Bug Fixes
+
+* enable idempotency jobs by default and improve user guidance ([b305877](https://github.com/eburairu/data-pipeline-simulator/commit/b305877817890f537f9338af5a61a54d01fc88bf))
+* resolve build errors related to missing imports and unused variables ([2047847](https://github.com/eburairu/data-pipeline-simulator/commit/2047847b70e8f1bd5aea85ff0328c9795eee5f76))
+
+
+### Features
+
+* add idempotency test template and setup button ([731e2b3](https://github.com/eburairu/data-pipeline-simulator/commit/731e2b3cadd1627fdd35bb561c86cfabf74fb2fa))
+* Change default database view mode to table ([40b15ba](https://github.com/eburairu/data-pipeline-simulator/commit/40b15ba87fb2a434e25ff49cc4b9424104366da2))
+* Improve mobile responsiveness and safe local CI testing ([ebe4260](https://github.com/eburairu/data-pipeline-simulator/commit/ebe4260ec1626e000cfa63f26ac78b25727dcafa))
+* refactor pipeline templates into a dedicated service and UI manager ([e01cefa](https://github.com/eburairu/data-pipeline-simulator/commit/e01cefa957445ef4c66ef2c08c186cf1c39feea0))
+
 # 1.0.0 (2026-02-01)
 
 
