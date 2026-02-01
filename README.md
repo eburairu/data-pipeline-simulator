@@ -7,11 +7,17 @@
 
 ### 1. データ統合 (Data Integration)
 *   **マッピングデザイナー (Mapping Designer)**: GUIベースのデザイナーを使用して、Source, Filter, Expression, Aggregator, Target などの変換ロジックを視覚的に定義できます。
+*   **タスクフローデザイナー (Task Flow Designer)**: 複数のマッピングタスクを依存関係に基づいてグループ化し、一括実行や並列実行を管理します。
 *   **コネクション管理 (Connections)**: ファイルシステムやデータベースへの接続情報を抽象化して管理します。
 *   **マッピングタスク (Mapping Tasks)**: 定義したマッピングを実行可能なタスクとしてスケジュールし、実行履歴や統計（処理行数、エラー行数）をモニタリングできます。
 *   **高度なETL機能**:
     *   **式言語 (Expression Functions)**: `LPAD`, `SYSDATE`, `IS_DATE` などの豊富な関数を使用したデータ変換。
     *   **バリデーション**: データ品質チェックと、エラー行のBad Fileへの出力機能。
+    *   **多様な変換 (Transformations)**:
+        *   Joiner, Lookup (キャッシュ対応), Router, Sorter, Union
+        *   Normalizer, Rank, Sequence (永続化対応), UpdateStrategy
+        *   Cleansing, Deduplicator, Pivot, Unpivot
+        *   SQL (仮想DB操作), WebService (Mock APIコール), HierarchyParser (JSONフラット化)
 
 ### 2. データ連携ハブ (Data Hub)
 *   **トピック管理 (Topics)**: データをカテゴリごとに保持・管理するトピックを定義し、データの保持期間（Retention）を設定できます。
@@ -60,8 +66,8 @@ npm run dev
 1.  **シミュレーション (Simulation) タブ**: データパイプライン全体のフローを可視化し、リアルタイムで監視・制御します。
 2.  **設定 (Settings) タブ**:
     *   **Data Hub**: トピック、アプリケーション、Pub/Subの設定を行います。
-    *   **Data Integration**: コネクション、マッピング、マッピングタスクの定義を行います。
-    *   **Data Source**: テストデータ生成ルールを定義します。
+    *   **Data Integration**: コネクション、マッピング、マッピングタスク、タスクフローの定義を行います。
+    *   **Data Source**: テストデータ生成ルール定義、テンプレート管理、およびインフラ（ホスト/ディレクトリ）の設定を行います。
     *   **Database**: 仮想テーブルの定義を行います。
 3.  **モニタ (Monitor) タブ**: 実行されたジョブの履歴と詳細ログを確認します。
 4.  **ダッシュボード (Dashboard) タブ**: データベース内のデータを可視化します。
@@ -74,6 +80,7 @@ npm run dev
 *   [Data Hub機能仕様](.specify/specs/002-datahub-features/spec.md)
 *   [Data Integration機能仕様](.specify/specs/003-dataintegration-features/spec.md)
 *   [ETL拡張仕様](.specify/specs/004-etl-enhancements/spec.md)
+*   [システムリファクタリング仕様](.specify/specs/005-system-refactoring/spec.md)
 
 ## 技術スタック
 
