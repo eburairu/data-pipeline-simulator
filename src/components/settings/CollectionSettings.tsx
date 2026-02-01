@@ -69,7 +69,7 @@ const CollectionSettings: React.FC = () => {
 
   return (
     <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Collection Settings</h3>
+      <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Publications (Collection)</h3>
 
       {/* Global Settings */}
        <div>
@@ -154,7 +154,7 @@ const CollectionSettings: React.FC = () => {
                                 checked={job.targetType === 'topic'}
                                 onChange={() => handleTargetTypeChange(job.id, 'topic')}
                                 className="mr-1"
-                            /> Topic (CIH)
+                            /> Topic
                         </label>
                     </div>
 

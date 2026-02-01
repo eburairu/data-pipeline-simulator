@@ -20,7 +20,9 @@ import {
     type DeduplicatorConfig,
     type PivotConfig,
     type UnpivotConfig,
-    type SqlConfig
+    type SqlConfig,
+    type WebServiceConfig,
+    type HierarchyParserConfig
 } from './MappingTypes';
 import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
 import { ExpressionFunctions } from './ExpressionFunctions';
@@ -53,6 +55,8 @@ export interface ExecutionState {
     [key: string]: any;
 }
 
+export type ExecutionObserver = (stats: ExecutionStats) => void;
+
 // Helper to evaluate conditions/expressions safely-ish
 const evaluateExpression = (record: any, expression: string, parameters: Record<string, string> = {}): any => {
     try {
@@ -81,8 +85,43 @@ const substituteParams = (str: string, params: Record<string, string>): string =
     return str.replace(/\$\{(\w+)\}/g, (_, key) => params[key] || '');
 };
 
-// Re-implementing traverse properly
-const traverse = (
+// Helper to check stop on errors
+const checkStopOnErrors = (stats: ExecutionStats, task: MappingTask) => {
+    if (task.stopOnErrors && task.stopOnErrors > 0) {
+        const totalErrors = Object.values(stats.transformations).reduce((acc, t) => acc + t.errors, 0);
+        if (totalErrors > task.stopOnErrors) {
+            throw new Error(`Execution halted: Total errors (${totalErrors}) exceeded limit (${task.stopOnErrors}).`);
+        }
+    }
+};
+
+// Helper to get nested value
+const getValueByPath = (obj: any, path: string): any => {
+    if (!path) return undefined;
+    // Simple split by dot, handling array index like "items[0]"
+    const parts = path.split('.');
+    let current = obj;
+    for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+        if (arrayMatch) {
+            current = current[arrayMatch[1]];
+            if (current && Array.isArray(current)) {
+                current = current[parseInt(arrayMatch[2])];
+            } else {
+                return undefined;
+            }
+        } else {
+            current = current[part];
+        }
+    }
+    return current;
+};
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Async Traverse with Observer
+const traverseAsync = async (
     currentNode: Transformation,
     batch: any[],
     mapping: Mapping,
@@ -91,16 +130,29 @@ const traverse = (
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats,
-    state: ExecutionState, // Added state for persistent sequences
-    parameters: Record<string, string> = {}
+    state: ExecutionState,
+    parameters: Record<string, string>,
+    task: MappingTask,
+    observer?: ExecutionObserver
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
     const nextNodes = outgoingLinks.map(l => mapping.transformations.find(t => t.id === l.targetId)).filter(Boolean) as Transformation[];
 
     for (const nextNode of nextNodes) {
+        // Simulate processing delay for "Realism"
+        await delay(50); // 50ms per node step
+
         let processedBatch: any[] = [];
+
+        // Update Input Stats
+        if (!stats.transformations[nextNode.id]) {
+            stats.transformations[nextNode.id] = { name: nextNode.name, input: 0, output: 0, errors: 0, rejects: 0 };
+        }
         stats.transformations[nextNode.id].input += batch.length;
+
+        // Notify Observer (Input Phase)
+        if (observer) observer({ ...stats });
 
         try {
             switch (nextNode.type) {
@@ -196,6 +248,7 @@ const traverse = (
                                     transformationName: nextNode.name
                                 });
                                 stats.transformations[nextNode.id].errors++;
+                                checkStopOnErrors(stats, task);
                             }
                         }
                     }
@@ -213,14 +266,17 @@ const traverse = (
                             const tableDef = tables.find(t => t.name === tableName);
                             const updateCols = conf.updateColumns || [];
 
-                            batch.forEach(row => {
+                            // Simulate Database IO latency per chunk (simplified as one await here)
+                            await delay(20);
+
+                            for (const row of batch) {
                                 const strategy = row['_strategy'] || 'insert'; // Default to insert
                                 const rowToProcess = { ...row };
                                 delete rowToProcess['_strategy']; // Remove internal flag
 
                                 if (strategy === 'reject') {
                                     stats.transformations[nextNode.id].rejects++;
-                                    return; // Skip downstream
+                                    continue;
                                 }
 
                                 // Apply field mapping (simple: match names)
@@ -255,10 +311,10 @@ const traverse = (
                                             matchId = match.id;
                                             if (dupBehavior === 'error') {
                                                 stats.transformations[nextNode.id].errors++;
-                                                return;
+                                                continue;
                                             } else if (dupBehavior === 'ignore') {
                                                 processedBatch.push(row); // Treat as success
-                                                return;
+                                                continue;
                                             } else if (dupBehavior === 'update') {
                                                 shouldUpdate = true;
                                             }
@@ -293,7 +349,7 @@ const traverse = (
                                         }
                                     }
                                 }
-                            });
+                            }
                         } else if (targetConn.type === 'file') {
                             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                             const filename = `output_${timestamp}.json`;
@@ -381,6 +437,8 @@ const traverse = (
                         if (!stats.cache[cacheKey]) {
                             const rawData = db.select(lookupConn.tableName || '');
                             stats.cache[cacheKey] = rawData.map((r: any) => r.data || r); // Ensure pure data objects
+                            // Simulate lookup loading delay
+                            await delay(50);
                             console.log(`[MappingEngine] Lookup ${nextNode.name}: Cached ${stats.cache[cacheKey].length} rows`);
                         }
 
@@ -573,7 +631,6 @@ const traverse = (
 
                     // Update state
                     state.sequences[nextNode.id] = currentVal;
-                    console.log(`[MappingEngine] Sequence ${nextNode.name}: updated next value to ${currentVal}`);
                     break;
                 }
                 case 'updateStrategy': {
@@ -697,6 +754,74 @@ const traverse = (
                     processedBatch = batch.map(row => ({ ...row, _sql_status: 'success' }));
                     break;
                 }
+                case 'webService': {
+                    const conf = nextNode.config as WebServiceConfig;
+                    const url = substituteParams(conf.url, parameters);
+                    // Simulate network delay
+                    await delay(100);
+
+                    // Mock Response Logic
+                    processedBatch = batch.map(row => {
+                        const newRow = { ...row };
+                        // Mock Data based on URL
+                        let responseData: any = {};
+                        if (url.includes('/users')) {
+                            responseData = { id: 101, name: 'Simulated User', email: 'user@example.com', role: 'admin' };
+                        } else if (url.includes('/weather')) {
+                            responseData = { temp: 25, condition: 'Sunny', location: 'Tokyo' };
+                        } else if (url.includes('/products')) {
+                             responseData = { id: 'P001', name: 'Widget A', price: 19.99, stock: 50 };
+                        } else {
+                            responseData = { status: 'ok', timestamp: new Date().toISOString() };
+                        }
+
+                        // Map Response
+                        if (conf.responseMap) {
+                            conf.responseMap.forEach(mapping => {
+                                newRow[mapping.field] = getValueByPath(responseData, mapping.path);
+                            });
+                        }
+                        return newRow;
+                    });
+                    break;
+                }
+                case 'hierarchyParser': {
+                    const conf = nextNode.config as HierarchyParserConfig;
+                    const inputField = conf.inputField;
+                    const outputs = conf.outputFields || [];
+
+                    processedBatch = [];
+                    for (const row of batch) {
+                        const jsonStr = row[inputField];
+                        if (typeof jsonStr === 'string' || typeof jsonStr === 'object') {
+                            let data = jsonStr;
+                            if (typeof jsonStr === 'string') {
+                                try {
+                                    // Try to parse if it looks like JSON
+                                    if (jsonStr.trim().startsWith('{') || jsonStr.trim().startsWith('[')) {
+                                         data = JSON.parse(jsonStr);
+                                    }
+                                } catch (e) {
+                                    // Parse error
+                                }
+                            }
+
+                            // If root is array, flatten (explode). If object, just map.
+                            const items = Array.isArray(data) ? data : [data];
+
+                            items.forEach(item => {
+                                const newRow = { ...row };
+                                outputs.forEach(out => {
+                                    newRow[out.name] = getValueByPath(item, out.path);
+                                });
+                                processedBatch.push(newRow);
+                            });
+                        } else {
+                            processedBatch.push(row);
+                        }
+                    }
+                    break;
+                }
                 default:
                     processedBatch = batch;
             }
@@ -709,16 +834,21 @@ const traverse = (
                 error: e instanceof Error ? e.message : String(e),
                 transformationName: nextNode.name
             });
+
+            checkStopOnErrors(stats, task);
         }
 
         stats.transformations[nextNode.id].output += processedBatch.length;
+
+        // Notify Observer (Output Phase)
+        if (observer) observer({ ...stats });
+
         if (processedBatch.length > 0) {
-            traverse(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters);
+            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, task, observer);
         }
     }
 };
 
-// Refactor executeMappingTask to use recursive traverse
 export const executeMappingTaskRecursive = async (
     task: MappingTask,
     mapping: Mapping,
@@ -726,7 +856,8 @@ export const executeMappingTaskRecursive = async (
     tables: TableDefinition[],
     fs: FileSystemOps,
     db: DbOps,
-    state: ExecutionState
+    state: ExecutionState,
+    observer?: ExecutionObserver
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
     const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
@@ -734,12 +865,54 @@ export const executeMappingTaskRecursive = async (
     // We want to return a fresh state object that includes updates
     const newState = { ...state, sequences: { ...(state.sequences || {}) } };
 
+    // Resolve Parameter File
+    let fileParameters: Record<string, string> = {};
+    if (task.parameterFileName) {
+        try {
+            const parts = task.parameterFileName.split(':');
+            let host = 'localhost';
+            let path = task.parameterFileName;
+            if (parts.length > 1) {
+                host = parts[0];
+                path = parts.slice(1).join(':');
+            }
+            // Need to find filename from path
+            const pathParts = path.split('/');
+            const filename = pathParts.pop();
+            const dir = pathParts.join('/');
+
+            if (filename) {
+               const content = fs.readFile(host, dir || '/', filename);
+               if (content) {
+                   content.split(/\r?\n/).forEach(line => {
+                       const idx = line.indexOf('=');
+                       if (idx > 0) {
+                           const key = line.substring(0, idx).trim();
+                           const val = line.substring(idx+1).trim();
+                           if (key && !key.startsWith('#')) {
+                               fileParameters[key] = val;
+                           }
+                       }
+                   });
+               }
+            }
+        } catch (e) {
+             if (!stats.rejectRows) stats.rejectRows = [];
+             stats.rejectRows.push({
+                row: { file: task.parameterFileName },
+                error: `Failed to load parameter file: ${e instanceof Error ? e.message : String(e)}`,
+                transformationName: 'ParameterInit'
+             });
+        }
+    }
+
     // Resolve Parameters
     const startTime = new Date();
     const parameters = {
         'SYSDATE': startTime.toISOString(),
         'SESSSTARTTIME': startTime.toISOString(),
         ...(mapping.parameters || {}),
+        ...fileParameters,
         ...(task.parameters || {})
     };
 
@@ -757,6 +930,9 @@ export const executeMappingTaskRecursive = async (
         if (!conn) continue;
 
         let records: any[] = [];
+
+        // Simulate reading delay
+        await delay(100);
 
         if (conn.type === 'file') {
             const files = fs.listFiles(conn.host!, conn.path!);
@@ -822,9 +998,12 @@ export const executeMappingTaskRecursive = async (
         stats.transformations[sourceNode.id].input = records.length;
         stats.transformations[sourceNode.id].output = records.length;
 
+        // Notify initial stats
+        if (observer) observer({ ...stats });
+
         if (records.length > 0) {
             // Pass newState to traverse so it can update sequences
-            traverse(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters);
+            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer);
         }
     }
 

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 
 export interface DBRecord {
   id: string;
@@ -25,7 +25,23 @@ interface VirtualDBContextType {
 const VirtualDBContext = createContext<VirtualDBContextType | undefined>(undefined);
 
 export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [records, setRecords] = useState<DBRecord[]>([]);
+  const [records, setRecords] = useState<DBRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('virtual-db');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Failed to load DB from storage', e);
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('virtual-db', JSON.stringify(records));
+    } catch (e) {
+      console.error('Failed to save DB to storage', e);
+    }
+  }, [records]);
 
   const insert = useCallback((table: string, data: Record<string, unknown>) => {
     const newRecord: DBRecord = {

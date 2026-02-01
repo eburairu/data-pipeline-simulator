@@ -65,7 +65,7 @@ const DeliverySettings: React.FC = () => {
 
   return (
     <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Delivery Settings</h3>
+      <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Subscriptions (Delivery)</h3>
 
       <div className="space-y-4">
         {delivery.jobs.map((job) => {
@@ -122,7 +122,7 @@ const DeliverySettings: React.FC = () => {
                                 checked={job.sourceType === 'topic'}
                                 onChange={() => handleSourceTypeChange(job.id, 'topic')}
                                 className="mr-1"
-                            /> Topic (CIH)
+                            /> Topic
                         </label>
                     </div>
 

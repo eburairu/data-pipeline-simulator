@@ -1,4 +1,4 @@
-# Feature Specification: ETL Enhancements for IDMC CDI Simulation
+# Feature Specification: ETL Enhancements for Data Integration Simulation
 
 **Feature Branch**: `feat/etl-enhancements`
 **Created**: 2026-05-21
@@ -6,7 +6,7 @@
 **Input**: User Request for more realistic pipeline simulation
 
 ## Overview
-本仕様は、IDMC CDI (Cloud Data Integration) のシミュレーションをより現実に近づけるため、ETL処理能力を強化するものである。具体的には、Expression変換における関数ライブラリの拡充、およびエラー行を適切に処理するためのReject File (Bad File) 生成機能を実装する。
+本仕様は、Data Integration のシミュレーションをより現実に近づけるため、ETL処理能力を強化するものである。具体的には、Expression変換における関数ライブラリの拡充、およびエラー行を適切に処理するためのReject File (Bad File) 生成機能を実装する。
 
 ## User Scenarios & Testing
 

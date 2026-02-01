@@ -12,16 +12,16 @@ import BiDashboardSettings from './BiDashboardSettings';
 import { Database, ArrowLeftRight, Workflow, Server, Activity } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
 
-type SettingsTab = 'datasource' | 'transfer' | 'processing' | 'database' | 'bi';
+type SettingsTab = 'datasource' | 'integrationHub' | 'dataIntegration' | 'database' | 'bi';
 
 const SettingsPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('datasource');
   const { t } = useTranslation();
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'datasource', label: t('settings.tabs.datasource'), icon: <Server size={16} /> },
-    { id: 'transfer', label: t('settings.tabs.transfer'), icon: <ArrowLeftRight size={16} /> },
-    { id: 'processing', label: t('settings.tabs.processing'), icon: <Workflow size={16} /> },
+    { id: 'datasource', label: 'Data Source', icon: <Server size={16} /> },
+    { id: 'integrationHub', label: 'Data Hub', icon: <ArrowLeftRight size={16} /> },
+    { id: 'dataIntegration', label: 'Data Integration', icon: <Workflow size={16} /> },
     { id: 'database', label: t('settings.tabs.database'), icon: <Database size={16} /> },
     { id: 'bi', label: t('settings.tabs.bi'), icon: <Activity size={16} /> },
   ];
@@ -54,7 +54,7 @@ const SettingsPanel: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'transfer' && (
+        {activeTab === 'integrationHub' && (
           <div className="space-y-6">
             <TopicSettings />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -64,7 +64,7 @@ const SettingsPanel: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'processing' && (
+        {activeTab === 'dataIntegration' && (
           <div className="space-y-6">
             <ConnectionSettings />
             <MappingDesigner />

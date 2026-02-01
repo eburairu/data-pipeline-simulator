@@ -1,41 +1,39 @@
-# Specification: Data Pipeline Simulator
+# [DEPRECATED] Specification: Data Pipeline Simulator
+
+> **注意**: このドキュメントは非推奨です。最新の仕様は [`.specify/specs/`](../.specify/specs/) ディレクトリ配下のドキュメントを参照してください。
 
 ## Overview
 
 **名称**: Data Pipeline Simulator  
-**目的**: IDMC CDI のデータパイプラインをブラウザ上でシミュレート  
+**目的**: Data Integration Platform のデータパイプラインをブラウザ上でシミュレート
 **対象ユーザー**: データエンジニア、ETL開発者、学習者
 
 ---
 
 ## Functional Requirements
 
-### FR4.1: 冪等性担保 (Idempotency)
-- ターゲットノードにて、データの重複登録を防ぐ設定を追加
-- 重複判定キー（Deduplication Keys）の指定
-- 重複時のアクション設定（Ignore, Update, Error）
-
-
 ### FR1: データソース生成
 - ユーザーが定義したパターンでソースファイルを自動生成
 - タイムスタンプ付きファイル名（ミリ秒精度で一意性保証）
 - CSV/JSON 形式をサポート
 
-### FR2: 収集処理（Collection）
-- ソースホストからファイルを取得
-- 正規表現フィルターでファイル選択
-- 取得時にファイル名リネーム対応
+### FR2: 出版処理（Publication / Data Hub）
+- 外部システムからデータを受信し、Data Hub の「トピック」へデータをパブリッシュする処理
+- ソース（ファイル）からトピックへのデータ転送
+- フィルタリング、リネーム機能
 
-### FR3: 配信処理（Delivery）
-- 中間ストレージからファイルを移動
-- ターゲットパスへの配置
-- 処理後ファイル削除オプション
+### FR3: 購読処理（Subscription / Data Hub）
+- Data Hubのトピックからデータをサブスクライブし、ターゲットシステムへ配信する処理
+- トピックからターゲット（ファイル/DB/マッピングタスク）へのデータ転送
+- 複数サブスクライバーへの同時配信シミュレーション
 
-### FR4: マッピング処理
+### FR4: マッピング処理 (Data Integration)
 - ソースからターゲットへのデータ変換
+- **Web Services Consumer**: REST API呼び出しのシミュレーション（モックレスポンス）
+- **Hierarchy Parser**: JSON/XMLデータの階層構造解析とフラット化
 - Expression による計算フィールド追加
 - Filter による行選択
-- ファイル名列追加機能（IDMC CDI 類似）
+- ファイル名列追加機能（Standard ETL 類似）
 - 冪等性担保（Idempotency）のシミュレーション
   - ターゲットへの書き込み時に重複チェックを実施
   - 重複時の挙動（Ignore/Update/Error）を選択可能
@@ -54,11 +52,15 @@
 - ステータス（Success/Failed/Running）、処理時間、処理件数の可視化
 - エラー発生時の詳細メッセージ表示
 - ジョブ履歴のフィルタリングと閲覧機能
-- **詳細ドリルダウン機能**:
-  - 各実行ログをクリックすることで詳細ビューを表示
-  - マッピング処理: 各変換ノード（Transformation）ごとの入力/出力/エラー/除外件数を表示
-  - 転送処理（Collection/Delivery）: 処理ファイル名、サイズ、理論上のスループットを表示
-  - エラー詳細: リジェクトされた行データや、スタックトレース/エラーメッセージの構造化表示
+
+### FR8: 非同期ストリーム実行 (Async Stream Execution)
+- **非同期処理**: マッピング実行を非同期で行い、UIスレッドをブロックしない
+- **遅延シミュレーション**: 各変換ステップで人工的な遅延（Processing Delay）を導入し、リアルな処理時間を表現
+- **プログレッシブ更新**: 全データ処理完了を待たずに、処理の進行状況（Progress）を逐次更新
+
+### FR9: 詳細な実行統計 (Enhanced Statistics)
+- **ノード別統計**: 各Transformationノードごとの入力数(Input)、出力数(Output)、エラー数(Error)を計測
+- **リアルタイム表示**: ジョブ実行中に統計情報をリアルタイムでMonitor画面に反映
 
 ---
 
@@ -79,19 +81,19 @@
 
 ### US3: 運用状況のモニタリング
 1. ユーザーが「Monitor」タブを開く
-2. 最近実行されたジョブの一覧とステータスを確認
-3. エラーになったジョブ（赤色表示）をクリックして詳細を確認
-4. 問題を特定し、設定を修正して再実行
+2. 現在実行中のジョブが「Running」として表示され、処理件数がリアルタイムで増加する様子を確認
+3. 完了後、詳細ログをクリックして各ノードの処理結果（Input/Output）を確認
 
 ---
 
 ## Success Criteria
 
-- 生成されたファイルが5秒以内にパイプラインを通過
+- 生成されたファイルが5秒以内にパイプラインを通過（遅延設定による）
 - ファイル処理状況がリアルタイムでUI反映
 - 各ジョブタイプを独立して制御可能
 - コンソールログで処理統計を確認可能
 - 実行履歴がUI上で確認でき、エラー特定が容易であること
+- マッピング実行中にブラウザがフリーズしないこと（非同期化）
 
 ---
 
@@ -105,6 +107,10 @@
 - name, type (file/database)
 - host, directory/tableName
 
+### Topic
+- name, retentionPeriod
+- associatedPublications, associatedSubscriptions
+
 ### Mapping
 - nodes: source, transform, target
 - edges: ノード間接続
@@ -115,9 +121,10 @@
 
 ### JobExecutionLog
 - jobId, jobName, jobType
-- status (Success/Failed)
+- status (Success/Failed/Running)
 - startTime, endTime
-- recordCount (input/output)
+- recordCount (input/output/error)
+- transformationStats: Map<NodeId, Stats>
 - errorMessage
 
 ---

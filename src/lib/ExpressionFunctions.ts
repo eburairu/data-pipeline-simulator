@@ -19,7 +19,7 @@ export const ExpressionFunctions = {
     // String
     SUBSTR: (str: string, start: number, length?: number) => {
         if (typeof str !== 'string') return null;
-        // IDMC/SQL uses 1-based index (usually), JS uses 0. Let's assume standard ETL 1-based for familiarity?
+        // Standard ETL/SQL uses 1-based index (usually), JS uses 0. Let's assume standard ETL 1-based for familiarity?
         // Actually keep it simple: JS logic for now, or 1-based for realism?
         // Let's stick to standard ETL behavior: 1-based.
         const s = start > 0 ? start - 1 : 0;

@@ -36,23 +36,23 @@
 ### 技術スタック
 
 - **フロントエンド**: React + TypeScript + Vite
-- **スタイリング**: Tailwind CSS
-- **可視化**: ReactFlow, dagre
+- **スタイリング**: Tailwind CSS (v4)
+- **可視化**: ReactFlow, dagre, Recharts
 - **アイコン**: lucide-react
 
 ### 主要コンポーネント
 
-- `src/App.tsx` - メインアプリケーション、シミュレーション制御
+- `src/App.tsx` - メインアプリケーション、シミュレーション制御 (SimulationManager)
 - `src/components/PipelineFlow.tsx` - パイプラインビジュアライザー
-- `src/components/settings/` - 設定画面コンポーネント
+- `src/components/settings/` - 設定画面コンポーネント (Data Hub/Data Integration設定)
 - `src/lib/MappingEngine.ts` - ETLマッピング実行エンジン
 - `src/lib/VirtualFileSystemContext.tsx` - 仮想ファイルシステム
 - `src/lib/VirtualDatabaseContext.tsx` - 仮想データベース
 
 ### 仕様ドキュメント
 
-- `specs/constitution.md` - プロジェクト原則
-- `specs/spec.md` - 機能要件
+- `.specify/memory/constitution.md` - プロジェクト原則
+- `.specify/specs/` - 機能仕様書群
 
 ## Antigravity スキル
 

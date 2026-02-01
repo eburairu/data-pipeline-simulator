@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
 export type JobType = 'collection' | 'delivery' | 'mapping';
-export type JobStatus = 'success' | 'failed';
+export type JobStatus = 'success' | 'failed' | 'running';
 
 export interface MappingExecutionDetails {
   transformations: {
@@ -17,13 +17,13 @@ export interface TransferExecutionDetails {
 }
 
 export interface JobExecutionLog {
-  id: string;
-  jobId: string;
+  id: string; // Log ID (UUID)
+  jobId: string; // Job Definition ID
   jobName: string;
   jobType: JobType;
   status: JobStatus;
   startTime: number;
-  endTime: number;
+  endTime?: number;
   recordsInput: number;
   recordsOutput: number;
   errorMessage?: string;
@@ -33,7 +33,8 @@ export interface JobExecutionLog {
 
 interface JobMonitorContextType {
   logs: JobExecutionLog[];
-  addLog: (log: Omit<JobExecutionLog, 'id'>) => void;
+  addLog: (log: Omit<JobExecutionLog, 'id'>) => string; // Return the new Log ID
+  updateLog: (logId: string, updates: Partial<JobExecutionLog>) => void;
   clearLogs: () => void;
   retryJob: (jobId: string, jobType: JobType) => void;
 }
@@ -58,6 +59,13 @@ export const JobMonitorProvider: React.FC<{ children: ReactNode; retryJob?: (job
       }
       return updated;
     });
+    return newLog.id;
+  }, []);
+
+  const updateLog = useCallback((logId: string, updates: Partial<JobExecutionLog>) => {
+    setLogs((prev) => prev.map(log =>
+      log.id === logId ? { ...log, ...updates } : log
+    ));
   }, []);
 
   const clearLogs = useCallback(() => {
@@ -67,7 +75,7 @@ export const JobMonitorProvider: React.FC<{ children: ReactNode; retryJob?: (job
   const handleRetry = retryJob || ((id, type) => console.warn(`Retry not implemented for ${type} job ${id}`));
 
   return (
-    <JobMonitorContext.Provider value={{ logs, addLog, clearLogs, retryJob: handleRetry }}>
+    <JobMonitorContext.Provider value={{ logs, addLog, updateLog, clearLogs, retryJob: handleRetry }}>
       {children}
     </JobMonitorContext.Provider>
   );

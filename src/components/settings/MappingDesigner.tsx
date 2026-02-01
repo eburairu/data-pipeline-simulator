@@ -41,32 +41,36 @@ import {
     type DeduplicatorConfig,
     type PivotConfig,
     type UnpivotConfig,
-    type SqlConfig
+    type SqlConfig,
+    type WebServiceConfig,
+    type HierarchyParserConfig
 } from '../../lib/MappingTypes';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles, Copy, Table, Columns, Database } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid, CheckSquare, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles, Copy, Table, Columns, Database, Globe, FileJson } from 'lucide-react';
 
 // --- Constants ---
 const TRANSFORMATION_TYPES = [
     { type: 'source', label: 'Source', short: 'SRC', bg: 'bg-green-100', border: 'border-green-500', icon: null },
+    { type: 'target', label: 'Target', short: 'TGT', bg: 'bg-red-100', border: 'border-red-500', icon: null },
     { type: 'filter', label: 'Filter', short: 'FLT', bg: 'bg-yellow-100', border: 'border-yellow-500', icon: null },
     { type: 'expression', label: 'Expression', short: 'EXP', bg: 'bg-purple-100', border: 'border-purple-500', icon: null },
     { type: 'aggregator', label: 'Aggregator', short: 'AGG', bg: 'bg-orange-100', border: 'border-orange-500', icon: null },
-    { type: 'validator', label: 'Validator', short: null, bg: 'bg-pink-100', border: 'border-pink-500', icon: CheckSquare },
-    { type: 'joiner', label: 'Joiner', short: 'JOIN', bg: 'bg-blue-100', border: 'border-blue-500', icon: null },
     { type: 'lookup', label: 'Lookup', short: null, bg: 'bg-cyan-100', border: 'border-cyan-500', icon: Search },
+    { type: 'joiner', label: 'Joiner', short: 'JOIN', bg: 'bg-blue-100', border: 'border-blue-500', icon: null },
+    { type: 'union', label: 'Union', short: null, bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Merge },
     { type: 'router', label: 'Router', short: null, bg: 'bg-lime-100', border: 'border-lime-500', icon: GitFork },
     { type: 'sorter', label: 'Sorter', short: null, bg: 'bg-amber-100', border: 'border-amber-500', icon: ArrowUpDown },
-    { type: 'union', label: 'Union', short: null, bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Merge },
     { type: 'normalizer', label: 'Normalizer', short: null, bg: 'bg-violet-100', border: 'border-violet-500', icon: Repeat },
     { type: 'rank', label: 'Rank', short: null, bg: 'bg-rose-100', border: 'border-rose-500', icon: Award },
     { type: 'sequence', label: 'Sequence', short: null, bg: 'bg-sky-100', border: 'border-sky-500', icon: Hash },
     { type: 'updateStrategy', label: 'Update Strategy', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Flag },
+    { type: 'validator', label: 'Validator', short: null, bg: 'bg-pink-100', border: 'border-pink-500', icon: CheckSquare },
     { type: 'cleansing', label: 'Cleansing', short: null, bg: 'bg-teal-100', border: 'border-teal-500', icon: Sparkles },
     { type: 'deduplicator', label: 'Deduplicator', short: null, bg: 'bg-orange-100', border: 'border-orange-500', icon: Copy },
     { type: 'pivot', label: 'Pivot', short: null, bg: 'bg-purple-100', border: 'border-purple-500', icon: Table },
     { type: 'unpivot', label: 'Unpivot', short: null, bg: 'bg-fuchsia-100', border: 'border-fuchsia-500', icon: Columns },
+    { type: 'webService', label: 'Web Service', short: 'WS', bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Globe },
+    { type: 'hierarchyParser', label: 'Hierarchy Parser', short: 'HP', bg: 'bg-green-100', border: 'border-green-500', icon: FileJson },
     { type: 'sql', label: 'SQL', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Database },
-    { type: 'target', label: 'Target', short: 'TGT', bg: 'bg-red-100', border: 'border-red-500', icon: null },
 ];
 
 // --- Custom Nodes for Designer ---
@@ -190,6 +194,8 @@ const MappingDesigner: React.FC = () => {
         if (type === 'pivot') newTrans.config = { groupByFields: [], pivotField: '', valueField: '' } as PivotConfig;
         if (type === 'unpivot') newTrans.config = { fieldsToUnpivot: [], newHeaderFieldName: 'Metric', newValueFieldName: 'Value' } as UnpivotConfig;
         if (type === 'sql') newTrans.config = { sqlQuery: '', mode: 'query' } as SqlConfig;
+        if (type === 'webService') newTrans.config = { url: 'http://api.example.com/data', method: 'GET', headers: [], responseMap: [] } as WebServiceConfig;
+        if (type === 'hierarchyParser') newTrans.config = { inputField: '', outputFields: [] } as HierarchyParserConfig;
 
         // Auto-link if a node is selected
         let newLinks = [...editingMapping.links];
@@ -484,7 +490,7 @@ const MappingDesigner: React.FC = () => {
                                 onChange={e => updateTransformationConfig(node.id, { filenameColumn: e.target.value })}
                             />
                             <p className="text-[10px] text-gray-400 mt-1">
-                                If set, adds the source filename as a column (like IDMC CDI)
+                                If set, adds the source filename as a column (like standard ETL)
                             </p>
                         </div>
                     </div>
@@ -1344,6 +1350,167 @@ const MappingDesigner: React.FC = () => {
                                 <option value="procedure">Procedure</option>
                                 <option value="script">Script</option>
                             </select>
+                        </div>
+                    </div>
+                )}
+
+                {/* Web Service Editor */}
+                {node.type === 'webService' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">URL (supports {'${param}'})</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="http://api.example.com/users"
+                                value={(node.config as WebServiceConfig).url || ''}
+                                onChange={e => updateTransformationConfig(node.id, { url: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500">Method</label>
+                            <select
+                                className="w-full border rounded p-1 text-sm"
+                                value={(node.config as WebServiceConfig).method || 'GET'}
+                                onChange={e => updateTransformationConfig(node.id, { method: e.target.value as any })}
+                            >
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Response Mapping</label>
+                            <button
+                                onClick={() => {
+                                    const currentMap = (node.config as WebServiceConfig).responseMap || [];
+                                    updateTransformationConfig(node.id, {
+                                        responseMap: [...currentMap, { path: '', field: '' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Map
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as WebServiceConfig).responseMap || []).map((map, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs font-mono"
+                                            placeholder="JSON Path (e.g. data.id)"
+                                            value={map.path}
+                                            onChange={e => {
+                                                const newMap = [...(node.config as WebServiceConfig).responseMap!];
+                                                newMap[idx] = { ...newMap[idx], path: e.target.value };
+                                                updateTransformationConfig(node.id, { responseMap: newMap });
+                                            }}
+                                        />
+                                        <span className="text-xs text-gray-400">→</span>
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Output Field"
+                                            value={map.field}
+                                            onChange={e => {
+                                                const newMap = [...(node.config as WebServiceConfig).responseMap!];
+                                                newMap[idx] = { ...newMap[idx], field: e.target.value };
+                                                updateTransformationConfig(node.id, { responseMap: newMap });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const newMap = (node.config as WebServiceConfig).responseMap!.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { responseMap: newMap });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Hierarchy Parser Editor */}
+                {node.type === 'hierarchyParser' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs text-gray-500">Input Field (JSON/XML String)</label>
+                            <input
+                                className="w-full border rounded p-1 text-sm font-mono"
+                                placeholder="e.g. json_data"
+                                value={(node.config as HierarchyParserConfig).inputField || ''}
+                                onChange={e => updateTransformationConfig(node.id, { inputField: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <label className="block text-xs text-gray-500">Output Fields</label>
+                            <button
+                                onClick={() => {
+                                    const currentFields = (node.config as HierarchyParserConfig).outputFields || [];
+                                    updateTransformationConfig(node.id, {
+                                        outputFields: [...currentFields, { path: '', name: '', type: 'string' }]
+                                    });
+                                }}
+                                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                            >
+                                + Add Field
+                            </button>
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {((node.config as HierarchyParserConfig).outputFields || []).map((field, idx) => (
+                                <div key={idx} className="border rounded p-2 bg-gray-50 space-y-1">
+                                    <div className="flex gap-2 items-center mb-1">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs font-mono"
+                                            placeholder="Path (e.g. items[0].id)"
+                                            value={field.path}
+                                            onChange={e => {
+                                                const newFields = [...(node.config as HierarchyParserConfig).outputFields!];
+                                                newFields[idx] = { ...newFields[idx], path: e.target.value };
+                                                updateTransformationConfig(node.id, { outputFields: newFields });
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const newFields = (node.config as HierarchyParserConfig).outputFields!.filter((_, i) => i !== idx);
+                                                updateTransformationConfig(node.id, { outputFields: newFields });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 text-xs"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            className="flex-1 border rounded p-1 text-xs"
+                                            placeholder="Output Name"
+                                            value={field.name}
+                                            onChange={e => {
+                                                const newFields = [...(node.config as HierarchyParserConfig).outputFields!];
+                                                newFields[idx] = { ...newFields[idx], name: e.target.value };
+                                                updateTransformationConfig(node.id, { outputFields: newFields });
+                                            }}
+                                        />
+                                        <select
+                                            className="border rounded p-1 text-xs w-20"
+                                            value={field.type}
+                                            onChange={e => {
+                                                const newFields = [...(node.config as HierarchyParserConfig).outputFields!];
+                                                newFields[idx] = { ...newFields[idx], type: e.target.value as any };
+                                                updateTransformationConfig(node.id, { outputFields: newFields });
+                                            }}
+                                        >
+                                            <option value="string">String</option>
+                                            <option value="number">Number</option>
+                                            <option value="boolean">Boolean</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}

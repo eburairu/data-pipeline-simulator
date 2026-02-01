@@ -22,7 +22,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - `src/lib/VirtualDB.tsx` - データベースシミュレーション
 
 2. **現状分析 & 改善点特定**:
-   - `TransformationType` と IDMC CDI参照リスト（後述）を比較し、未実装の変換を特定
+   - `TransformationType` と Data Integration参照リスト（後述）を比較し、未実装の変換を特定
    - バリデーションルールや型定義の不足を確認
    - 既存実装のリファクタリングや最適化の余地を検討
    - ユーザー入力がある場合は、その要求に対する現状とのギャップを特定
@@ -69,9 +69,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ---
 
-## IDMC CDI 変換タイプ参照リスト
+## Data Integration 変換タイプ参照リスト
 
-以下はInformatica IDMC CDIに存在する代表的な変換タイプです。実装判断の参考にしてください：
+以下は Data Integration に存在する代表的な変換タイプです。実装判断の参考にしてください：
 
 | カテゴリ | 変換タイプ | 説明 |
 |---------|-----------|------|
