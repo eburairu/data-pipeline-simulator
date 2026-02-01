@@ -1,13 +1,12 @@
-import { 
+import type { 
     DataSourceSettings, 
     TableDefinition, 
     ConnectionDefinition, 
-    Mapping, 
-    MappingTask, 
     Host,
     DataSourceDefinition,
     GenerationJob
 } from './SettingsContext';
+import type { Mapping, MappingTask } from './MappingTypes';
 
 export interface TemplateContextActions {
     setDataSource: React.Dispatch<React.SetStateAction<DataSourceSettings>>;

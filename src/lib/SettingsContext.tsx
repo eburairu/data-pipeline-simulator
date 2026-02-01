@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, type ReactNode, useCallback
 import { validateAllSettings, type ValidationError } from './validation';
 import { type Mapping, type MappingTask } from './MappingTypes';
 import { type DBFilter } from './VirtualDB';
+import { AVAILABLE_TEMPLATES, type PipelineTemplate } from './templates';
 
 export interface DataSourceDefinition {
   id: string;

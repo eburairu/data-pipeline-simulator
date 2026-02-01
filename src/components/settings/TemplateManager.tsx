@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSettings } from '../../lib/SettingsContext';
-import { Wand2, Trash, X, Info } from 'lucide-react';
+import { Wand2, Trash, X } from 'lucide-react';
 
 export const TemplateManager: React.FC = () => {
     const { availableTemplates, applyTemplate, cleanupTemplate } = useSettings();
