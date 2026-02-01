@@ -44,6 +44,7 @@ jobs:
           branch: gh-pages
           clean: true
           clean-exclude: dev
+          dry-run: ${{ env.ACT }}
 
       # --- Build & Deploy for Develop ---
       - name: Build for Develop
@@ -60,3 +61,4 @@ jobs:
           branch: gh-pages
           target-folder: dev
           clean: true
+          dry-run: ${{ env.ACT }}
