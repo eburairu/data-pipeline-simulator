@@ -183,7 +183,7 @@ interface SettingsContextType {
   addColumn: (tableId: string, columnName: string, type: string) => void;
   removeColumn: (tableId: string, columnName: string) => void;
 
-  // IDMC Features
+  // Data Integration Features
   connections: ConnectionDefinition[];
   addConnection: (conn: Omit<ConnectionDefinition, 'id'>) => void;
   removeConnection: (id: string) => void;

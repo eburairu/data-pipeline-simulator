@@ -1,12 +1,12 @@
-# Feature Specification: IDMC CDI Simulation Enhancements
+# Feature Specification: Data Integration Simulation Enhancements
 
-**Feature Branch**: `feat/idmc-cdi-simulation`
+**Feature Branch**: `feat/data-integration-simulation`
 **Created**: 2026-05-21
 **Status**: Draft
-**Input**: User Request for IDMC CDI (Cloud Data Integration) Simulation
+**Input**: User Request for Data Integration Simulation
 
 ## Overview
-本仕様は、現在の単純なETL処理（Raw -> Summary）を拡張し、Informatica IDMC (Intelligent Data Management Cloud) の CDI (Cloud Data Integration) の概念を取り入れたシミュレーション機能を提供するものである。具体的には、Connection（接続）、Mapping（変換ロジック）、Mapping Task（実行タスク）の概念を導入し、複数のデータ処理フローを並行して定義・実行・可視化可能にする。
+本仕様は、現在の単純なETL処理（Raw -> Summary）を拡張し、Data Integration Platform の Data Integration の概念を取り入れたシミュレーション機能を提供するものである。具体的には、Connection（接続）、Mapping（変換ロジック）、Mapping Task（実行タスク）の概念を導入し、複数のデータ処理フローを並行して定義・実行・可視化可能にする。
 
 ## User Scenarios & Testing
 

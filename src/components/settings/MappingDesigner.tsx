@@ -490,7 +490,7 @@ const MappingDesigner: React.FC = () => {
                                 onChange={e => updateTransformationConfig(node.id, { filenameColumn: e.target.value })}
                             />
                             <p className="text-[10px] text-gray-400 mt-1">
-                                If set, adds the source filename as a column (like IDMC CDI)
+                                If set, adds the source filename as a column (like standard ETL)
                             </p>
                         </div>
                     </div>

@@ -222,7 +222,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     });
 
 
-    // --- 2. Render Mapping Tasks (IDMC) ---
+    // --- 2. Render Mapping Tasks ---
 
     // We try to place them to the right of existing nodes if possible, or new rows.
     let taskRowIndex = 0;

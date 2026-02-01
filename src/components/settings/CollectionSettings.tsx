@@ -154,7 +154,7 @@ const CollectionSettings: React.FC = () => {
                                 checked={job.targetType === 'topic'}
                                 onChange={() => handleTargetTypeChange(job.id, 'topic')}
                                 className="mr-1"
-                            /> Topic (CIH)
+                            /> Topic
                         </label>
                     </div>
 

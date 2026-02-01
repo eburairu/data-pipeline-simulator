@@ -1,10 +1,10 @@
-# CIH Features Specification (Pub/Sub & Retention)
+# Data Hub Features Specification (Pub/Sub & Retention)
 
 ## 概要
-Informatica Cloud Integration Hub (CIH) の主要機能であるPub/Subモデルとデータ保持ポリシー（Retention Policy）をシミュレーションするための機能を追加する。
+Data Hub の主要機能であるPub/Subモデルとデータ保持ポリシー（Retention Policy）をシミュレーションするための機能を追加する。
 
 ## 背景
-現在のシミュレーターはファイルベースの1対1転送のみサポートしており、CIHのような「一度Publishして複数のSubscriberが受け取る」モデルや、「Subscriberが一時停止していてもデータが保持される」挙動を再現できない。
+現在のシミュレーターはファイルベースの1対1転送のみサポートしており、Data Hubのような「一度Publishして複数のSubscriberが受け取る」モデルや、「Subscriberが一時停止していてもデータが保持される」挙動を再現できない。
 
 ## 機能要件
 
@@ -16,7 +16,7 @@ Informatica Cloud Integration Hub (CIH) の主要機能であるPub/Subモデル
 ### 2. Publication (Collection Job)
 *   Collection Jobのターゲットとして「Topic」を選択可能にする。
 *   **挙動**: Source Host/Pathからファイルを読み取り、指定されたTopicディレクトリへファイルを**移動**または**コピー**する（現状のCollectionは移動なので、TopicへのPublishも移動が基本だが、Sourceを残すオプションも検討）。
-    *   *Decision*: CIHの「Ingest」は通常Sourceからデータを取り込むため、Moveで良い。ただし、Topicへは「Publish」される。
+    *   *Decision*: Data Hubの「Ingest」は通常Sourceからデータを取り込むため、Moveで良い。ただし、Topicへは「Publish」される。
     *   ファイル名は維持、またはリネームパターンに従う。
 
 ### 3. Subscription (Delivery Job)
@@ -25,7 +25,7 @@ Informatica Cloud Integration Hub (CIH) の主要機能であるPub/Subモデル
 *   **状態管理**:
     *   各Delivery Jobは、自分がどこまで処理したか（Watermark）を管理する必要がある。
     *   シンプルにするため、処理済みファイルID（またはファイル名＋タイムスタンプ）をメモリ上で保持し、重複処理を防ぐ。
-    *   または、ファイル名にタイムスタンプが含まれる前提で、「最後に処理したタイムスタンプ」を保持する（CIHのOffsetに近い）。
+    *   または、ファイル名にタイムスタンプが含まれる前提で、「最後に処理したタイムスタンプ」を保持する（Data HubのOffsetに近い）。
     *   *Decision*: ファイル名にタイムスタンプが含まれることを推奨しつつ、シミュレーション内では「処理済みファイルセット」をメモリで持つ（Job再起動でリセットされるが、シミュレーションなので許容）。
 
 ### 4. Retention Policy

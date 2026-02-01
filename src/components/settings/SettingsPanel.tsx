@@ -20,8 +20,8 @@ const SettingsPanel: React.FC = () => {
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'datasource', label: 'Data Source', icon: <Server size={16} /> },
-    { id: 'integrationHub', label: 'Integration Hub (CIH)', icon: <ArrowLeftRight size={16} /> },
-    { id: 'dataIntegration', label: 'Data Integration (CDI)', icon: <Workflow size={16} /> },
+    { id: 'integrationHub', label: 'Data Hub', icon: <ArrowLeftRight size={16} /> },
+    { id: 'dataIntegration', label: 'Data Integration', icon: <Workflow size={16} /> },
     { id: 'database', label: t('settings.tabs.database'), icon: <Database size={16} /> },
     { id: 'bi', label: t('settings.tabs.bi'), icon: <Activity size={16} /> },
   ];

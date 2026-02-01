@@ -122,7 +122,7 @@ const DeliverySettings: React.FC = () => {
                                 checked={job.sourceType === 'topic'}
                                 onChange={() => handleSourceTypeChange(job.id, 'topic')}
                                 className="mr-1"
-                            /> Topic (CIH)
+                            /> Topic
                         </label>
                     </div>
 
