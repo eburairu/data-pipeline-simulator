@@ -9,14 +9,22 @@ import ConnectionSettings from './ConnectionSettings';
 import MappingDesigner from './MappingDesigner';
 import MappingTaskSettings from './MappingTaskSettings';
 import BiDashboardSettings from './BiDashboardSettings';
-import { Database, ArrowLeftRight, Workflow, Server, Activity } from 'lucide-react';
+import { Database, ArrowLeftRight, Workflow, Server, Activity, Wand2 } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
+import { useSettings } from '../../lib/SettingsContext';
 
 type SettingsTab = 'datasource' | 'integrationHub' | 'dataIntegration' | 'database' | 'bi';
 
 const SettingsPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('datasource');
   const { t } = useTranslation();
+  const { applyIdempotencyTemplate } = useSettings();
+
+  const handleApplyTemplate = () => {
+    if (window.confirm('This will create new resources (Data Source, DB Table, Mapping) for idempotency testing. Continue?')) {
+        applyIdempotencyTemplate();
+    }
+  };
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'datasource', label: 'Data Source', icon: <Server size={16} /> },
@@ -29,20 +37,32 @@ const SettingsPanel: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
-                ? 'border-blue-500 text-blue-600 bg-blue-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex border-b border-gray-200 justify-between items-center">
+        <div className="flex overflow-x-auto">
+            {tabs.map((tab) => (
+            <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+                {tab.icon}
+                {tab.label}
+            </button>
+            ))}
+        </div>
+        <div className="pr-4">
+            <button
+                onClick={handleApplyTemplate}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors shadow-sm"
+                title="Create sample resources for Idempotency/Deduplication testing"
+            >
+                <Wand2 size={14} />
+                Setup Idempotency Test
+            </button>
+        </div>
       </div>
 
       {/* Tab Content */}
