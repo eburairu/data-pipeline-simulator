@@ -7,6 +7,7 @@ export type ProcessNodeData = {
   isProcessing: boolean;
   sourcePos?: Position;
   targetPos?: Position;
+  icon?: React.ReactNode;
 };
 
 const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ data }) => {
@@ -26,7 +27,13 @@ const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ data }) => {
         {data.isProcessing ? (
            <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
         ) : (
-           <Settings className="w-8 h-8 text-blue-600" />
+           data.icon ? (
+               <div className="w-8 h-8 flex items-center justify-center text-blue-600">
+                   {data.icon}
+               </div>
+           ) : (
+               <Settings className="w-8 h-8 text-blue-600" />
+           )
         )}
 
         <Handle

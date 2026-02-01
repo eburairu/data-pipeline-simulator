@@ -292,7 +292,28 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     });
 
 
-    // --- 3. Render Task Flows ---
+    // --- 3. Render Task Dependencies ---
+    mappingTasks.forEach(task => {
+        if (!task.enabled || !task.dependencies) return;
+        
+        const targetTaskId = `process-task-${task.id}`;
+        task.dependencies.forEach(depId => {
+            const sourceTaskId = `process-task-${depId}`;
+            if (calculatedNodes.some(n => n.id === sourceTaskId) && calculatedNodes.some(n => n.id === targetTaskId)) {
+                calculatedEdges.push({
+                    id: `e-dep-${depId}-${task.id}`,
+                    source: sourceTaskId,
+                    target: targetTaskId,
+                    animated: true,
+                    label: 'depends on',
+                    style: { stroke: '#ef4444', strokeWidth: 1, strokeDasharray: '2,2' }
+                });
+            }
+        });
+    });
+
+
+    // --- 4. Render Task Flows ---
     taskFlows.forEach(flow => {
       if (!flow.enabled) return;
       

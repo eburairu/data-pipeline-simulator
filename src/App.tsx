@@ -142,7 +142,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       let regex: RegExp;
       try {
         regex = new RegExp(job.filterRegex);
-      } catch (e) {
+      } catch {
         setErrors(prev => [...prev, `Collection Job ${job.name}: Invalid Regex`]);
         return;
       }
@@ -216,7 +216,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         toggleStep(`transfer_1_${job.id}`, false);
         collectionLocks.current[job.id] = false;
       }
-    } catch (e) {
+    } catch {
       collectionLocks.current[job.id] = false;
     }
   }, [collection.jobs, collection.processingTime, moveFile, toggleStep, isFileLocked, lockFile, unlockFile, addLog, updateLog, connections]);
@@ -338,22 +338,22 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         toggleStep(`transfer_2_${job.id}`, false);
         deliveryLocks.current[job.id] = false;
       }
-    } catch (e) {
+    } catch {
       deliveryLocks.current[job.id] = false;
     }
   }, [delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog, updateLog, connections]);
 
-  const executeMappingJob = useCallback(async (taskId: string, parentLogId?: string) => {
+  const executeMappingJob = useCallback(async (taskId: string, parentLogId?: string): Promise<{ input: number, output: number } | null> => {
     const task = mappingTasks.find(t => t.id === taskId);
-    if (!task) return;
-    if (mappingLocks.current[task.id]) return;
+    if (!task) return null;
+    if (mappingLocks.current[task.id]) return null;
 
     const mapping = mappings.find(m => m.id === task.mappingId);
-    if (!mapping) return;
+    if (!mapping) return null;
 
     // ... checks ...
     const sources = mapping.transformations.filter(t => t.type === 'source');
-    if (sources.length === 0) return;
+    if (sources.length === 0) return null;
 
     mappingLocks.current[task.id] = true;
     toggleStep(`mapping_task_${task.id}`, true);
@@ -371,6 +371,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         details: `Initializing mapping ${mapping.name}...`,
         parentLogId: parentLogId
     });
+
+    let resultCounts = { input: 0, output: 0 };
 
     try {
       if (!mappingStates.current[task.id]) mappingStates.current[task.id] = {};
@@ -412,6 +414,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       const totalOutput = Object.values(stats.transformations).reduce((acc, s) => acc + s.output, 0);
       const totalErrors = Object.values(stats.transformations).reduce((acc, s) => acc + s.errors, 0);
 
+      resultCounts = { input: totalInput, output: totalOutput };
+
       updateLog(logId, {
         status: totalErrors > 0 ? 'failed' : 'success',
         endTime: Date.now(),
@@ -435,6 +439,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
           setTimeout(() => executeMappingJob(t.id), 500);
         });
       }
+      return resultCounts;
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : 'Unknown error';
       updateLog(logId, {
@@ -443,6 +448,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         errorMessage: errMsg,
         details: `Fatal error in mapping execution`
       });
+      return null;
     } finally {
       await new Promise(res => setTimeout(res, 500));
       toggleStep(`mapping_task_${task.id}`, false);
@@ -467,19 +473,41 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         details: `Starting flow execution (${flow.parallelExecution ? 'Parallel' : 'Sequential'})...`
     });
 
+    let totalInput = 0;
+    let totalOutput = 0;
+
     try {
         if (flow.parallelExecution) {
-            await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId, logId)));
+            const results = await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId, logId)));
+            results.forEach(r => {
+                if (r) {
+                    totalInput += r.input;
+                    totalOutput += r.output;
+                }
+            });
         } else {
             for (const taskId of flow.taskIds) {
-                await executeMappingJob(taskId, logId);
+                const r = await executeMappingJob(taskId, logId);
+                if (r) {
+                    totalInput += r.input;
+                    totalOutput += r.output;
+                    
+                    // Update flow log incrementally for sequential
+                    updateLog(logId, {
+                        recordsInput: totalInput,
+                        recordsOutput: totalOutput,
+                        details: `Executing flow... (${totalInput} rows in total so far)`
+                    });
+                }
             }
         }
         
         updateLog(logId, {
             status: 'success',
             endTime: Date.now(),
-            details: `Flow finished successfully.`
+            recordsInput: totalInput,
+            recordsOutput: totalOutput,
+            details: `Flow finished successfully. Total: ${totalInput} In / ${totalOutput} Out.`
         });
     } catch (e) {
         updateLog(logId, {
@@ -499,8 +527,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       if (jobType === 'collection') executeCollectionJob(jobId);
       if (jobType === 'delivery') executeDeliveryJob(jobId);
       if (jobType === 'mapping') executeMappingJob(jobId);
+      if (jobType === 'taskflow') executeTaskFlow(jobId);
     });
-  }, [setRetryHandler, executeCollectionJob, executeDeliveryJob, executeMappingJob]);
+  }, [setRetryHandler, executeCollectionJob, executeDeliveryJob, executeMappingJob, executeTaskFlow]);
 
   // --- Timers (Generator, Collection, Delivery, Mapping, Topic) ---
   useEffect(() => {

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useJobMonitor, type JobType, type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../lib/JobMonitorContext';
 import { useSettings } from '../lib/SettingsContext';
 import MappingDesigner from './settings/MappingDesigner';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch, CornerDownRight } from 'lucide-react';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch, CornerDownRight, ChevronRight } from 'lucide-react';
 
 const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = ({ log, onClose }) => {
   const isMapping = log.jobType === 'mapping';
@@ -224,21 +224,67 @@ const JobMonitor: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | JobStatus>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | JobType>('all');
   const [selectedLog, setSelectedLog] = useState<JobExecutionLog | null>(null);
+  const [expandedFlows, setExpandedFlows] = useState<Set<string>>(new Set());
+  const [now, setNow] = useState(Date.now());
 
   // Force re-render to update running times
-  const [, setTick] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  const toggleFlow = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedFlows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
+      // If it has a parent, it's only shown if the parent is expanded (handled in render)
+      // or if we are filtering specifically for mapping tasks
       const statusMatch = statusFilter === 'all' || log.status === statusFilter;
       const typeMatch = typeFilter === 'all' || log.jobType === typeFilter;
       return statusMatch && typeMatch;
     });
   }, [logs, statusFilter, typeFilter]);
+
+  // Organize logs to handle nesting
+  const organizedLogs = useMemo(() => {
+    const topLevel = filteredLogs.filter(l => !l.parentLogId);
+    const children = filteredLogs.filter(l => !!l.parentLogId);
+    
+    const result: { log: JobExecutionLog; isChild: boolean; isVisible: boolean }[] = [];
+    
+    topLevel.forEach(parent => {
+      result.push({ log: parent, isChild: false, isVisible: true });
+      
+      const flowChildren = children.filter(c => c.parentLogId === parent.id);
+      const isExpanded = expandedFlows.has(parent.id);
+      
+      flowChildren.forEach(child => {
+        result.push({ 
+            log: child, 
+            isChild: true, 
+            isVisible: isExpanded || typeFilter === 'mapping' // Show if expanded OR if specifically filtering for mappings
+        });
+      });
+    });
+
+    // Handle orphaned children (if parent was filtered out or deleted)
+    const processedChildIds = new Set(result.filter(r => r.isChild).map(r => r.log.id));
+    children.forEach(child => {
+        if (!processedChildIds.has(child.id)) {
+            result.push({ log: child, isChild: true, isVisible: true });
+        }
+    });
+
+    return result;
+  }, [filteredLogs, expandedFlows, typeFilter]);
 
   const getTypeIcon = (type: JobType) => {
     switch (type) {
@@ -254,7 +300,7 @@ const JobMonitor: React.FC = () => {
   };
 
   const formatDuration = (start: number, end?: number) => {
-    const e = end || Date.now();
+    const e = end || now;
     const diff = e - start;
     if (diff < 1000) return `${diff}ms`;
     return `${(diff / 1000).toFixed(2)}s`;
@@ -315,23 +361,35 @@ const JobMonitor: React.FC = () => {
         <div className="flex-grow overflow-auto p-0 bg-gray-50/50">
           {/* Mobile View (Cards) */}
           <div className="md:hidden space-y-2 p-2">
-            {filteredLogs.length === 0 ? (
+            {organizedLogs.filter(r => r.isVisible).length === 0 ? (
               <div className="p-8 text-center text-gray-400 italic">
                 No execution logs found.
               </div>
             ) : (
-              filteredLogs.map((log) => (
+                organizedLogs.filter(r => r.isVisible).map(({ log, isChild }) => (
                 <div
                   key={log.id}
                   onClick={() => setSelectedLog(log)}
-                  className="bg-white p-3 rounded shadow-sm border border-gray-200 space-y-2 active:bg-blue-50 transition-colors"
+                  className={`bg-white p-3 rounded shadow-sm border border-gray-200 space-y-2 active:bg-blue-50 transition-colors ${isChild ? 'ml-4 bg-gray-50/50' : ''}`}
                 >
                   <div className="flex justify-between items-start">
-                    <div className={`flex items-center gap-2 overflow-hidden ${log.parentLogId ? 'ml-6' : ''}`}>
-                      {log.parentLogId && <CornerDownRight size={14} className="text-gray-400 shrink-0" />}
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {isChild && <CornerDownRight size={14} className="text-gray-400 shrink-0" />}
+                      {log.jobType === 'taskflow' && (
+                          <button onClick={(e) => toggleFlow(log.id, e)} className="p-1">
+                              <ChevronRight size={14} className={`transition-transform ${expandedFlows.has(log.id) ? 'rotate-90' : ''}`} />
+                          </button>
+                      )}
                       {getTypeIcon(log.jobType)}
                       <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-gray-800 text-sm truncate">{log.jobName}</span>
+                        <span className="font-semibold text-gray-800 text-sm truncate">
+                            {log.jobName}
+                            {log.jobType === 'taskflow' && (
+                                <span className="ml-1 text-[10px] font-normal text-gray-400">
+                                    ({organizedLogs.filter(r => r.log.parentLogId === log.id).length})
+                                </span>
+                            )}
+                        </span>
                         <span className="text-[10px] text-gray-500 uppercase">{log.jobType}</span>
                       </div>
                     </div>
@@ -396,18 +454,18 @@ const JobMonitor: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredLogs.length === 0 ? (
+              {organizedLogs.filter(r => r.isVisible).length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-gray-400 italic">
                     No execution logs found.
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                organizedLogs.filter(r => r.isVisible).map(({ log, isChild }) => (
                   <tr
                     key={log.id}
                     onClick={() => setSelectedLog(log)}
-                    className="hover:bg-blue-50 transition-colors cursor-pointer group"
+                    className={`hover:bg-blue-50 transition-colors cursor-pointer group ${isChild ? 'bg-gray-50/50' : ''}`}
                   >
                     <td className="p-3 text-gray-500 whitespace-nowrap font-mono text-xs">
                       {formatTime(log.startTime)}
@@ -420,8 +478,26 @@ const JobMonitor: React.FC = () => {
                     </td>
                     <td className="p-3 font-medium text-gray-700 truncate max-w-[200px]" title={log.jobName}>
                       <div className="flex items-center gap-2">
-                        {log.parentLogId && <CornerDownRight size={14} className="text-gray-400 shrink-0 ml-4" />}
-                        <span className="truncate">{log.jobName}</span>
+                        {isChild && <CornerDownRight size={14} className="text-gray-400 shrink-0 ml-4" />}
+                        {log.jobType === 'taskflow' && (
+                            <button 
+                                onClick={(e) => toggleFlow(log.id, e)}
+                                className="p-0.5 hover:bg-gray-200 rounded transition-colors text-gray-500"
+                            >
+                                <ChevronRight 
+                                    size={14} 
+                                    className={`transition-transform ${expandedFlows.has(log.id) ? 'rotate-90' : ''}`} 
+                                />
+                            </button>
+                        )}
+                        <span className="truncate">
+                            {log.jobName}
+                            {log.jobType === 'taskflow' && (
+                                <span className="ml-1 text-[10px] font-normal text-gray-400">
+                                    ({organizedLogs.filter(r => r.log.parentLogId === log.id).length} tasks)
+                                </span>
+                            )}
+                        </span>
                       </div>
                     </td>
                     <td className="p-3">
