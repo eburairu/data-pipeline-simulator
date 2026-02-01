@@ -5,7 +5,7 @@
 ## Overview
 
 **名称**: Data Pipeline Simulator  
-**目的**: IDMC CDI のデータパイプラインをブラウザ上でシミュレート  
+**目的**: Data Integration Platform のデータパイプラインをブラウザ上でシミュレート
 **対象ユーザー**: データエンジニア、ETL開発者、学習者
 
 ---
@@ -17,23 +17,23 @@
 - タイムスタンプ付きファイル名（ミリ秒精度で一意性保証）
 - CSV/JSON 形式をサポート
 
-### FR2: 出版処理（Publication / CIH）
-- 外部システムからデータを受信し、Informatica Cloud Integration Hub (CIH) の「トピック」へデータをパブリッシュする処理
+### FR2: 出版処理（Publication / Data Hub）
+- 外部システムからデータを受信し、Data Hub の「トピック」へデータをパブリッシュする処理
 - ソース（ファイル）からトピックへのデータ転送
 - フィルタリング、リネーム機能
 
-### FR3: 購読処理（Subscription / CIH）
-- CIHのトピックからデータをサブスクライブし、ターゲットシステムへ配信する処理
+### FR3: 購読処理（Subscription / Data Hub）
+- Data Hubのトピックからデータをサブスクライブし、ターゲットシステムへ配信する処理
 - トピックからターゲット（ファイル/DB/マッピングタスク）へのデータ転送
 - 複数サブスクライバーへの同時配信シミュレーション
 
-### FR4: マッピング処理 (CDI)
+### FR4: マッピング処理 (Data Integration)
 - ソースからターゲットへのデータ変換
 - **Web Services Consumer**: REST API呼び出しのシミュレーション（モックレスポンス）
 - **Hierarchy Parser**: JSON/XMLデータの階層構造解析とフラット化
 - Expression による計算フィールド追加
 - Filter による行選択
-- ファイル名列追加機能（IDMC CDI 類似）
+- ファイル名列追加機能（Standard ETL 類似）
 - 冪等性担保（Idempotency）のシミュレーション
   - ターゲットへの書き込み時に重複チェックを実施
   - 重複時の挙動（Ignore/Update/Error）を選択可能
@@ -107,7 +107,7 @@
 - name, type (file/database)
 - host, directory/tableName
 
-### Topic (CIH)
+### Topic
 - name, retentionPeriod
 - associatedPublications, associatedSubscriptions
 

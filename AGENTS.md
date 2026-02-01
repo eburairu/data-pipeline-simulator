@@ -44,7 +44,7 @@
 
 - `src/App.tsx` - メインアプリケーション、シミュレーション制御 (SimulationManager)
 - `src/components/PipelineFlow.tsx` - パイプラインビジュアライザー
-- `src/components/settings/` - 設定画面コンポーネント (CIH/CDI設定)
+- `src/components/settings/` - 設定画面コンポーネント (Data Hub/Data Integration設定)
 - `src/lib/MappingEngine.ts` - ETLマッピング実行エンジン
 - `src/lib/VirtualFileSystemContext.tsx` - 仮想ファイルシステム
 - `src/lib/VirtualDatabaseContext.tsx` - 仮想データベース

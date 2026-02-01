@@ -8,9 +8,9 @@ describe('ExpressionFunctions', () => {
         expect(ExpressionFunctions.LPAD('123', 5, '0')).toBe('00123');
         expect(ExpressionFunctions.RPAD('123', 5, '0')).toBe('12300');
         expect(ExpressionFunctions.LPAD('123', 2, '0')).toBe('12'); // Truncate if shorter? JS padStart doesn't truncate, it returns original if len < str.length. Wait, padStart returns original string if targetLength is less than str.length.
-        // IDMC LPAD truncates if target length is smaller? Let's check spec. Usually yes.
+        // Standard ETL LPAD truncates if target length is smaller? Let's check spec. Usually yes.
         // JS padStart: "If targetLength is less than str.length, then str is returned as-is."
-        // IDMC LPAD: "If length is less than the length of the string, LPAD truncates the string."
+        // Standard ETL LPAD: "If length is less than the length of the string, LPAD truncates the string."
         // We implemented truncation behavior for realism.
         expect(ExpressionFunctions.LPAD('12345', 3, '0')).toBe('123');
     });

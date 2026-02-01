@@ -177,7 +177,7 @@ describe('MappingEngine New Features', () => {
         };
 
         mockFs.listFiles.mockReturnValue([{ name: 'data.csv' }]);
-        mockFs.readFile.mockImplementation((host, path, file) => {
+        mockFs.readFile.mockImplementation((_host, _path, file) => {
             if (file === 'params.txt') return 'MY_PARAM=HelloWorld';
             if (file === 'data.csv') return 'col\nval';
             return '';
@@ -194,6 +194,7 @@ describe('MappingEngine New Features', () => {
         // Check output file content
         expect(mockFs.writeFile).toHaveBeenCalled();
         const callArgs = mockFs.writeFile.mock.calls.find(c => c[2].startsWith('output_'));
+        if (!callArgs) throw new Error('No output file written');
         const content = JSON.parse(callArgs[3]);
         expect(content[0].out).toBe('HelloWorld');
     });
