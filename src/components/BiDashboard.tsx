@@ -350,7 +350,7 @@ const BiDashboard: React.FC = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full overflow-y-auto pb-8">
        {biDashboard.items.map(item => (
            <ErrorBoundary key={item.id}>
-               <div className="h-[800px] lg:h-[1000px]">
+               <div className="h-auto min-h-[500px] lg:h-[800px]">
                    <DashboardWidget item={item} />
                </div>
            </ErrorBoundary>

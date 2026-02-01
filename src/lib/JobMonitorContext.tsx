@@ -7,6 +7,7 @@ export interface MappingExecutionDetails {
   transformations: {
     [transformationId: string]: { name: string; input: number; output: number; errors: number; rejects: number };
   };
+  links?: { [linkId: string]: number };
   rejectRows?: { row: any; error: string; transformationName: string }[];
 }
 

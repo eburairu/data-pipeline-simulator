@@ -695,7 +695,7 @@ interface DatabaseViewProps {
 
 const DatabaseView: React.FC<DatabaseViewProps> = ({ tables, select }) => {
   const { t } = useTranslation();
-  const [dbViewMode, setDbViewMode] = useState<'text' | 'table'>('text');
+  const [dbViewMode, setDbViewMode] = useState<'text' | 'table'>('table');
   return (
     <div className="border p-2 sm:p-3 rounded bg-gray-50/50">
       <div className="flex justify-between items-center mb-2 border-b pb-1">

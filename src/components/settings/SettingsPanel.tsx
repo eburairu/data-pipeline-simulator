@@ -11,6 +11,7 @@ import MappingTaskSettings from './MappingTaskSettings';
 import BiDashboardSettings from './BiDashboardSettings';
 import { Database, ArrowLeftRight, Workflow, Server, Activity } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
+import { TemplateManager } from './TemplateManager';
 
 type SettingsTab = 'datasource' | 'integrationHub' | 'dataIntegration' | 'database' | 'bi';
 
@@ -29,20 +30,25 @@ const SettingsPanel: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
-                ? 'border-blue-500 text-blue-600 bg-blue-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex border-b border-gray-200 justify-between items-center">
+        <div className="flex overflow-x-auto">
+            {tabs.map((tab) => (
+            <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+            >
+                {tab.icon}
+                {tab.label}
+            </button>
+            ))}
+        </div>
+        <div className="pr-4 flex gap-2">
+            <TemplateManager />
+        </div>
       </div>
 
       {/* Tab Content */}

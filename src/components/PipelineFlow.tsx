@@ -328,10 +328,19 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       window.requestAnimationFrame(() => {
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
-        dagreGraph.setGraph({ rankdir: 'LR' });
 
-        const getWidth = (node: Node) => (node.type === 'storage' ? 220 : 180);
-        const getHeight = (node: Node) => (node.type === 'storage' ? 120 : 80);
+        const isMobile = window.innerWidth < 768;
+        const rankdir = isMobile ? 'TB' : 'LR';
+        dagreGraph.setGraph({ rankdir });
+
+        const getWidth = (node: Node) => {
+            const baseWidth = node.type === 'storage' ? 220 : 180;
+            return isMobile ? baseWidth * 0.8 : baseWidth;
+        };
+        const getHeight = (node: Node) => {
+            const baseHeight = node.type === 'storage' ? 120 : 80;
+            return isMobile ? baseHeight * 0.8 : baseHeight;
+        };
 
         nodes.forEach((node) => {
           dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
@@ -346,8 +355,8 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
           const nodeWithPosition = dagreGraph.node(node.id);
           return {
             ...node,
-            targetPosition: Position.Left,
-            sourcePosition: Position.Right,
+            targetPosition: isMobile ? Position.Top : Position.Left,
+            sourcePosition: isMobile ? Position.Bottom : Position.Right,
             width: getWidth(node),
             height: getHeight(node),
             position: {
@@ -367,10 +376,19 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-    const getWidth = (node: Node) => (node.type === 'storage' ? 220 : 180);
-    const getHeight = (node: Node) => (node.type === 'storage' ? 120 : 80);
+    const isMobile = window.innerWidth < 768;
+    const rankdir = isMobile ? 'TB' : 'LR';
 
-    dagreGraph.setGraph({ rankdir: 'LR' });
+    const getWidth = (node: Node) => {
+        const baseWidth = node.type === 'storage' ? 220 : 180;
+        return isMobile ? baseWidth * 0.8 : baseWidth;
+    };
+    const getHeight = (node: Node) => {
+        const baseHeight = node.type === 'storage' ? 120 : 80;
+        return isMobile ? baseHeight * 0.8 : baseHeight;
+    };
+
+    dagreGraph.setGraph({ rankdir });
 
     nodes.forEach((node) => {
       dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
@@ -386,8 +404,8 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       const nodeWithPosition = dagreGraph.node(node.id);
       return {
         ...node,
-        targetPosition: Position.Left,
-        sourcePosition: Position.Right,
+        targetPosition: isMobile ? Position.Top : Position.Left,
+        sourcePosition: isMobile ? Position.Bottom : Position.Right,
         width: getWidth(node),
         height: getHeight(node),
         position: {
