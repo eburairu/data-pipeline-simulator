@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useJobMonitor, type JobType, type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../lib/JobMonitorContext';
 import { useSettings } from '../lib/SettingsContext';
 import MappingDesigner from './settings/MappingDesigner';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch } from 'lucide-react';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch, CornerDownRight } from 'lucide-react';
 
 const JobDetailModal: React.FC<{ log: JobExecutionLog; onClose: () => void }> = ({ log, onClose }) => {
   const isMapping = log.jobType === 'mapping';
@@ -327,7 +327,8 @@ const JobMonitor: React.FC = () => {
                   className="bg-white p-3 rounded shadow-sm border border-gray-200 space-y-2 active:bg-blue-50 transition-colors"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2 overflow-hidden">
+                    <div className={`flex items-center gap-2 overflow-hidden ${log.parentLogId ? 'ml-6' : ''}`}>
+                      {log.parentLogId && <CornerDownRight size={14} className="text-gray-400 shrink-0" />}
                       {getTypeIcon(log.jobType)}
                       <div className="flex flex-col min-w-0">
                         <span className="font-semibold text-gray-800 text-sm truncate">{log.jobName}</span>
@@ -418,7 +419,10 @@ const JobMonitor: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-3 font-medium text-gray-700 truncate max-w-[200px]" title={log.jobName}>
-                      {log.jobName}
+                      <div className="flex items-center gap-2">
+                        {log.parentLogId && <CornerDownRight size={14} className="text-gray-400 shrink-0 ml-4" />}
+                        <span className="truncate">{log.jobName}</span>
+                      </div>
                     </td>
                     <td className="p-3">
                       {log.status === 'success' ? (

@@ -343,7 +343,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     }
   }, [delivery.jobs, moveFile, writeFile, toggleStep, isFileLocked, lockFile, unlockFile, processedFilesRef, addLog, updateLog, connections]);
 
-  const executeMappingJob = useCallback(async (taskId: string) => {
+  const executeMappingJob = useCallback(async (taskId: string, parentLogId?: string) => {
     const task = mappingTasks.find(t => t.id === taskId);
     if (!task) return;
     if (mappingLocks.current[task.id]) return;
@@ -368,7 +368,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         startTime: startTime,
         recordsInput: 0,
         recordsOutput: 0,
-        details: `Initializing mapping ${mapping.name}...`
+        details: `Initializing mapping ${mapping.name}...`,
+        parentLogId: parentLogId
     });
 
     try {
@@ -453,6 +454,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
     const flow = taskFlows.find(f => f.id === flowId);
     if (!flow || !flow.enabled) return;
 
+    toggleStep(`task_flow_${flow.id}`, true);
     const startTime = Date.now();
     const logId = addLog({
         jobId: flow.id,
@@ -467,10 +469,10 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
     try {
         if (flow.parallelExecution) {
-            await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId)));
+            await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId, logId)));
         } else {
             for (const taskId of flow.taskIds) {
-                await executeMappingJob(taskId);
+                await executeMappingJob(taskId, logId);
             }
         }
         
@@ -485,6 +487,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
             endTime: Date.now(),
             errorMessage: e instanceof Error ? e.message : 'Unknown error during flow execution'
         });
+    } finally {
+        toggleStep(`task_flow_${flow.id}`, false);
     }
   }, [taskFlows, executeMappingJob, addLog, updateLog]);
 

@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, GitBranch } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
@@ -22,7 +22,7 @@ interface PipelineFlowProps {
 const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections } = useSettings();
+  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections } = useSettings();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -292,6 +292,40 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     });
 
 
+    // --- 3. Render Task Flows ---
+    taskFlows.forEach(flow => {
+      if (!flow.enabled) return;
+      
+      const flowId = `process-flow-${flow.id}`;
+      
+      // Represent Flow as a specialized process node
+      calculatedNodes.push({
+        id: flowId,
+        type: 'process',
+        position: { x: TASK_START_X + 500, y: 50 },
+        data: { 
+            label: `Flow: ${flow.name}`, 
+            isProcessing: activeSteps.includes(`task_flow_${flow.id}`),
+            icon: <GitBranch size={16} className="text-indigo-600" />
+        }
+      });
+
+      // Connect Flow to its contained tasks
+      flow.taskIds.forEach(taskId => {
+        const targetTaskId = `process-task-${taskId}`;
+        if (calculatedNodes.some(n => n.id === targetTaskId)) {
+          calculatedEdges.push({ 
+            id: `e-${flowId}-${targetTaskId}`, 
+            source: flowId, 
+            target: targetTaskId, 
+            animated: true,
+            style: { stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' } 
+          });
+        }
+      });
+    });
+
+
     // --- Legacy ETL (Disabled visual) ---
     // (Old ETL visualization code removed)
 
@@ -317,7 +351,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     setEdges(calculatedEdges);
 
-  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, connections, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
+  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
 
   // Auto-align nodes when the flow is initialized
   const [hasAutoAligned, setHasAutoAligned] = useState(false);
@@ -438,6 +472,14 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       >
         <Background />
         <Controls />
+        <Panel position="top-left">
+          <div className="bg-white/80 backdrop-blur-sm px-3 py-2 rounded shadow border border-gray-200">
+            <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <Workflow size={16} className="text-blue-600" />
+              Pipeline Architecture Visualizer
+            </h3>
+          </div>
+        </Panel>
         <Panel position="top-right">
           <button
             onClick={onLayout}

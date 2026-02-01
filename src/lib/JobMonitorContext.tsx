@@ -30,6 +30,7 @@ export interface JobExecutionLog {
   errorMessage?: string;
   details?: string; // Filename or other context
   extendedDetails?: MappingExecutionDetails | TransferExecutionDetails;
+  parentLogId?: string; // ID of the parent TaskFlow log
 }
 
 interface JobMonitorContextType {
