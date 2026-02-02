@@ -385,7 +385,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         dagreGraph.setDefaultEdgeLabel(() => ({}));
 
         const isMobile = window.innerWidth < 768;
-        const rankdir = isMobile ? 'TB' : 'LR';
+        const rankdir = 'LR'; // Force Left-to-Right layout even on mobile
         dagreGraph.setGraph({ rankdir });
 
         const getWidth = (node: Node) => {
@@ -410,8 +410,8 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
           const nodeWithPosition = dagreGraph.node(node.id);
           return {
             ...node,
-            targetPosition: isMobile ? Position.Top : Position.Left,
-            sourcePosition: isMobile ? Position.Bottom : Position.Right,
+            targetPosition: Position.Left,
+            sourcePosition: Position.Right,
             width: getWidth(node),
             height: getHeight(node),
             position: {
@@ -432,7 +432,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
     const isMobile = window.innerWidth < 768;
-    const rankdir = isMobile ? 'TB' : 'LR';
+    const rankdir = 'LR'; // Force Left-to-Right layout even on mobile
 
     const getWidth = (node: Node) => {
         const baseWidth = node.type === 'storage' ? 220 : 180;
@@ -459,8 +459,8 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       const nodeWithPosition = dagreGraph.node(node.id);
       return {
         ...node,
-        targetPosition: isMobile ? Position.Top : Position.Left,
-        sourcePosition: isMobile ? Position.Bottom : Position.Right,
+        targetPosition: Position.Left,
+        sourcePosition: Position.Right,
         width: getWidth(node),
         height: getHeight(node),
         position: {
