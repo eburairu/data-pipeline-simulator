@@ -388,7 +388,7 @@ const JobMonitor: React.FC = () => {
 
         {/* Visualizer Panel */}
         {showVisualizer && (
-            <div className="h-40 sm:h-64 md:h-80 border-b border-gray-200 bg-gray-50 overflow-hidden relative shrink-0">
+            <div className="h-80 sm:h-[500px] md:h-[600px] border-b border-gray-200 bg-gray-50 overflow-hidden relative shrink-0">
                 <PipelineFlow activeSteps={activeSteps} />
                 <div className="absolute bottom-2 left-2 bg-white/70 backdrop-blur-sm px-2 py-1 rounded border text-[10px] text-gray-500 pointer-events-none">
                     Real-time Pipeline Architecture
