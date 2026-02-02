@@ -11,7 +11,7 @@ description: "Tasks for system-wide refactoring and type safety"
 
 **Purpose**: Verify environment and tools
 
-- [ ] T001 Verify linting configuration and current error count
+- [x] T001 Verify linting configuration and current error count
 
 ## Phase 2: Foundational (Type Safety & Context)
 
@@ -27,31 +27,31 @@ description: "Tasks for system-wide refactoring and type safety"
 
 - [x] T005 [US1] Refactor `evaluateExpression` in `src/lib/MappingEngine.ts` to use strict types
 - [x] T006 [US1] Refactor recursive mapping logic in `src/lib/MappingEngine.ts` to use strict types
-- [ ] T007 [US1] Update `src/lib/DataGenerator.ts` to use new type definitions
-- [ ] T008 [US1] Update `src/lib/Validation.ts` to use new type definitions
+- [x] T007 [US1] Update `src/lib/DataGenerator.ts` to use new type definitions
+- [x] T008 [US1] Update `src/lib/Validation.ts` to use new type definitions
 
 ## Phase 4: Hooks Extraction & Logic Separation
 
 **Purpose**: Separate logic from UI components.
 
-- [ ] T009 [US2] Create `src/lib/hooks/useSimulationTimers.ts` for timer management
-- [ ] T010 [US2] Refactor `src/lib/hooks/useSimulationEngine.ts` to use strict types and improve state management
+- [x] T009 [US2] Create `src/lib/hooks/useSimulationTimers.ts` for timer management
+- [x] T010 [US2] Refactor `src/lib/hooks/useSimulationEngine.ts` to use strict types and improve state management
 
 ## Phase 5: Component Modularization
 
 **Purpose**: Clean up App.tsx and modularize UI.
 
-- [ ] T011 [US3] Extract `DatabaseView` logic into `src/components/views/DatabaseView.tsx` (new file)
-- [ ] T012 [US3] Extract `StorageViews` logic into `src/components/views/StorageViews.tsx` (new file)
-- [ ] T013 [US3] Clean up `src/App.tsx` to use extracted components and hooks
+- [x] T011 [US3] Extract `DatabaseView` logic into `src/components/views/DatabaseView.tsx` (new file)
+- [x] T012 [US3] Extract `StorageViews` logic into `src/components/views/StorageViews.tsx` (new file)
+- [x] T013 [US3] Clean up `src/App.tsx` to use extracted components and hooks
 
 ## Phase 6: Polish & Verification
 
 **Purpose**: Ensure quality and stability.
 
-- [ ] T014 Run full type check (`tsc`) and ensure zero errors
-- [ ] T015 Run lint check (`npm run lint`) and fix remaining warnings
-- [ ] T016 Verify application functionality (manual test)
+- [x] T014 Run full type check (`tsc`) and ensure zero errors
+- [x] T015 Run lint check (`npm run lint`) and fix remaining warnings
+- [x] T016 Verify application functionality (manual test)
 
 ## Dependencies & Execution Order
 
