@@ -1,60 +1,60 @@
 ---
-description: "Tasks for system-wide refactoring and type safety"
+description: "システム全体のリファクタリングと型安全のためのタスク"
 ---
 
-# Tasks: 005-system-refactoring
+# タスク: 005-system-refactoring
 
-**Input**: Design documents from `.specify/specs/005-system-refactoring/`
-**Prerequisites**: plan.md, spec.md
+**入力**: `.specify/specs/005-system-refactoring/` からの設計ドキュメント
+**前提条件**: plan.md, spec.md
 
-## Phase 1: Setup
+## フェーズ 1: セットアップ
 
-**Purpose**: Verify environment and tools
+**目的**: 環境とツールの検証
 
-- [x] T001 Verify linting configuration and current error count
+- [x] T001 リンター設定と現在のエラー数を確認
 
-## Phase 2: Foundational (Type Safety & Context)
+## フェーズ 2: 基盤（型安全とコンテキスト）
 
-**Purpose**: Establish strict type definitions and fix core contexts.
+**目的**: 厳格な型定義を確立し、コアコンテキストを修正。
 
-- [x] T002 [P] Define strict interfaces for `DataRow`, `Schema`, `FieldDefinition` in `src/lib/types.ts`
-- [x] T003 [P] Consolidate and refine mapping types in `src/lib/MappingTypes.ts`
-- [x] T004 [US1] Refactor `src/lib/SettingsContext.tsx` to remove `any` and use defined types
+- [x] T002 [P] `src/lib/types.ts` に `DataRow`、`Schema`、`FieldDefinition` の厳格なインターフェースを定義
+- [x] T003 [P] `src/lib/MappingTypes.ts` のマッピング型を統合・改善
+- [x] T004 [US1] `src/lib/SettingsContext.tsx` をリファクタリングし、`any` を除去して定義された型を使用
 
-## Phase 3: Core Logic Refactoring (Zero Any)
+## フェーズ 3: コアロジックリファクタリング（Zero Any）
 
-**Purpose**: Remove `any` from the mapping engine and core logic.
+**目的**: マッピングエンジンとコアロジックから `any` を除去。
 
-- [x] T005 [US1] Refactor `evaluateExpression` in `src/lib/MappingEngine.ts` to use strict types
-- [x] T006 [US1] Refactor recursive mapping logic in `src/lib/MappingEngine.ts` to use strict types
-- [x] T007 [US1] Update `src/lib/DataGenerator.ts` to use new type definitions
-- [x] T008 [US1] Update `src/lib/Validation.ts` to use new type definitions
+- [x] T005 [US1] `src/lib/MappingEngine.ts` の `evaluateExpression` を厳格な型を使用するようリファクタリング
+- [x] T006 [US1] `src/lib/MappingEngine.ts` の再帰的マッピングロジックを厳格な型を使用するようリファクタリング
+- [x] T007 [US1] `src/lib/DataGenerator.ts` を新しい型定義を使用するよう更新
+- [x] T008 [US1] `src/lib/Validation.ts` を新しい型定義を使用するよう更新
 
-## Phase 4: Hooks Extraction & Logic Separation
+## フェーズ 4: フック抽出とロジック分離
 
-**Purpose**: Separate logic from UI components.
+**目的**: UIコンポーネントからロジックを分離。
 
-- [x] T009 [US2] Create `src/lib/hooks/useSimulationTimers.ts` for timer management
-- [x] T010 [US2] Refactor `src/lib/hooks/useSimulationEngine.ts` to use strict types and improve state management
+- [x] T009 [US2] `src/lib/hooks/useSimulationTimers.ts` をタイマー管理用に作成
+- [x] T010 [US2] `src/lib/hooks/useSimulationEngine.ts` を厳格な型と改善された状態管理を使用するようリファクタリング
 
-## Phase 5: Component Modularization
+## フェーズ 5: コンポーネントのモジュール化
 
-**Purpose**: Clean up App.tsx and modularize UI.
+**目的**: App.tsx をクリーンアップし、UIをモジュール化。
 
-- [x] T011 [US3] Extract `DatabaseView` logic into `src/components/views/DatabaseView.tsx` (new file)
-- [x] T012 [US3] Extract `StorageViews` logic into `src/components/views/StorageViews.tsx` (new file)
-- [x] T013 [US3] Clean up `src/App.tsx` to use extracted components and hooks
+- [x] T011 [US3] `DatabaseView` ロジックを `src/components/views/DatabaseView.tsx` に抽出（新規ファイル）
+- [x] T012 [US3] `StorageViews` ロジックを `src/components/views/StorageViews.tsx` に抽出（新規ファイル）
+- [x] T013 [US3] `src/App.tsx` をクリーンアップし、抽出されたコンポーネントとフックを使用
 
-## Phase 6: Polish & Verification
+## フェーズ 6: ポリッシュと検証
 
-**Purpose**: Ensure quality and stability.
+**目的**: 品質と安定性の確保。
 
-- [x] T014 Run full type check (`tsc`) and ensure zero errors
-- [x] T015 Run lint check (`npm run lint`) and fix remaining warnings
-- [x] T016 Verify application functionality (manual test)
+- [x] T014 完全な型チェック（`tsc`）を実行し、エラーがゼロであることを確認
+- [x] T015 リントチェック（`npm run lint`）を実行し、残りの警告を修正
+- [x] T016 アプリケーション機能を検証（手動テスト）
 
-## Dependencies & Execution Order
+## 依存関係と実行順序
 
-- **Phase 2** blocks everything else. `SettingsContext` is used everywhere.
-- **Phase 3** depends on Phase 2.
-- **Phase 4 & 5** can be done in parallel after Phase 2, but Phase 3 is recommended before complex UI refactoring.
+- **フェーズ 2** は他のすべてをブロック。`SettingsContext` はあらゆる場所で使用されている。
+- **フェーズ 3** はフェーズ 2 に依存。
+- **フェーズ 4 & 5** はフェーズ 2 の後に並行実行可能だが、複雑なUIリファクタリングの前にフェーズ 3 を完了することを推奨。

@@ -1,33 +1,33 @@
-# Plan: Codebase Improvements and Optimization
+# 実装計画: コードベース改善と最適化
 
-## Overview
-This plan focuses on addressing technical debt, improving type safety, optimizing performance, and refining the architecture of the Data Pipeline Simulator. Based on a comprehensive codebase investigation, several key areas have been identified for enhancement.
+## 概要
+この計画は、Data Pipeline Simulator の技術的負債への対処、型安全の向上、パフォーマンスの最適化、およびアーキテクチャの改善に焦点を当てています。包括的なコードベース調査に基づき、いくつかの重要な領域が強化対象として特定されました。
 
-## Goals
-1.  **Enhance Type Safety**: Eliminate remaining `any` types, particularly in core logic (`ExpressionFunctions`) and UI components (`App.tsx`), and introduce strict typing for i18n.
-2.  **Refactor Architecture**: Decompose the monolithic `App.tsx` into smaller, manageable components and separate concern-heavy logic (like migration) from Contexts.
-3.  **Optimize Performance**: Prepare the application for larger datasets by optimizing rendering in `JobMonitor` and `BiDashboard`.
-4.  **Standardize UI**: Unify configuration components (`ParamInput`) to reduce duplication.
+## 目標
+1.  **型安全の強化**: 残存する `any` 型を排除する。特にコアロジック（`ExpressionFunctions`）とUIコンポーネント（`App.tsx`）で、i18n の厳格な型付けを導入する。
+2.  **アーキテクチャのリファクタリング**: モノリシックな `App.tsx` をより小さく管理しやすいコンポーネントに分解し、関心の重いロジック（マイグレーションなど）をコンテキストから分離する。
+3.  **パフォーマンスの最適化**: `JobMonitor` と `BiDashboard` のレンダリングを最適化して、より大きなデータセットに対応できるよう準備する。
+4.  **UIの標準化**: 設定コンポーネント（`ParamInput`）を統一して重複を削減する。
 
-## Phased Approach
+## フェーズ別アプローチ
 
-### Phase 1: Type Safety & Core Logic
-Focus on the foundational logic that powers the application.
-- Refactor `ExpressionFunctions.ts` to use Generics.
-- Improve type definitions in `i18n` and Contexts.
+### フェーズ 1: 型安全とコアロジック
+アプリケーションを動かす基本ロジックに焦点を当てる。
+- `ExpressionFunctions.ts` をジェネリクスを使用するようリファクタリング。
+- `i18n` とコンテキストの型定義を改善。
 
-### Phase 2: Architectural Decomposition
-Break down the largest components to improve maintainability.
-- Extract `StorageView` and `DatabaseView` from `App.tsx`.
-- Move migration logic out of `DataContext.tsx`.
+### フェーズ 2: アーキテクチャの分解
+最大のコンポーネントを分解して保守性を向上。
+- `App.tsx` から `StorageView` と `DatabaseView` を抽出。
+- マイグレーションロジックを `DataContext.tsx` から移動。
 
-### Phase 3: UI Standardization & Performance
-Improve the user interface code and rendering performance.
-- Create a reusable `ParamInput` component.
-- Optimize list rendering in Monitor and Dashboard.
+### フェーズ 3: UI標準化とパフォーマンス
+ユーザーインターフェースコードとレンダリングパフォーマンスを改善。
+- 再利用可能な `ParamInput` コンポーネントを作成。
+- モニターとダッシュボードのリスト描画を最適化。
 
-## Risks & Mitigation
-- **Risk**: Refactoring `App.tsx` might break the interaction between Simulation Manager and UI.
-    - **Mitigation**: Ensure strict prop typing and use component tests to verify behavior.
-- **Risk**: Changing `ExpressionFunctions` types might affect runtime behavior of user-defined expressions.
-    - **Mitigation**: Enhance unit tests for expressions before refactoring.
+## リスクと軽減策
+- **リスク**: `App.tsx` のリファクタリングがシミュレーションマネージャーとUIの連携を壊す可能性。
+    - **軽減**: 厳格なプロパティ型付けとコンポーネントテストで動作を検証。
+- **リスク**: `ExpressionFunctions` の型変更がユーザー定義式のランタイム動作に影響する可能性。
+    - **軽減**: リファクタリング前に式のユニットテストを強化。
