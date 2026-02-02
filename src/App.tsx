@@ -18,6 +18,7 @@ import { processTemplate } from './lib/templateUtils';
 import { generateDataFromSchema } from './lib/DataGenerator';
 import { StorageView } from './components/views/StorageView';
 import { DatabaseView } from './components/views/DatabaseView';
+import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition, DataSourceDefinition } from './lib/types';
 
 // eslint-disable-next-line react-refresh/only-export-components
 const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type: JobType) => void) => void }> = ({ setRetryHandler }) => {
@@ -33,10 +34,10 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
   // Dummy toggleStep as visualizer is removed from Simulation tab
-  const toggleStep = useCallback((_step: string, _active: boolean) => {}, []);
+  const toggleStep = useCallback((_step: string, _active: boolean) => { }, []);
 
   const engine = useSimulationEngine(toggleStep, setErrors);
-  
+
   useSimulationTimers(
     { generator: isGeneratorRunning, transfer: isTransferRunning, mapping: isMappingRunning },
     engine
@@ -141,35 +142,35 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
 // Helper Components for Cleaner Render
 interface StorageViewsProps {
-  dataSource: any;
-  collection: any;
-  delivery: any;
-  topics: any[];
-  connections: any[];
+  dataSource: DataSourceSettings;
+  collection: CollectionSettings;
+  delivery: DeliverySettings;
+  topics: TopicDefinition[];
+  connections: ConnectionDefinition[];
   listFiles: (host: string, path: string) => VFile[];
 }
 
 const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, delivery, topics, connections, listFiles }) => {
   const { t } = useTranslation();
-  const sourceStorages = dataSource.definitions.map((d: any) => ({ name: d.name, host: d.host, path: d.path, type: 'source' }));
-  const topicStorages = topics.map((t: any) => ({ name: t.name, host: 'localhost', path: `/topics/${t.id}`, type: 'topic' }));
+  const sourceStorages = dataSource.definitions.map((d: DataSourceDefinition) => ({ name: d.name, host: d.host, path: d.path, type: 'source' as const }));
+  const topicStorages = topics.map((t) => ({ name: t.name, host: 'localhost', path: `/topics/${t.id}`, type: 'topic' as const }));
   const incomingPaths = new Set<string>();
   const incomingStorages: { host: string, path: string, type: 'incoming' }[] = [];
-  collection.jobs.forEach((job: any) => {
+  collection.jobs.forEach((job) => {
     if (job.targetType === 'topic') return;
     const conn = connections.find(c => c.id === job.targetConnectionId);
     if (conn && conn.type === 'file' && conn.host && conn.path) {
-        const key = `${conn.host}:${conn.path}`;
-        if (!incomingPaths.has(key)) { incomingPaths.add(key); incomingStorages.push({ host: conn.host, path: conn.path, type: 'incoming' }); }
+      const key = `${conn.host}:${conn.path}`;
+      if (!incomingPaths.has(key)) { incomingPaths.add(key); incomingStorages.push({ host: conn.host, path: conn.path, type: 'incoming' }); }
     }
   });
   const internalPaths = new Set<string>();
   const internalStorages: { host: string, path: string, type: 'internal' }[] = [];
-  delivery.jobs.forEach((job: any) => {
+  delivery.jobs.forEach((job) => {
     const conn = connections.find(c => c.id === job.targetConnectionId);
     if (conn && conn.type === 'file' && conn.host && conn.path) {
-        const key = `${conn.host}:${conn.path}`;
-        if (!internalPaths.has(key)) { internalPaths.add(key); internalStorages.push({ host: conn.host, path: conn.path, type: 'internal' }); }
+      const key = `${conn.host}:${conn.path}`;
+      if (!internalPaths.has(key)) { internalPaths.add(key); internalStorages.push({ host: conn.host, path: conn.path, type: 'internal' }); }
     }
   });
 
@@ -178,20 +179,20 @@ const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, del
       <div className="border p-2 sm:p-3 rounded bg-gray-50/50">
         <h3 className="font-bold border-b mb-2 pb-1 text-gray-700 flex items-center gap-2 text-xs sm:text-sm"><span className="w-2 h-2 rounded-full bg-green-500"></span> {t('app.storage.source')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {sourceStorages.map((s: any) => <StorageView key={`${s.host}:${s.path}`} {...s} files={listFiles(s.host, s.path)} />)}
+          {sourceStorages.map((s) => <StorageView key={`${s.host}:${s.path}`} {...s} files={listFiles(s.host, s.path)} />)}
         </div>
       </div>
       <div className="border p-2 sm:p-3 rounded bg-gray-50/50">
         <h3 className="font-bold border-b mb-2 pb-1 text-gray-700 flex items-center gap-2 text-xs sm:text-sm"><span className="w-2 h-2 rounded-full bg-orange-500"></span> {t('app.storage.intermediate')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {topicStorages.map((s: any) => <StorageView key={`topic-${s.name}`} {...s} files={listFiles(s.host, s.path)} />)}
-          {incomingStorages.map((s: any) => <StorageView key={`${s.host}:${s.path}`} {...s} files={listFiles(s.host, s.path)} />)}
+          {topicStorages.map((s) => <StorageView key={`topic-${s.name}`} {...s} files={listFiles(s.host, s.path)} />)}
+          {incomingStorages.map((s) => <StorageView key={`${s.host}:${s.path}`} {...s} files={listFiles(s.host, s.path)} />)}
         </div>
       </div>
       <div className="border p-2 sm:p-3 rounded bg-gray-50/50">
         <h3 className="font-bold border-b mb-2 pb-1 text-gray-700 flex items-center gap-2 text-xs sm:text-sm"><span className="w-2 h-2 rounded-full bg-blue-500"></span> {t('app.storage.internal')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          {internalStorages.map((s: any) => <StorageView key={`${s.host}:${s.path}`} {...s} files={listFiles(s.host, s.path)} />)}
+          {internalStorages.map((s) => <StorageView key={`${s.host}:${s.path}`} {...s} files={listFiles(s.host, s.path)} />)}
         </div>
       </div>
     </div>
@@ -222,14 +223,14 @@ function App() {
       <div className="min-h-screen bg-gray-100 p-2 sm:p-4 md:p-8 flex flex-col gap-4 sm:gap-8">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
-             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">{t('app.title')}</h1>
-             <button
-               onClick={toggleLanguage}
-               className="flex items-center gap-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded"
-               title="Toggle Language"
-             >
-               <Globe size={14} /> {language.toUpperCase()}
-             </button>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">{t('app.title')}</h1>
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center gap-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded"
+              title="Toggle Language"
+            >
+              <Globe size={14} /> {language.toUpperCase()}
+            </button>
           </div>
 
           <div className="flex bg-white rounded-lg shadow p-1 w-full sm:w-auto overflow-x-auto">
