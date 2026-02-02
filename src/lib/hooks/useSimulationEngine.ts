@@ -4,7 +4,8 @@ import { useVirtualDB } from '../VirtualDB';
 import { useSettings } from '../SettingsContext';
 import { useJobMonitor } from '../JobMonitorContext';
 import { processTemplate } from '../templateUtils';
-import { executeMappingTaskRecursive, type ExecutionState, type ExecutionStats } from '../MappingEngine';
+import { executeMappingTaskRecursive, type ExecutionState, type ExecutionStats, type DbRecord } from '../MappingEngine';
+import type { DataRow } from '../types';
 
 export const useSimulationEngine = (
     toggleStep: (step: string, active: boolean) => void,
@@ -330,7 +331,12 @@ export const useSimulationEngine = (
                     deleteFile: deleteFile,
                     writeFile: writeFile
                 },
-                { select, insert, update, delete: remove },
+                { 
+                    select: (t) => select(t) as unknown as (DataRow | DbRecord)[], 
+                    insert, 
+                    update, 
+                    delete: remove 
+                },
                 mappingStates.current[task.id],
                 observer
             );
