@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useJobMonitor, type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../lib/JobMonitorContext';
 import { useSettings } from '../lib/SettingsContext';
 import MappingDesigner from './settings/MappingDesigner';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch, CornerDownRight, ChevronRight } from 'lucide-react';
+import PipelineFlow from './PipelineFlow';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 
 // Re-defining internal types locally to avoid import issues if they change
 type JobType = 'collection' | 'delivery' | 'mapping' | 'taskflow';
@@ -228,6 +229,7 @@ const JobMonitor: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | JobType>('all');
   const [selectedLog, setSelectedLog] = useState<JobExecutionLog | null>(null);
   const [expandedFlows, setExpandedFlows] = useState<Set<string>>(new Set());
+  const [showVisualizer, setShowVisualizer] = useState(true);
   const [now, setNow] = useState(() => Date.now());
 
   // Force re-render to update running times
@@ -235,6 +237,20 @@ const JobMonitor: React.FC = () => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Calculate active steps for PipelineFlow based on current running logs
+  const activeSteps = useMemo(() => {
+    return logs
+      .filter(l => l.status === 'running')
+      .map(l => {
+        if (l.jobType === 'collection') return `transfer_1_${l.jobId}`;
+        if (l.jobType === 'delivery') return `transfer_2_${l.jobId}`;
+        if (l.jobType === 'mapping') return `mapping_task_${l.jobId}`;
+        if (l.jobType === 'taskflow') return `task_flow_${l.jobId}`;
+        return '';
+      })
+      .filter(Boolean);
+  }, [logs]);
 
   const toggleFlow = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -353,6 +369,14 @@ const JobMonitor: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className={`flex items-center gap-2 px-3 py-1 rounded border text-xs font-medium transition-colors ${showVisualizer ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                title={showVisualizer ? "Hide Visualizer" : "Show Visualizer"}
+            >
+                {showVisualizer ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                Visualizer
+            </button>
+            <button
                 onClick={clearLogs}
                 className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 px-3 py-1 rounded border border-gray-300 hover:border-red-300 transition-colors"
             >
@@ -361,6 +385,16 @@ const JobMonitor: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Visualizer Panel */}
+        {showVisualizer && (
+            <div className="h-96 md:h-80 border-b border-gray-200 bg-gray-50 overflow-hidden relative">
+                <PipelineFlow activeSteps={activeSteps} />
+                <div className="absolute bottom-2 left-2 bg-white/70 backdrop-blur-sm px-2 py-1 rounded border text-[10px] text-gray-500 pointer-events-none">
+                    Real-time Pipeline Architecture
+                </div>
+            </div>
+        )}
 
         {/* Log List */}
         <div className="flex-grow overflow-auto p-0 bg-gray-50/50">

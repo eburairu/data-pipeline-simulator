@@ -4,7 +4,6 @@ import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
 import { SettingsProvider, useSettings } from './lib/SettingsContext';
 import { LanguageProvider } from './lib/i18n/LanguageContext';
 import { JobMonitorProvider, type JobType } from './lib/JobMonitorContext';
-import PipelineFlow from './components/PipelineFlow';
 import BiDashboard from './components/BiDashboard';
 import SettingsPanel from './components/settings/SettingsPanel';
 import JobMonitor from './components/JobMonitor';
@@ -46,7 +45,6 @@ const StorageView = React.memo(({ name, host, path, type, files }: { name?: stri
 // Wrapper to handle the cyclic dependency between Logic and Logger
 const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type: JobType) => void) => void }> = ({ setRetryHandler }) => {
   const { t } = useTranslation();
-  const [activeSteps, setActiveSteps] = useState<string[]>([]);
   const [isGeneratorRunning, setIsGeneratorRunning] = useState(false);
   const [isTransferRunning, setIsTransferRunning] = useState(false);
   const [isMappingRunning, setIsMappingRunning] = useState(false);
@@ -57,9 +55,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const { dataSource, collection, delivery, topics, connections, tables, biDashboard } = useSettings();
   const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
-  const toggleStep = useCallback((step: string, active: boolean) => {
-    setActiveSteps(prev => active ? (prev.includes(step) ? prev : [...prev, step]) : prev.filter(s => s !== step));
-  }, []);
+  // Dummy toggleStep as visualizer is removed from Simulation tab
+  const toggleStep = useCallback((_step: string, _active: boolean) => {}, []);
 
   const engine = useSimulationEngine(toggleStep, setErrors);
   
@@ -159,9 +156,6 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
               <BiDashboard />
             </div>
           )}
-          <div className="h-[400px] sm:h-[500px] bg-white rounded shadow border border-gray-200 overflow-hidden">
-            <PipelineFlow activeSteps={activeSteps} />
-          </div>
         </div>
       </div>
     </>
