@@ -690,7 +690,7 @@ const processHierarchyParser = (node: HierarchyParserTransformation, batch: Data
 // Async Traverse with Observer
 const traverseAsync = async (
     currentNode: Transformation,
-    batch: DataRow[],
+    batchOrRouterResult: DataRow[] | Record<string, DataRow[]>,
     mapping: Mapping,
     connections: ConnectionDefinition[],
     tables: TableDefinition[],
@@ -707,13 +707,26 @@ const traverseAsync = async (
     
     // Group links by targetId to handle multiple links to same target (unlikely but possible)
     for (const link of outgoingLinks) {
+        // Resolve input batch for this link
+        let batch: DataRow[] = [];
+        if (currentNode.type === 'router' && !Array.isArray(batchOrRouterResult)) {
+             let defaultGroup = 'default';
+             if ('defaultGroup' in currentNode.config) {
+                 defaultGroup = (currentNode.config as any).defaultGroup;
+             }
+             const groupName = link.routerGroup || defaultGroup;
+             batch = (batchOrRouterResult as Record<string, DataRow[]>)[groupName] || [];
+        } else {
+             batch = batchOrRouterResult as DataRow[];
+        }
+
         const nextNode = mapping.transformations.find(t => t.id === link.targetId);
         if (!nextNode) continue;
 
         // Simulate processing delay for "Realism"
         await delay(50); // 50ms per node step
 
-        let processedBatch: DataRow[] = [];
+        let processedBatch: DataRow[] | Record<string, DataRow[]> = [];
 
         // Update Input Stats
         if (!stats.transformations[nextNode.id]) {
@@ -766,8 +779,7 @@ const traverseAsync = async (
                 }
                 case 'router': {
                     const routed = processRouter(nextNode, batch, parameters);
-                    // TODO: Router logic needs fixing to support multiple outputs properly
-                    processedBatch = routed[nextNode.config.defaultGroup || 'default'];
+                    processedBatch = routed;
                     break;
                 }
                 case 'sorter': {
@@ -844,12 +856,18 @@ const traverseAsync = async (
             checkStopOnErrors(stats, _task);
         }
 
-        stats.transformations[nextNode.id].output += processedBatch.length;
+        let outputCount = 0;
+        if (Array.isArray(processedBatch)) {
+            outputCount = processedBatch.length;
+        } else {
+            outputCount = Object.values(processedBatch).reduce((acc, arr) => acc + arr.length, 0);
+        }
+        stats.transformations[nextNode.id].output += outputCount;
 
         // Notify Observer (Output Phase)
         if (observer) observer({ ...stats });
 
-        if (processedBatch.length > 0) {
+        if (outputCount > 0) {
             await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, _task, observer);
         }
     }
