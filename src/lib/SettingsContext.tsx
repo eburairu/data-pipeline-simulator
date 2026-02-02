@@ -71,6 +71,14 @@ interface SettingsContextType {
   availableTemplates: PipelineTemplate[];
   applyTemplate: (templateId: string) => void;
   cleanupTemplate: (templateId: string) => void;
+
+  // Exposed setters for templates
+  setHosts: React.Dispatch<React.SetStateAction<Host[]>>;
+  setConnections: React.Dispatch<React.SetStateAction<ConnectionDefinition[]>>;
+  setTables: React.Dispatch<React.SetStateAction<TableDefinition[]>>;
+  setMappings: React.Dispatch<React.SetStateAction<Mapping[]>>;
+  setMappingTasks: React.Dispatch<React.SetStateAction<MappingTask[]>>;
+  setTaskFlows: React.Dispatch<React.SetStateAction<TaskFlow[]>>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -218,7 +226,7 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
             cleanupTemplate,
             // Exposed setters for templates
             setHosts, setConnections, setTables, setMappings, setMappingTasks, setTaskFlows
-        } as any}>
+        }}>
             {children}
         </SettingsContext.Provider>
     );

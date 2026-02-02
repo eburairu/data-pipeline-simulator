@@ -2,6 +2,9 @@
 
 import { type DBFilter } from './VirtualDB';
 
+export type DataValue = string | number | boolean | null | undefined | Date;
+export type DataRow = Record<string, DataValue>;
+
 export interface DataSourceDefinition {
   id: string;
   name: string;
