@@ -315,7 +315,7 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'monitor' && <div className="h-[calc(100vh-140px)]"><JobMonitor /></div>}
+        {activeTab === 'monitor' && <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-140px)]"><JobMonitor /></div>}
 
         {activeTab === 'settings' && (
           <div className="bg-white rounded shadow p-4 sm:p-6 border border-gray-200">
