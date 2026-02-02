@@ -310,12 +310,12 @@ function App() {
         </div>
 
         {activeTab === 'dashboard' && (
-          <div className="flex-grow min-h-[500px] h-[calc(100vh-180px)]">
+          <div className="flex-grow min-h-[500px] h-[calc(100dvh-180px)]">
             <BiDashboard />
           </div>
         )}
 
-        {activeTab === 'monitor' && <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-140px)]"><JobMonitor /></div>}
+        {activeTab === 'monitor' && <div className="h-[calc(100dvh-150px)] sm:h-[calc(100vh-140px)]"><JobMonitor /></div>}
 
         {activeTab === 'settings' && (
           <div className="bg-white rounded shadow p-4 sm:p-6 border border-gray-200">
