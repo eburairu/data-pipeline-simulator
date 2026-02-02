@@ -228,6 +228,7 @@ export interface MappingLink {
   id: string;
   sourceId: string;
   targetId: string;
+  routerGroup?: string;
 }
 
 export interface Mapping {
