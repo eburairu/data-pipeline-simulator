@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
-import { type DataSourceSettings, type TopicDefinition, type TableDefinition, type BiDashboardSettings, type DataSourceDefinition, type GenerationJob } from '../types';
+import { type DataSourceSettings, type TopicDefinition, type TableDefinition, type BiDashboardSettings } from '../types';
+import { migrateDataSourceSettings, migrateBiDashboardSettings } from '../migrations/DataMigration';
 
 interface DataContextType {
   dataSource: DataSourceSettings;
@@ -89,51 +90,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.dataSource) {
-             if (parsed.dataSource.definitions && parsed.dataSource.jobs) {
-                setDataSource(parsed.dataSource);
-             } else if (Array.isArray(parsed.dataSource.jobs)) {
-                 // Simple migration logic
-                 const newDefinitions: DataSourceDefinition[] = [];
-                 const newJobs: GenerationJob[] = [];
-                 parsed.dataSource.jobs.forEach((oldJob: any) => {
-                    const defId = `ds_def_${oldJob.id}`;
-                    newDefinitions.push({
-                      id: defId,
-                      name: `${oldJob.name} Location`,
-                      host: oldJob.host,
-                      path: oldJob.sourcePath
-                    });
-                    newJobs.push({ 
-                        ...oldJob, 
-                        dataSourceId: defId, 
-                        mode: oldJob.mode || 'template', 
-                        rowCount: oldJob.rowCount || 1 
-                    });
-                 });
-                 setDataSource({ definitions: newDefinitions, jobs: newJobs });
-             }
-        }
+        
+        const migratedDS = migrateDataSourceSettings(parsed);
+        if (migratedDS) setDataSource(migratedDS);
+
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);
-        if (parsed.biDashboard) {
-             if ('defaultTableId' in parsed.biDashboard) {
-                const old = parsed.biDashboard;
-                setBiDashboard({
-                  showDashboard: old.showDashboard,
-                  items: old.defaultTableId ? [{
-                      id: 'dashboard_item_1',
-                      title: 'Default View',
-                      tableId: old.defaultTableId,
-                      viewType: old.defaultViewType || 'table',
-                      filters: [],
-                      refreshInterval: old.refreshInterval || 0
-                  }] : []
-                });
-             } else {
-                setBiDashboard(parsed.biDashboard);
-             }
-        }
+
+        const migratedBI = migrateBiDashboardSettings(parsed);
+        if (migratedBI) setBiDashboard(migratedBI);
       } catch (e) {
         console.error('Failed to load data settings', e);
       }
