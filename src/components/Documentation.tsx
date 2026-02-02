@@ -256,51 +256,80 @@ const FunctionReferenceSection = () => {
                 {t('docs.functions.expressionFuncs.desc')}
             </p>
 
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-8">
                 <div>
                 <h4 className="font-semibold text-gray-600 mb-2 border-b">{t('docs.functions.expressionFuncs.string.title')}</h4>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2 text-[13px]">
                     <li><code className="text-blue-600 font-mono">SUBSTR(str, start, [len])</code> - Extract substring (1-based index)</li>
                     <li><code className="text-blue-600 font-mono">INSTR(str, search)</code> - Find position (1-based)</li>
                     <li><code className="text-blue-600 font-mono">LENGTH(str)</code> - String length</li>
                     <li><code className="text-blue-600 font-mono">UPPER(str)</code> / <code className="text-blue-600 font-mono">LOWER(str)</code></li>
                     <li><code className="text-blue-600 font-mono">TRIM(str)</code> - Remove whitespace</li>
                     <li><code className="text-blue-600 font-mono">CONCAT(str1, str2, ...)</code> - Join strings</li>
-                    <li><code className="text-blue-600 font-mono">LPAD(str, len, pad)</code> / <code className="text-blue-600 font-mono">RPAD</code></li>
-                    <li><code className="text-blue-600 font-mono">REPLACE_STR(str, search, replace)</code></li>
+                    <li><code className="text-blue-600 font-mono">LPAD(str, len, [pad])</code> / <code className="text-blue-600 font-mono">RPAD</code> - Padding</li>
+                    <li><code className="text-blue-600 font-mono">REPLACE_STR(str, search, replace)</code> - Global replace</li>
+                    <li><code className="text-blue-600 font-mono">REVERSE(str)</code> - Reverse string</li>
+                    <li><code className="text-blue-600 font-mono">IS_SPACES(str)</code> - Returns true if only spaces</li>
                 </ul>
                 </div>
 
                 <div>
                 <h4 className="font-semibold text-gray-600 mb-2 border-b">{t('docs.functions.expressionFuncs.logic.title')}</h4>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2 text-[13px]">
                     <li><code className="text-blue-600 font-mono">IIF(cond, trueVal, falseVal)</code> - If-Then-Else</li>
                     <li><code className="text-blue-600 font-mono">DECODE(val, search1, res1, ..., default)</code> - Switch case</li>
-                    <li><code className="text-blue-600 font-mono">ISNULL(val)</code> - Returns true if null/undefined</li>
-                    <li><code className="text-blue-600 font-mono">NVL(val, default)</code> - Return default if val is null</li>
+                    <li><code className="text-blue-600 font-mono">ISNULL(val)</code> - Returns true if null/empty</li>
+                    <li><code className="text-blue-600 font-mono">NVL(val, default)</code> - Return default if null</li>
                 </ul>
                 </div>
 
                 <div>
                 <h4 className="font-semibold text-gray-600 mb-2 border-b">{t('docs.functions.expressionFuncs.math.title')}</h4>
-                <ul className="space-y-2 text-sm">
-                    <li><code className="text-blue-600 font-mono">ROUND(num, decimals)</code></li>
-                    <li><code className="text-blue-600 font-mono">TRUNC(num, decimals)</code></li>
+                <ul className="space-y-2 text-[13px]">
+                    <li><code className="text-blue-600 font-mono">ROUND(num, [decimals])</code> / <code className="text-blue-600 font-mono">TRUNC</code></li>
                     <li><code className="text-blue-600 font-mono">ABS(num)</code>, <code className="text-blue-600 font-mono">CEIL(num)</code>, <code className="text-blue-600 font-mono">FLOOR(num)</code></li>
-                    <li><code className="text-blue-600 font-mono">MOD(div, divisor)</code></li>
-                    <li><code className="text-blue-600 font-mono">IS_NUMBER(val)</code></li>
+                    <li><code className="text-blue-600 font-mono">MOD(div, divisor)</code> - Remainder</li>
+                    <li><code className="text-blue-600 font-mono">IS_NUMBER(val)</code> - Validates numeric string</li>
                 </ul>
                 </div>
 
                 <div>
                 <h4 className="font-semibold text-gray-600 mb-2 border-b">{t('docs.functions.expressionFuncs.date.title')}</h4>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2 text-[13px]">
                     <li><code className="text-blue-600 font-mono">GET_DATE()</code> - Current Date object</li>
-                    <li><code className="text-blue-600 font-mono">DATE_DIFF(d1, d2, part)</code> - Diff in 'D', 'H', etc.</li>
+                    <li><code className="text-blue-600 font-mono">IS_DATE(val, [format])</code> - Validate date string</li>
+                    <li><code className="text-blue-600 font-mono">DATE_DIFF(d1, d2, part)</code> - 'D'(Day), 'H'(Hour), 'M'(Month)</li>
                     <li><code className="text-blue-600 font-mono">ADD_TO_DATE(date, amt, part)</code></li>
-                    <li><code className="text-blue-600 font-mono">TO_CHAR(val)</code> / <code className="text-blue-600 font-mono">TO_DATE(str)</code></li>
-                    <li><code className="text-blue-600 font-mono">MD5(str)</code>, <code className="text-blue-600 font-mono">SHA1(str)</code></li>
-                    <li><code className="text-blue-600 font-mono">JSON_VALUE(json, path)</code> - Extract from JSON</li>
+                    <li><code className="text-blue-600 font-mono">GET_DATE_PART(date, part)</code> - 'YYYY', 'MM', 'DD'</li>
+                    <li><code className="text-blue-600 font-mono">TRUNC_DATE(date, part)</code> - Truncate to 'DD', 'MM', 'YYYY'</li>
+                    <li><code className="text-blue-600 font-mono">LAST_DAY(date)</code> - Last day of month</li>
+                </ul>
+                </div>
+
+                <div>
+                <h4 className="font-semibold text-gray-600 mb-2 border-b">Conversion & Formatting</h4>
+                <ul className="space-y-2 text-[13px]">
+                    <li><code className="text-blue-600 font-mono">TO_CHAR(val, [format])</code> - Convert to string</li>
+                    <li><code className="text-blue-600 font-mono">TO_DATE(str, [format])</code> - Convert to Date object</li>
+                    <li><code className="text-blue-600 font-mono">TO_INTEGER(val)</code> / <code className="text-blue-600 font-mono">TO_DECIMAL</code> / <code className="text-blue-600 font-mono">TO_FLOAT</code></li>
+                </ul>
+                </div>
+
+                <div>
+                <h4 className="font-semibold text-gray-600 mb-2 border-b">JSON & Regex</h4>
+                <ul className="space-y-2 text-[13px]">
+                    <li><code className="text-blue-600 font-mono">JSON_VALUE(json, path)</code> - Extract value using dot notation</li>
+                    <li><code className="text-blue-600 font-mono">REG_MATCH(str, pattern)</code> - Regex boolean match</li>
+                    <li><code className="text-blue-600 font-mono">REG_REPLACE(str, pattern, replace)</code> - Regex global replace</li>
+                </ul>
+                </div>
+
+                <div>
+                <h4 className="font-semibold text-gray-600 mb-2 border-b">Encoding & Crypto (Simulated)</h4>
+                <ul className="space-y-2 text-[13px]">
+                    <li><code className="text-blue-600 font-mono">MD5(str)</code> / <code className="text-blue-600 font-mono">SHA1(str)</code> - Hash generation</li>
+                    <li><code className="text-blue-600 font-mono">BASE64_ENCODE(str)</code> / <code className="text-blue-600 font-mono">BASE64_DECODE</code></li>
+                    <li><code className="text-blue-600 font-mono">AES_ENCRYPT(str, key)</code> / <code className="text-blue-600 font-mono">AES_DECRYPT</code></li>
                 </ul>
                 </div>
             </div>
