@@ -1,48 +1,48 @@
-# Specification: Codebase Improvements
+# 仕様書: コードベース改善
 
-## 1. Type Safety Improvements
+## 1. 型安全の改善
 
-### 1.1 ExpressionFunctions Generics
-**Current State**: `ExpressionFunctions.ts` uses `any` for arguments and return types (e.g., `IIF(condition: any, trueVal: any, falseVal: any): any`).
-**Requirement**:
-- Use Generics to enforce type consistency where possible (e.g., `IIF<T>(condition: boolean, trueVal: T, falseVal: T): T`).
-- Maintain compatibility with `MappingEngine`'s dynamic evaluation.
+### 1.1 ExpressionFunctions のジェネリクス
+**現状**: `ExpressionFunctions.ts` は引数と戻り値の型に `any` を使用（例：`IIF(condition: any, trueVal: any, falseVal: any): any`）。
+**要件**:
+- ジェネリクスを使用して可能な限り型の一貫性を強制する（例：`IIF<T>(condition: boolean, trueVal: T, falseVal: T): T`）。
+- `MappingEngine` の動的評価との互換性を維持する。
 
-### 1.2 i18n Typed Keys
-**Current State**: `t(key)` accepts any string, leading to potential runtime errors if keys are missing.
-**Requirement**:
-- Define a `TranslationKey` type based on the structure of `translations.ts`.
-- Update `useTranslation` hook to accept `TranslationKey` instead of string.
+### 1.2 i18n の型付きキー
+**現状**: `t(key)` は任意の文字列を受け付け、キーが欠落している場合にランタイムエラーの可能性がある。
+**要件**:
+- `translations.ts` の構造に基づいて `TranslationKey` 型を定義する。
+- `useTranslation` フックが string の代わりに `TranslationKey` を受け入れるよう更新する。
 
-## 2. Architectural Refactoring
+## 2. アーキテクチャのリファクタリング
 
-### 2.1 App.tsx Decomposition
-**Current State**: `App.tsx` contains `StorageView` and `DatabaseView` definitions, as well as the main `App` and `SimulationManager` logic.
-**Requirement**:
-- Extract `StorageView` to `src/components/views/StorageView.tsx`.
-- Extract `DatabaseView` to `src/components/views/DatabaseView.tsx`.
-- Ensure props are strictly typed (no `any`).
+### 2.1 App.tsx の分解
+**現状**: `App.tsx` には `StorageView` と `DatabaseView` の定義、およびメインの `App` と `SimulationManager` ロジックが含まれている。
+**要件**:
+- `StorageView` を `src/components/views/StorageView.tsx` に抽出する。
+- `DatabaseView` を `src/components/views/DatabaseView.tsx` に抽出する。
+- プロパティは厳密に型付けする（`any` なし）。
 
-### 2.2 DataContext Migration Logic
-**Current State**: `DataContext.tsx` handles legacy data migration within its `useEffect`.
-**Requirement**:
-- Create `src/lib/migrations/DataMigration.ts`.
-- Move migration logic (e.g., updating old job formats) to this new module.
-- Call the migration utility from `DataContext` or `SettingsContext` initialization.
+### 2.2 DataContext マイグレーションロジック
+**現状**: `DataContext.tsx` は `useEffect` 内でレガシーデータのマイグレーションを処理している。
+**要件**:
+- `src/lib/migrations/DataMigration.ts` を作成する。
+- マイグレーションロジック（例：古いジョブフォーマットの更新）をこの新しいモジュールに移動する。
+- マイグレーションユーティリティを `DataContext` または `SettingsContext` の初期化から呼び出す。
 
-## 3. UI Standardization
+## 3. UI標準化
 
-### 3.1 Unified ParamInput
-**Current State**: Multiple settings files (`MappingTaskSettings.tsx`, `DataSourceSettings.tsx`) implement their own key-value pair input fields.
-**Requirement**:
-- Create `src/components/common/ParamInput.tsx`.
-- Standardize props: `value: Record<string, string>`, `onChange: (val: Record<string, string>) => void`, `placeholder?: string`.
-- Replace inline implementations in settings components.
+### 3.1 統一された ParamInput
+**現状**: 複数の設定ファイル（`MappingTaskSettings.tsx`、`DataSourceSettings.tsx`）が独自のキー・バリューペア入力フィールドを実装している。
+**要件**:
+- `src/components/common/ParamInput.tsx` を作成する。
+- プロパティを標準化: `value: Record<string, string>`、`onChange: (val: Record<string, string>) => void`、`placeholder?: string`。
+- 設定コンポーネント内のインライン実装を置き換える。
 
-## 4. Performance Optimization
+## 4. パフォーマンス最適化
 
-### 4.1 Rendering Optimization
-**Current State**: Lists in `JobMonitor` and `DatabaseView` render all items.
-**Requirement**:
-- Implement simple pagination or limit rendering (e.g., show last 100 logs/records) if virtualization is too heavy for now.
-- `JobMonitor` already has virtualization potential, ensure it is performant on mobile.
+### 4.1 レンダリング最適化
+**現状**: `JobMonitor` と `DatabaseView` のリストはすべてのアイテムをレンダリングしている。
+**要件**:
+- 仮想化が重すぎる場合、シンプルなページングまたはレンダリング制限（例：最後の100ログ/レコードを表示）を実装する。
+- `JobMonitor` は既に仮想化の可能性があり、モバイルでのパフォーマンスを確保する。

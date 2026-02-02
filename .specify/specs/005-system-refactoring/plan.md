@@ -1,67 +1,67 @@
-# Implementation Plan: 005-system-refactoring
+# 実装計画: 005-system-refactoring
 
-**Branch**: `feature/system-refactoring` | **Date**: 2026-02-02 | **Spec**: [.specify/specs/005-system-refactoring/spec.md](.specify/specs/005-system-refactoring/spec.md)
-**Input**: Feature specification from `.specify/specs/005-system-refactoring/spec.md`
+**ブランチ**: `feature/system-refactoring` | **日付**: 2026-02-02 | **仕様書**: [.specify/specs/005-system-refactoring/spec.md](.specify/specs/005-system-refactoring/spec.md)
+**入力**: `.specify/specs/005-system-refactoring/spec.md` からの機能仕様書
 
-## Summary
+## 概要
 
-This refactoring initiative aims to eliminate technical debt identified in the `data-pipeline-simulator` project. The primary focus is on enforcing a "Zero any Policy" for strict type safety, extracting complex simulation logic from `App.tsx` into custom hooks (`useSimulationEngine`, `useSimulationTimers`), and improving React rendering performance and component modularity.
+このリファクタリングイニシアチブは、`data-pipeline-simulator` プロジェクトで特定された技術的負債を排除することを目的としています。主な焦点は、厳格な型安全のための「Zero any ポリシー」の施行、`App.tsx` からの複雑なシミュレーションロジックのカスタムフック（`useSimulationEngine`、`useSimulationTimers`）への抽出、およびReactレンダリングパフォーマンスとコンポーネントのモジュール性の向上です。
 
-## Technical Context
+## 技術コンテキスト
 
-**Language/Version**: TypeScript 5.x
-**Primary Dependencies**: React 18, Vite
-**Storage**: LocalStorage (via VirtualFileSystem/VirtualDB)
-**Testing**: Vitest, React Testing Library
-**Target Platform**: Web Browser (SPA)
-**Project Type**: Single Page Application (Web)
-**Performance Goals**: Smooth simulation updates (60fps UI), efficient handling of large data batches.
-**Constraints**: Must maintain existing functionality while refactoring.
-**Scale/Scope**: ~30 core files, ~110 'any' types to resolve.
+**言語/バージョン**: TypeScript 5.x
+**主要な依存関係**: React 18, Vite
+**ストレージ**: LocalStorage（VirtualFileSystem/VirtualDB経由）
+**テスト**: Vitest, React Testing Library
+**ターゲットプラットフォーム**: Webブラウザ（SPA）
+**プロジェクトタイプ**: シングルページアプリケーション（Web）
+**パフォーマンス目標**: スムーズなシミュレーション更新（60fps UI）、大量データバッチの効率的な処理。
+**制約条件**: リファクタリング中も既存機能を維持する必要がある。
+**スケール/スコープ**: 約30のコアファイル、解決すべき約110の'any'型。
 
-## Constitution Check
+## 憲章チェック
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*ゲート: フェーズ0の調査前に合格が必要。フェーズ1の設計後に再チェック。*
 
-- **Complexity**: The refactoring reduces complexity by decoupling logic from UI.
-- **Dependencies**: No new major dependencies introduced.
-- **Standards**: Enforces strict TypeScript usage.
+- **複雑さ**: リファクタリングはロジックをUIから分離することで複雑さを軽減。
+- **依存関係**: 新しい主要な依存関係は導入されない。
+- **標準**: 厳格なTypeScriptの使用を施行。
 
-## Project Structure
+## プロジェクト構造
 
-### Documentation (this feature)
+### ドキュメント（この機能用）
 
 ```text
 .specify/specs/005-system-refactoring/
-├── plan.md              # This file
-├── spec.md              # Input specification
-└── tasks.md             # To be created
+├── plan.md              # このファイル
+├── spec.md              # 入力仕様書
+└── tasks.md             # タスクリスト
 ```
 
-### Source Code (repository root)
+### ソースコード（リポジトリルート）
 
 ```text
 src/
-├── App.tsx                    # To be simplified
+├── App.tsx                    # 簡素化対象
 ├── components/
-│   ├── common/                # Shared UI components (new/refactored)
-│   ├── views/                 # New directory for page/view components (e.g. DatabaseView)
+│   ├── common/                # 共有UIコンポーネント（新規/リファクタリング）
+│   ├── views/                 # ページ/ビューコンポーネント用の新ディレクトリ（例: DatabaseView）
 │   └── ...
 ├── lib/
-│   ├── hooks/                 # Logic extraction targets
+│   ├── hooks/                 # ロジック抽出ターゲット
 │   │   ├── useSimulationEngine.ts
 │   │   └── useSimulationTimers.ts
-│   ├── types.ts               # Core type definitions
-│   ├── MappingTypes.ts        # Mapping specific types
-│   ├── SettingsContext.tsx    # Context refactoring target
-│   └── MappingEngine.ts       # Logic refactoring target
+│   ├── types.ts               # コア型定義
+│   ├── MappingTypes.ts        # マッピング固有の型
+│   ├── SettingsContext.tsx    # コンテキストリファクタリングターゲット
+│   └── MappingEngine.ts       # ロジックリファクタリングターゲット
 └── ...
 ```
 
-**Structure Decision**: Maintain the existing Vite/React structure but enforce better separation of concerns by moving logic to `hooks/` and sub-components to `components/`.
+**構造の決定**: 既存のVite/React構造を維持しつつ、ロジックを `hooks/` に、サブコンポーネントを `components/` に移動することで、より良い関心の分離を施行。
 
-## Complexity Tracking
+## 複雑さの追跡
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| (None) | | |
+| 違反 | 必要な理由 | より単純な代替案を却下した理由 |
+|------|-----------|------------------------------|
+| (なし) | | |
