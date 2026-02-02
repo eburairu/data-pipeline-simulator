@@ -1,4 +1,4 @@
-import { type ColumnSchema } from './SettingsContext';
+import { type ColumnSchema } from './types';
 import { type TemplateContext, processTemplate } from './templateUtils';
 
 export const generateDataFromSchema = (

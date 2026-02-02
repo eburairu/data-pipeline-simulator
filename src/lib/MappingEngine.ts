@@ -24,10 +24,8 @@ import {
     type WebServiceConfig,
     type HierarchyParserConfig
 } from './MappingTypes';
-import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
+import { type DataRow, type ConnectionDefinition, type TableDefinition } from './types';
 import { ExpressionFunctions } from './ExpressionFunctions';
-
-export type DataRow = Record<string, unknown>;
 
 export interface DbRecord {
     id: string;
@@ -74,7 +72,7 @@ export interface ExecutionState {
 export type ExecutionObserver = (stats: ExecutionStats) => void;
 
 // Helper to evaluate conditions/expressions safely-ish
-const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): any => {
+const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): DataValue => {
     try {
         const recordKeys = Object.keys(record);
         const recordValues = Object.values(record);
@@ -88,7 +86,7 @@ const evaluateExpression = (record: DataRow, expression: string, parameters: Rec
         // Create a function with keys as arguments
         // Order: Record Fields, Parameters, Functions
         const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
-        return func(...recordValues, ...paramValues, ...funcValues);
+        return func(...recordValues, ...paramValues, ...funcValues) as DataValue;
     } catch {
         // console.warn(`Expression evaluation failed: ${expression}`, e);
         return null;
