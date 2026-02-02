@@ -1,3 +1,20 @@
+# [1.2.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.1.0...v1.2.0) (2026-02-02)
+
+
+### Bug Fixes
+
+* import Workflow icon and further strengthen pre-push hook ([e41cde8](https://github.com/eburairu/data-pipeline-simulator/commit/e41cde8e58aae410cb8535c17c5b5fd8957f10ff))
+* resolve TS unused variable errors and strengthen pre-push hook ([67aa05f](https://github.com/eburairu/data-pipeline-simulator/commit/67aa05fb2ee58594c701002d2c17c2d8febf8754))
+
+
+### Features
+
+* add GUI Flow Designer and enable TaskFlow monitoring ([7962459](https://github.com/eburairu/data-pipeline-simulator/commit/7962459fa41e12abb7c1647ed337f9d1b97c7615))
+* add PipelineFlow visualizer to JobMonitor tab ([5b485a9](https://github.com/eburairu/data-pipeline-simulator/commit/5b485a9f42454605a3fe1cacce90495caf8586c3))
+* add TaskFlow orchestration for multiple mapping tasks ([c66810a](https://github.com/eburairu/data-pipeline-simulator/commit/c66810a3023a1baffd7b2db06bc136a354955e5e))
+* enhance TaskFlow monitoring and fix purity lint issues ([59ee972](https://github.com/eburairu/data-pipeline-simulator/commit/59ee97239ce7abd60f70125210ab53c661bf7336))
+* name flow panel and add nested taskflow display in monitor ([977ede1](https://github.com/eburairu/data-pipeline-simulator/commit/977ede1084bbef745381a25a63c80f6f25254f58))
+
 # [1.1.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.0.0...v1.1.0) (2026-02-01)
 
 
