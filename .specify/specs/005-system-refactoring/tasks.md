@@ -18,7 +18,7 @@ description: "Tasks for system-wide refactoring and type safety"
 **Purpose**: Establish strict type definitions and fix core contexts.
 
 - [x] T002 [P] Define strict interfaces for `DataRow`, `Schema`, `FieldDefinition` in `src/lib/types.ts`
-- [ ] T003 [P] Consolidate and refine mapping types in `src/lib/MappingTypes.ts`
+- [x] T003 [P] Consolidate and refine mapping types in `src/lib/MappingTypes.ts`
 - [x] T004 [US1] Refactor `src/lib/SettingsContext.tsx` to remove `any` and use defined types
 
 ## Phase 3: Core Logic Refactoring (Zero Any)
@@ -26,7 +26,7 @@ description: "Tasks for system-wide refactoring and type safety"
 **Purpose**: Remove `any` from the mapping engine and core logic.
 
 - [x] T005 [US1] Refactor `evaluateExpression` in `src/lib/MappingEngine.ts` to use strict types
-- [ ] T006 [US1] Refactor recursive mapping logic in `src/lib/MappingEngine.ts` to use strict types
+- [x] T006 [US1] Refactor recursive mapping logic in `src/lib/MappingEngine.ts` to use strict types
 - [ ] T007 [US1] Update `src/lib/DataGenerator.ts` to use new type definitions
 - [ ] T008 [US1] Update `src/lib/Validation.ts` to use new type definitions
 
