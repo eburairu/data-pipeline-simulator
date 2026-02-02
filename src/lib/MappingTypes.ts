@@ -5,6 +5,12 @@ export type TransformationType =
   | 'cleansing' | 'deduplicator' | 'pivot' | 'unpivot' | 'sql' 
   | 'webService' | 'hierarchyParser';
 
+export interface BaseTransformation {
+  id: string;
+  name: string;
+  position: { x: number, y: number };
+}
+
 export interface SourceConfig {
   connectionId: string;
   deleteAfterRead?: boolean;
@@ -165,28 +171,58 @@ export interface HierarchyParserConfig {
 }
 
 export type Transformation = 
-  | { id: string; type: 'source'; name: string; position: { x: number, y: number }; config: SourceConfig }
-  | { id: string; type: 'target'; name: string; position: { x: number, y: number }; config: TargetConfig }
-  | { id: string; type: 'filter'; name: string; position: { x: number, y: number }; config: FilterConfig }
-  | { id: string; type: 'expression'; name: string; position: { x: number, y: number }; config: ExpressionConfig }
-  | { id: string; type: 'aggregator'; name: string; position: { x: number, y: number }; config: AggregatorConfig }
-  | { id: string; type: 'validator'; name: string; position: { x: number, y: number }; config: ValidatorConfig }
-  | { id: string; type: 'joiner'; name: string; position: { x: number, y: number }; config: JoinerConfig }
-  | { id: string; type: 'lookup'; name: string; position: { x: number, y: number }; config: LookupConfig }
-  | { id: string; type: 'router'; name: string; position: { x: number, y: number }; config: RouterConfig }
-  | { id: string; type: 'sorter'; name: string; position: { x: number, y: number }; config: SorterConfig }
-  | { id: string; type: 'union'; name: string; position: { x: number, y: number }; config: UnionConfig }
-  | { id: string; type: 'normalizer'; name: string; position: { x: number, y: number }; config: NormalizerConfig }
-  | { id: string; type: 'rank'; name: string; position: { x: number, y: number }; config: RankConfig }
-  | { id: string; type: 'sequence'; name: string; position: { x: number, y: number }; config: SequenceConfig }
-  | { id: string; type: 'updateStrategy'; name: string; position: { x: number, y: number }; config: UpdateStrategyConfig }
-  | { id: string; type: 'cleansing'; name: string; position: { x: number, y: number }; config: CleansingConfig }
-  | { id: string; type: 'deduplicator'; name: string; position: { x: number, y: number }; config: DeduplicatorConfig }
-  | { id: string; type: 'pivot'; name: string; position: { x: number, y: number }; config: PivotConfig }
-  | { id: string; type: 'unpivot'; name: string; position: { x: number, y: number }; config: UnpivotConfig }
-  | { id: string; type: 'sql'; name: string; position: { x: number, y: number }; config: SqlConfig }
-  | { id: string; type: 'webService'; name: string; position: { x: number, y: number }; config: WebServiceConfig }
-  | { id: string; type: 'hierarchyParser'; name: string; position: { x: number, y: number }; config: HierarchyParserConfig };
+  | SourceTransformation
+  | TargetTransformation
+  | FilterTransformation
+  | ExpressionTransformation
+  | AggregatorTransformation
+  | ValidatorTransformation
+  | JoinerTransformation
+  | LookupTransformation
+  | RouterTransformation
+  | SorterTransformation
+  | UnionTransformation
+  | NormalizerTransformation
+  | RankTransformation
+  | SequenceTransformation
+  | UpdateStrategyTransformation
+  | CleansingTransformation
+  | DeduplicatorTransformation
+  | PivotTransformation
+  | UnpivotTransformation
+  | SqlTransformation
+  | WebServiceTransformation
+  | HierarchyParserTransformation;
+
+export type SourceTransformation = BaseTransformation & { type: 'source'; config: SourceConfig };
+export type TargetTransformation = BaseTransformation & { type: 'target'; config: TargetConfig };
+export type FilterTransformation = BaseTransformation & { type: 'filter'; config: FilterConfig };
+export type ExpressionTransformation = BaseTransformation & { type: 'expression'; config: ExpressionConfig };
+export type AggregatorTransformation = BaseTransformation & { type: 'aggregator'; config: AggregatorConfig };
+export type ValidatorTransformation = BaseTransformation & { type: 'validator'; config: ValidatorConfig };
+export type JoinerTransformation = BaseTransformation & { type: 'joiner'; config: JoinerConfig };
+export type LookupTransformation = BaseTransformation & { type: 'lookup'; config: LookupConfig };
+export type RouterTransformation = BaseTransformation & { type: 'router'; config: RouterConfig };
+export type SorterTransformation = BaseTransformation & { type: 'sorter'; config: SorterConfig };
+export type UnionTransformation = BaseTransformation & { type: 'union'; config: UnionConfig };
+export type NormalizerTransformation = BaseTransformation & { type: 'normalizer'; config: NormalizerConfig };
+export type RankTransformation = BaseTransformation & { type: 'rank'; config: RankConfig };
+export type SequenceTransformation = BaseTransformation & { type: 'sequence'; config: SequenceConfig };
+export type UpdateStrategyTransformation = BaseTransformation & { type: 'updateStrategy'; config: UpdateStrategyConfig };
+export type CleansingTransformation = BaseTransformation & { type: 'cleansing'; config: CleansingConfig };
+export type DeduplicatorTransformation = BaseTransformation & { type: 'deduplicator'; config: DeduplicatorConfig };
+export type PivotTransformation = BaseTransformation & { type: 'pivot'; config: PivotConfig };
+export type UnpivotTransformation = BaseTransformation & { type: 'unpivot'; config: UnpivotConfig };
+export type SqlTransformation = BaseTransformation & { type: 'sql'; config: SqlConfig };
+export type WebServiceTransformation = BaseTransformation & { type: 'webService'; config: WebServiceConfig };
+export type HierarchyParserTransformation = BaseTransformation & { type: 'hierarchyParser'; config: HierarchyParserConfig };
+
+export type TransformationConfig = 
+  | SourceConfig | TargetConfig | FilterConfig | ExpressionConfig | AggregatorConfig 
+  | ValidatorConfig | JoinerConfig | LookupConfig | RouterConfig | SorterConfig 
+  | UnionConfig | NormalizerConfig | RankConfig | SequenceConfig | UpdateStrategyConfig 
+  | CleansingConfig | DeduplicatorConfig | PivotConfig | UnpivotConfig | SqlConfig 
+  | WebServiceConfig | HierarchyParserConfig;
 
 export interface MappingLink {
   id: string;

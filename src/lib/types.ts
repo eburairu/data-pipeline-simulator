@@ -5,6 +5,16 @@ import { type DBFilter } from './VirtualDB';
 export type DataValue = string | number | boolean | null | undefined | Date;
 export type DataRow = Record<string, DataValue>;
 
+export interface FieldDefinition {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'date' | 'object';
+  description?: string;
+}
+
+export interface Schema {
+  fields: FieldDefinition[];
+}
+
 export interface DataSourceDefinition {
   id: string;
   name: string;
