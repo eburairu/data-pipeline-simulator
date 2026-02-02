@@ -15,11 +15,15 @@ export const generateDataFromSchema = (
   // Create a mutable copy of the state to track changes during this batch
   const currentSequenceState = { ...sequenceState };
 
+  // Create generators for each column once
+  const generators = schema.map(col => createValueGenerator(col, context));
+
   for (let i = 0; i < rowCount; i++) {
-    const rowValues = schema.map(col => {
-        const { value, nextSeq } = generateValue(col, i, context, currentSequenceState[col.id]);
+    const rowValues = generators.map((gen, index) => {
+        const colId = schema[index].id;
+        const { value, nextSeq } = gen(i, currentSequenceState[colId]);
         if (nextSeq !== undefined) {
-            currentSequenceState[col.id] = nextSeq;
+            currentSequenceState[colId] = nextSeq;
         }
         return value;
     });
@@ -39,31 +43,33 @@ const generateUUID = () => {
   });
 }
 
-// Return value and optional next sequence state
-const generateValue = (
+type ValueGenerator = (rowIndex: number, lastSequenceValue?: number) => { value: string, nextSeq?: number };
+
+const createValueGenerator = (
     col: ColumnSchema,
-    _rowIndex: number,
-    context: TemplateContext,
-    lastSequenceValue?: number
-): { value: string, nextSeq?: number } => {
+    context: TemplateContext
+): ValueGenerator => {
   const { type, params } = col;
 
   switch (type) {
     case 'static': {
       const val = params.value !== undefined ? String(params.value) : '';
-      return { value: processTemplate(val, context) };
+      const processed = processTemplate(val, context);
+      return () => ({ value: processed });
     }
     case 'randomInt': {
       const min = Number(params.min) || 0;
       const max = Number(params.max) || 100;
-      return { value: String(Math.floor(Math.random() * (max - min + 1)) + min) };
+      return () => ({ value: String(Math.floor(Math.random() * (max - min + 1)) + min) });
     }
     case 'randomFloat': {
       const min = Number(params.min) || 0;
       const max = Number(params.max) || 1;
       const precision = params.precision !== undefined ? Number(params.precision) : 2;
-      const val = Math.random() * (max - min) + min;
-      return { value: val.toFixed(precision) };
+      return () => {
+        const val = Math.random() * (max - min) + min;
+        return { value: val.toFixed(precision) };
+      };
     }
     case 'sin': {
       const period = Number(params.period) || 10000; // default 10s
@@ -72,7 +78,8 @@ const generateValue = (
       // Use timestamp for continuity
       const t = context.timestamp.getTime();
       const val = amplitude * Math.sin(2 * Math.PI * (t / period)) + offset;
-      return { value: val.toFixed(4) };
+      const fixedVal = val.toFixed(4);
+      return () => ({ value: fixedVal });
     }
     case 'cos': {
       const period = Number(params.period) || 10000;
@@ -80,47 +87,42 @@ const generateValue = (
       const offset = Number(params.offset) || 0;
       const t = context.timestamp.getTime();
       const val = amplitude * Math.cos(2 * Math.PI * (t / period)) + offset;
-      return { value: val.toFixed(4) };
+      const fixedVal = val.toFixed(4);
+      return () => ({ value: fixedVal });
     }
     case 'sequence': {
         const start = Number(params.start) || 1;
         const step = Number(params.step) || 1;
 
-        // If we have a last value, continue from there + step.
-        // If not (first run), start at 'start'.
-        // Note: For the *very first* row of the first run, we usually want 'start'.
-        // However, if we simply do 'lastValue + step', we need to initialize lastValue carefully.
-        // Let's say lastValue is undefined. Current = start. Next = start.
-        // Wait, if rowIndex > 0 in this batch, we should have updated lastValue locally in the loop.
-
-        let currentVal: number;
-        if (lastSequenceValue !== undefined) {
-            currentVal = lastSequenceValue + step;
-        } else {
-             // First time ever.
-             // If params.start is 1, we want 1.
-             // But if this is rowIndex > 0, we shouldn't be here if we are updating state correctly.
-             // logic: lastSequenceValue represents the value generated in the PREVIOUS step (or previous row).
-             currentVal = start;
-        }
-
-        return { value: String(currentVal), nextSeq: currentVal };
+        return (_rowIndex, lastSequenceValue) => {
+            let currentVal: number;
+            if (lastSequenceValue !== undefined) {
+                currentVal = lastSequenceValue + step;
+            } else {
+                 currentVal = start;
+            }
+            return { value: String(currentVal), nextSeq: currentVal };
+        };
     }
     case 'uuid': {
-        return { value: generateUUID() };
+        return () => ({ value: generateUUID() });
     }
     case 'list': {
         const listStr = String(params.values || '');
         const items = listStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
-        if (items.length === 0) return { value: '' };
-        const item = items[Math.floor(Math.random() * items.length)];
-        return { value: item };
+        if (items.length === 0) {
+            return () => ({ value: '' });
+        }
+        return () => {
+            const item = items[Math.floor(Math.random() * items.length)];
+            return { value: item };
+        };
     }
     case 'timestamp': {
-        // Requested by user
-        return { value: context.timestamp.toISOString() };
+        const val = context.timestamp.toISOString();
+        return () => ({ value: val });
     }
     default:
-      return { value: '' };
+      return () => ({ value: '' });
   }
 };
