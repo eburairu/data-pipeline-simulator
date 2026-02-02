@@ -59,6 +59,20 @@ feat(ui): add dark mode toggle to settings panel
 feat!: change configuration file format from YAML to JSON
 ```
 
+## コミット前のチェックリスト
+
+コミットを行う前に、必ず以下のコマンドを実行してコードの健全性を確認してください。
+
+```bash
+# 1. テストの実行
+npm test
+
+# 2. ビルドと型チェック（必須）
+npm run build
+```
+
+特に TypeScript の型定義を変更した場合は、`npm test` が通っても `npm run build` で失敗することがあります（未使用変数のエラーなど）。必ず両方をパスさせてください。
+
 ## 開発ワークフロー
 
 1. `main` ブランチから新しいブランチを作成
