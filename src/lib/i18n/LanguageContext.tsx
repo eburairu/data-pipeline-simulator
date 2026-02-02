@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
-import { translations, type Language } from './translations';
+import { translations, type Language, type TranslationKey } from './translations';
 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: TranslationKey) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -12,7 +12,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('ja'); // Default to Japanese as requested
 
-  const t = (path: string): string => {
+  const t = (path: TranslationKey): string => {
     const keys = path.split('.');
     let current: any = translations[language];
     for (const key of keys) {
