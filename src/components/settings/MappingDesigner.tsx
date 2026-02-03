@@ -63,7 +63,7 @@ const DesignerNode = ({ data }: { data: { label: string, type: string, isSelecte
             <Handle type="target" position={Position.Left} className="w-2 h-2" />
             <div className="font-bold text-center truncate w-full">{data.label}</div>
             <div className="text-[10px] text-gray-500 uppercase">{data.type}</div>
-            
+
             {/* Stats Overlay */}
             {data.stats && (data.stats.input > 0 || data.stats.output > 0 || data.stats.errors > 0) && (
                 <div className="absolute -top-3 -right-3 bg-white border border-gray-200 shadow-sm rounded-lg p-1 flex flex-col items-center text-[8px] z-10 min-w-[40px]">
@@ -72,7 +72,7 @@ const DesignerNode = ({ data }: { data: { label: string, type: string, isSelecte
                     <span className="text-blue-600">Out: {data.stats.output}</span>
                 </div>
             )}
-            
+
             <Handle type="source" position={Position.Right} className="w-2 h-2" />
         </div>
     );
@@ -300,9 +300,9 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
             id: t.id,
             type: 'designer',
             position: t.position || { x: 0, y: 0 },
-            data: { 
-                label: t.name, 
-                type: t.type, 
+            data: {
+                label: t.name,
+                type: t.type,
                 isSelected: selectedNodeId === t.id,
                 stats: executionStats?.transformations[t.id]
             },
@@ -478,7 +478,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                 {/* In a real scenario, all config forms would be here with readOnly checks */}
                 {node.type === 'source' && (
                     <div className="space-y-3">
-                         <div>
+                        <div>
                             <label className="block text-xs text-gray-500">Connection</label>
                             <select
                                 disabled={readOnly}
@@ -490,12 +490,27 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                                 {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
+                        <div>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    disabled={readOnly}
+                                    checked={(node.config as SourceConfig).deleteAfterRead !== false}
+                                    onChange={e => updateTransformationConfig(node.id, { deleteAfterRead: e.target.checked })}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                                />
+                                <span className="text-xs text-gray-700">
+                                    Delete source file after read
+                                    <span className="text-gray-400 ml-1">(uncheck to keep)</span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 )}
                 {/* ... (Other configs would follow similar pattern) ... */}
                 {/* For safety in this fix, I'm including the full content I read earlier, but applying readOnly props to inputs */}
-                
-                 {node.type === 'filter' && (
+
+                {node.type === 'filter' && (
                     <div>
                         <label className="block text-xs text-gray-500">Filter Condition (JS Expression)</label>
                         <input
@@ -559,7 +574,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                             nodes={nodes}
                             edges={edges}
                             nodeTypes={nodeTypes}
-                            edgeTypes={edgeTypes} 
+                            edgeTypes={edgeTypes}
                             onNodesChange={handleNodesChange}
                             onEdgesChange={handleEdgesChange}
                             onNodeClick={handleNodeClick}
