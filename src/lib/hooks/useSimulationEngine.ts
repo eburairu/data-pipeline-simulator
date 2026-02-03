@@ -502,38 +502,116 @@ export const useSimulationEngine = (
 
         let totalInput = 0;
         let totalOutput = 0;
+        let flowFailed = false;
 
         try {
-            if (flow.parallelExecution) {
-                const results = await Promise.all(flow.taskIds.map(taskId => executeMappingJob(taskId, logId)));
-                results.forEach(r => {
-                    if (r) {
-                        totalInput += r.input;
-                        totalOutput += r.output;
+            // Build Dependency Graph
+            const taskIds = new Set(flow.taskIds);
+            const adj: Record<string, string[]> = {}; // key: parent, val: children
+            const inDegree: Record<string, number> = {};
+
+            flow.taskIds.forEach(tid => {
+                adj[tid] = [];
+                inDegree[tid] = 0;
+            });
+
+            flow.taskIds.forEach(tid => {
+                const task = mappingTasks.find(t => t.id === tid);
+                if (task && task.dependencies) {
+                    task.dependencies.forEach(depId => {
+                        if (taskIds.has(depId)) {
+                            adj[depId].push(tid);
+                            inDegree[tid]++;
+                        }
+                    });
+                }
+            });
+
+            // Queue for tasks ready to run (in-degree 0)
+            const queue: string[] = flow.taskIds.filter(tid => inDegree[tid] === 0);
+            const running = new Set<string>();
+            const completed = new Set<string>();
+            const failed = new Set<string>();
+
+            // Execution Loop
+            while (completed.size + failed.size < flow.taskIds.length) {
+                const toStart: string[] = [];
+
+                if (flow.parallelExecution) {
+                    while (queue.length > 0) {
+                        toStart.push(queue.shift()!);
+                    }
+                } else {
+                    if (queue.length > 0 && running.size === 0) {
+                        toStart.push(queue.shift()!);
+                    }
+                }
+
+                if (toStart.length === 0 && running.size === 0) {
+                     // If queue is empty and nothing is running, but we haven't finished all tasks,
+                     // it means there's a cycle or unmet dependency from outside (shouldn't happen with proper filtering)
+                     break;
+                }
+
+                const promises = toStart.map(async (tid) => {
+                    running.add(tid);
+                    try {
+                        const result = await executeMappingJob(tid, logId);
+
+                        if (result) {
+                            totalInput += result.input;
+                            totalOutput += result.output;
+                            updateLog(logId, {
+                                recordsInput: totalInput,
+                                recordsOutput: totalOutput,
+                                details: `Executing flow... (${totalInput} rows processed)`
+                            });
+                        }
+
+                        completed.add(tid);
+                        running.delete(tid);
+
+                        // Unlock dependencies
+                        if (adj[tid]) {
+                            adj[tid].forEach(child => {
+                                inDegree[child]--;
+                                if (inDegree[child] === 0) {
+                                    queue.push(child);
+                                }
+                            });
+                        }
+
+                    } catch (e) {
+                        console.error(`Task ${tid} failed`, e);
+                        failed.add(tid);
+                        running.delete(tid);
+                        flowFailed = true;
                     }
                 });
-            } else {
-                for (const taskId of flow.taskIds) {
-                    const r = await executeMappingJob(taskId, logId);
-                    if (r) {
-                        totalInput += r.input;
-                        totalOutput += r.output;
-                        updateLog(logId, {
-                            recordsInput: totalInput,
-                            recordsOutput: totalOutput,
-                            details: `Executing flow... (${totalInput} rows in total so far)`
-                        });
-                    }
+
+                if (promises.length > 0) {
+                    await Promise.all(promises);
+                } else {
+                    await delay(100);
                 }
             }
 
-            updateLog(logId, {
-                status: 'success',
-                endTime: Date.now(),
-                recordsInput: totalInput,
-                recordsOutput: totalOutput,
-                details: `Flow finished successfully. Total: ${totalInput} In / ${totalOutput} Out.`
-            });
+            if (flowFailed || (completed.size + failed.size < flow.taskIds.length)) {
+                const msg = flowFailed ? 'One or more tasks failed.' : 'Flow execution incomplete (possible cycle).';
+                updateLog(logId, {
+                    status: 'failed',
+                    endTime: Date.now(),
+                    errorMessage: msg
+                });
+            } else {
+                updateLog(logId, {
+                    status: 'success',
+                    endTime: Date.now(),
+                    recordsInput: totalInput,
+                    recordsOutput: totalOutput,
+                    details: `Flow finished successfully. Total: ${totalInput} In / ${totalOutput} Out.`
+                });
+            }
         } catch (e) {
             updateLog(logId, {
                 status: 'failed',
@@ -543,7 +621,7 @@ export const useSimulationEngine = (
         } finally {
             toggleStep(`task_flow_${flow.id}`, false);
         }
-    }, [taskFlows, toggleStep, addLog, executeMappingJob, updateLog]);
+    }, [taskFlows, toggleStep, addLog, executeMappingJob, updateLog, mappingTasks]);
 
     return {
         executeCollectionJob,

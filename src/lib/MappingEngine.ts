@@ -662,6 +662,20 @@ const processWebService = async (node: WebServiceTransformation, batch: DataRow[
     // Simulate network delay
     await delay(50);
     
+    if (node.config.mockResponse) {
+        try {
+            const responseStr = substituteParams(node.config.mockResponse, parameters);
+            const parsed = JSON.parse(responseStr);
+            if (Array.isArray(parsed)) {
+                return parsed as DataRow[];
+            } else if (typeof parsed === 'object' && parsed !== null) {
+                return [parsed as DataRow];
+            }
+        } catch (e) {
+            console.warn(`[MappingEngine] Failed to parse mock response in node ${node.name}`, e);
+        }
+    }
+
     // Simple mock logic using url
     if (url) { /* use url */ }
 
