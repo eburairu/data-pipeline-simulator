@@ -2,6 +2,7 @@ import React from 'react';
 import { useSettings } from '../../lib/SettingsContext';
 import { type MappingTask } from '../../lib/MappingTypes';
 import { Trash2, Plus, PlayCircle } from 'lucide-react';
+import ParamInput from '../common/ParamInput';
 
 const MappingTaskSettings: React.FC = () => {
     const { mappingTasks, addMappingTask, updateMappingTask, removeMappingTask, mappings } = useSettings();
@@ -155,23 +156,12 @@ const MappingTaskSettings: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1">Parameters (Key=Value)</label>
-                                    <textarea
-                                        className="w-full border rounded p-1 text-xs font-mono h-32"
-                                        placeholder="DB_NAME=metrics_db&#10;LIMIT=100"
-                                        value={Object.entries(task.parameters || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
-                                        onChange={(e) => {
-                                            const text = e.target.value;
-                                            const params: Record<string, string> = {};
-                                            text.split('\n').forEach(line => {
-                                                const idx = line.indexOf('=');
-                                                if (idx > 0) {
-                                                    const key = line.substring(0, idx).trim();
-                                                    const val = line.substring(idx + 1).trim();
-                                                    if (key) params[key] = val;
-                                                }
-                                            });
-                                            handleChange(task.id, { parameters: params });
-                                        }}
+                                    <ParamInput
+                                        value={task.parameters || {}}
+                                        onChange={(params) => handleChange(task.id, { parameters: params })}
+                                        placeholder={"DB_NAME=metrics_db\nLIMIT=100"}
+                                        className="h-32"
+                                        rows={6}
                                     />
                                     <p className="text-[10px] text-gray-400 mt-1">
                                         One per line. Used for substitution (e.g. <code>${"{PARAM}"}</code>).
