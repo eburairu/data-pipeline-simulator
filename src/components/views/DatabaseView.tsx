@@ -23,10 +23,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ tables, select }) =>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {tables.map((table) => {
-          const records = select(table.name);
+          const allRecords = select(table.name);
+          const MAX_DISPLAY_RECORDS = 100;
+          const hasMore = allRecords.length > MAX_DISPLAY_RECORDS;
+          const records = hasMore ? allRecords.slice(0, MAX_DISPLAY_RECORDS) : allRecords;
+          const hiddenCount = allRecords.length - records.length;
           return (
             <div key={table.id} className="text-xs border border-gray-200 p-2 rounded bg-white shadow-sm flex flex-col">
-              <h4 className="font-semibold text-gray-700 mb-1 truncate" title={table.name}>{table.name}</h4>
+              <h4 className="font-semibold text-gray-700 mb-1 truncate flex justify-between items-center" title={table.name}>
+                <span>{table.name}</span>
+                <span className="text-[10px] text-gray-400 font-normal">{allRecords.length} rows</span>
+              </h4>
               <div className="h-32 sm:h-48 overflow-auto bg-gray-50 p-1 rounded-sm border border-gray-100 flex-grow relative">
                 {dbViewMode === 'text' ? (
                   records.length === 0 ? <span className="text-gray-400 italic text-[10px]">No records</span> :
@@ -38,6 +45,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ tables, select }) =>
                   </table>
                 )}
               </div>
+              {hasMore && (
+                <div className="mt-1 text-[10px] text-amber-600 bg-amber-50 rounded px-2 py-0.5 text-center">
+                  +{hiddenCount} more records (showing first {MAX_DISPLAY_RECORDS})
+                </div>
+              )}
             </div>
           );
         })}

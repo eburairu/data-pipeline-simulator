@@ -20,11 +20,13 @@ description: "コードベース改善と技術的負債削減のためのタス
 
 ## フェーズ 3: UI標準化
 
-- [ ] T006 [UI] キー・バリューペア編集用の `src/components/common/ParamInput.tsx` を作成。
-- [ ] T007 [UI] `MappingTaskSettings.tsx` のインラインパラメータ入力を `ParamInput` に置き換え。
-- [ ] T008 [UI] `DataSourceSettings.tsx` のインラインパラメータ入力を `ParamInput` に置き換え。
+- [x] T006 [UI] キー・バリューペア編集用の `src/components/common/ParamInput.tsx` を作成。
+- [x] T007 [UI] `MappingTaskSettings.tsx` のインラインパラメータ入力を `ParamInput` に置き換え。
+- [x] T008 [UI] `DataSourceSettings.tsx` のインラインパラメータ入力を `ParamInput` に置き換え。
+  - ※ `DataSourceSettings.tsx` にはパラメータ入力が存在しないため、対応不要と判断。
 
 ## フェーズ 4: パフォーマンスとポリッシュ
 
-- [ ] T009 [Perf] `DatabaseView` にDOMの肥大化を防ぐためのレンダリング制限（最大100アイテム）を実装。
-- [ ] T010 [Test] `npm test` と `npm run build` を実行してリグレッションがないことを確認。
+- [x] T009 [Perf] `DatabaseView` にDOMの肥大化を防ぐためのレンダリング制限（最大100アイテム）を実装。
+- [x] T010 [Test] `npm test` と `npm run build` を実行してリグレッションがないことを確認。
+  - ビルド成功、57テスト全合格。
