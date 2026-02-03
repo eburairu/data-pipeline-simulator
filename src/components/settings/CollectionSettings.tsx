@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSettings, type CollectionJob } from '../../lib/SettingsContext';
 import { validateCollectionJob } from '../../lib/validation';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import type { LoadMode, RetryConfig, CollectionTriggerType, ScheduleType } from '../../lib/types';
 
 const CollectionSettings: React.FC = () => {
   const { collection, setCollection, topics, connections } = useSettings();
+  const [expandedAdvanced, setExpandedAdvanced] = useState<Record<string, boolean>>({});
+
+  const toggleAdvanced = (jobId: string) => {
+    setExpandedAdvanced(prev => ({ ...prev, [jobId]: !prev[jobId] }));
+  };
 
   const handleJobChange = (id: string, field: keyof CollectionJob, value: any) => {
     const newJobs = collection.jobs.map(job =>
@@ -247,6 +253,160 @@ const CollectionSettings: React.FC = () => {
                       <span className="text-gray-400 ml-1">(uncheck to copy instead of move)</span>
                     </span>
                   </label>
+                </div>
+
+                {/* Advanced Settings */}
+                <div className="mt-3 pt-3 border-t border-gray-300">
+                  <button
+                    onClick={() => toggleAdvanced(job.id)}
+                    className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                  >
+                    {expandedAdvanced[job.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    高度な設定 (増分処理・リトライ)
+                  </button>
+
+                  {expandedAdvanced[job.id] && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded space-y-3">
+                      {/* Load Mode */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Load Mode</label>
+                        <select
+                          value={job.loadMode || 'full'}
+                          onChange={(e) => handleJobChange(job.id, 'loadMode', e.target.value as LoadMode)}
+                          className="w-full border rounded p-1 text-sm bg-white"
+                        >
+                          <option value="full">Full (全量処理)</option>
+                          <option value="incremental">Incremental (増分処理)</option>
+                          <option value="initial_and_incremental">Initial + Incremental (初回全量+増分)</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {job.loadMode === 'full' && '毎回すべてのファイルを処理'}
+                          {job.loadMode === 'incremental' && '前回処理以降の新規ファイルのみを処理'}
+                          {job.loadMode === 'initial_and_incremental' && '初回は全量、2回目以降は増分処理'}
+                          {!job.loadMode && '毎回すべてのファイルを処理'}
+                        </p>
+                      </div>
+
+                      {/* Retry Config */}
+                      <div className="border-t border-blue-300 pt-2">
+                        <label className="block text-xs font-bold text-gray-700 mb-2">Retry Configuration</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600">Max Retries</label>
+                            <input
+                              type="number"
+                              value={job.retryConfig?.maxRetries ?? 0}
+                              onChange={(e) => handleJobChange(job.id, 'retryConfig', {
+                                ...job.retryConfig,
+                                maxRetries: parseInt(e.target.value) || 0
+                              } as RetryConfig)}
+                              className="w-full border rounded p-1 text-sm"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600">Retry Delay (ms)</label>
+                            <input
+                              type="number"
+                              value={job.retryConfig?.retryDelayMs ?? 1000}
+                              onChange={(e) => handleJobChange(job.id, 'retryConfig', {
+                                ...job.retryConfig,
+                                retryDelayMs: parseInt(e.target.value) || 1000
+                              } as RetryConfig)}
+                              className="w-full border rounded p-1 text-sm"
+                              min="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600">Backoff Multiplier</label>
+                            <input
+                              type="number"
+                              value={job.retryConfig?.backoffMultiplier ?? 2}
+                              onChange={(e) => handleJobChange(job.id, 'retryConfig', {
+                                ...job.retryConfig,
+                                backoffMultiplier: parseFloat(e.target.value) || 2
+                              } as RetryConfig)}
+                              className="w-full border rounded p-1 text-sm"
+                              min="1"
+                              step="0.1"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={job.retryConfig?.continueOnError ?? false}
+                                onChange={(e) => handleJobChange(job.id, 'retryConfig', {
+                                  ...job.retryConfig,
+                                  continueOnError: e.target.checked
+                                } as RetryConfig)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-xs text-gray-700">Continue on Error</span>
+                            </label>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          エラー発生時に最大 {job.retryConfig?.maxRetries ?? 0} 回リトライ。
+                          {(job.retryConfig?.backoffMultiplier ?? 2) > 1 && ` 待機時間は指数的に増加 (×${job.retryConfig?.backoffMultiplier ?? 2})。`}
+                        </p>
+                      </div>
+
+                      {/* Phase 2-4: 追加機能（未実装） */}
+                      <div className="border-t border-blue-300 pt-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle size={14} className="text-orange-500" />
+                          <label className="text-xs font-bold text-gray-700">Phase 2-4: 追加機能 (型定義のみ・未実装)</label>
+                        </div>
+
+                        {/* Phase 2: Trigger Type */}
+                        <div className="mb-2">
+                          <label className="block text-xs font-medium text-gray-600">Trigger Type (Phase 2)</label>
+                          <select
+                            value={job.triggerType || 'polling'}
+                            onChange={(e) => handleJobChange(job.id, 'triggerType', e.target.value as CollectionTriggerType)}
+                            className="w-full border rounded p-1 text-sm bg-white"
+                            disabled
+                          >
+                            <option value="polling">Polling (実装済み)</option>
+                            <option value="file_listener">File Listener (未実装)</option>
+                          </select>
+                        </div>
+
+                        {/* Phase 3: Schedule Type */}
+                        <div className="mb-2">
+                          <label className="block text-xs font-medium text-gray-600">Schedule Type (Phase 3)</label>
+                          <select
+                            value={job.scheduleType || 'interval'}
+                            onChange={(e) => handleJobChange(job.id, 'scheduleType', e.target.value as ScheduleType)}
+                            className="w-full border rounded p-1 text-sm bg-white"
+                            disabled
+                          >
+                            <option value="interval">Interval (実装済み)</option>
+                            <option value="cron">Cron Schedule (未実装)</option>
+                            <option value="manual">Manual (未実装)</option>
+                          </select>
+                        </div>
+
+                        {/* Phase 4: Parallel Batch Size */}
+                        <div className="mb-2">
+                          <label className="block text-xs font-medium text-gray-600">Parallel Batch Size (Phase 4)</label>
+                          <input
+                            type="number"
+                            value={job.parallelBatchSize ?? 1}
+                            onChange={(e) => handleJobChange(job.id, 'parallelBatchSize', parseInt(e.target.value) || 1)}
+                            className="w-full border rounded p-1 text-sm"
+                            min="1"
+                            disabled
+                          />
+                        </div>
+
+                        <p className="text-xs text-orange-600 mt-2">
+                          ⚠️ Phase 2-4の機能は型定義のみ追加されており、実際のロジックは未実装です。
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

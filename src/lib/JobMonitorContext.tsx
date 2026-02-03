@@ -15,6 +15,8 @@ export interface TransferExecutionDetails {
   fileSize?: number;
   bandwidth?: number;
   throughput?: number;
+  retryCount?: number;          // Phase 1: リトライ回数
+  continueOnError?: boolean;    // Phase 1: エラー発生時も継続
 }
 
 export interface JobExecutionLog {
