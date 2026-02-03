@@ -83,7 +83,7 @@ export const useSimulationEngine = (
         if (collectionLocks.current[job.id]) return;
 
         try {
-            const currentFiles = listFiles(sourceHost, sourcePath);
+            let currentFiles = listFiles(sourceHost, sourcePath);
             if (currentFiles.length === 0) return;
 
             let regex: RegExp;
@@ -92,6 +92,26 @@ export const useSimulationEngine = (
             } catch {
                 setErrors(prev => [...prev, `Collection Job ${job.name}: Invalid Regex`]);
                 return;
+            }
+
+            // 増分処理: 処理済みファイルをフィルタリング
+            const loadMode = job.loadMode || 'full';
+            if (loadMode === 'incremental' || loadMode === 'initial_and_incremental') {
+                const processedRecords = select('_sys_subscription_state');
+                const processedFiles = processedRecords
+                    .filter((r) => (r as any).data?.jobId === job.id && (r as any).data?.jobType === 'collection')
+                    .map((r) => (r as any).data?.fileName)
+                    .filter(Boolean);
+
+                const processedSet = new Set(processedFiles);
+
+                // initial_and_incrementalモード: 初回は全量、2回目以降は増分
+                if (loadMode === 'initial_and_incremental' && processedSet.size === 0) {
+                    // 初回実行: 全量処理（フィルタリングしない）
+                } else if (loadMode === 'incremental' || (loadMode === 'initial_and_incremental' && processedSet.size > 0)) {
+                    // 増分処理: 処理済みファイルを除外
+                    currentFiles = currentFiles.filter(f => !processedSet.has(f.name));
+                }
             }
 
             const file = currentFiles.find(f => regex.test(f.name) && !isFileLocked(sourceHost, sourcePath, f.name));
@@ -113,66 +133,113 @@ export const useSimulationEngine = (
                 details: `Moving ${file.name}...`
             });
 
-            try {
-                const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
-                await delay(processingTime);
+            // リトライ機構
+            const maxRetries = job.retryConfig?.maxRetries || 0;
+            const retryDelayMs = job.retryConfig?.retryDelayMs || 1000;
+            const backoffMultiplier = job.retryConfig?.backoffMultiplier || 2;
+            const continueOnError = job.retryConfig?.continueOnError || false;
+            let retryCount = 0;
+            let success = false;
 
-                const context = {
-                    hostname: sourceHost,
-                    timestamp: new Date(),
-                    collectionHost: targetHost,
-                    fileName: file.name
-                };
-                const renamePattern = job.renamePattern || '${fileName}';
-                const newFileName = processTemplate(renamePattern, context);
+            while (retryCount <= maxRetries && !success) {
+                try {
+                    const processingTime = calculateProcessingTime(file.content, job.bandwidth, collection.processingTime);
+                    await delay(processingTime);
 
-                // Check if source file should be deleted after transfer (default: true = move)
-                const shouldDeleteSource = job.deleteSourceAfterTransfer !== false;
+                    const context = {
+                        hostname: sourceHost,
+                        timestamp: new Date(),
+                        collectionHost: targetHost,
+                        fileName: file.name
+                    };
+                    const renamePattern = job.renamePattern || '${fileName}';
+                    const newFileName = processTemplate(renamePattern, context);
 
-                if (shouldDeleteSource) {
-                    // Move file (delete source after copy)
-                    moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath, newFileName);
-                } else {
-                    // Copy file (keep source)
-                    writeFile(targetHost, targetPath, newFileName, file.content);
-                }
-                setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
+                    // Check if source file should be deleted after transfer (default: true = move)
+                    const shouldDeleteSource = job.deleteSourceAfterTransfer !== false;
 
-                updateLog(logId, {
-                    status: 'success',
-                    endTime: Date.now(),
-                    recordsOutput: 1,
-                    details: `${shouldDeleteSource ? 'Moved' : 'Copied'} ${file.name} to ${targetHost}:${targetPath}`,
-                    extendedDetails: {
-                        fileSize: file.content.length,
-                        bandwidth: job.bandwidth,
-                        throughput: (file.content.length / ((Date.now() - startTime) / 1000))
+                    if (shouldDeleteSource) {
+                        // Move file (delete source after copy)
+                        moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath, newFileName);
+                    } else {
+                        // Copy file (keep source)
+                        writeFile(targetHost, targetPath, newFileName, file.content);
                     }
-                });
+                    setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
 
-                // Trigger Subscriptions
-                if (job.targetType === 'topic' && job.targetTopicId && job.triggerSubscriptions) {
-                    const subscriberJobs = delivery.jobs.filter(dj => dj.sourceType === 'topic' && dj.sourceTopicId === job.targetTopicId && dj.enabled);
-                    subscriberJobs.forEach(dj => {
-                        // ref 経由で最新の executeDeliveryJob を呼び出す（循環依存を回避）
-                        executeDeliveryJobRef.current?.(dj.id).catch(console.error);
+                    updateLog(logId, {
+                        status: 'success',
+                        endTime: Date.now(),
+                        recordsOutput: 1,
+                        details: `${shouldDeleteSource ? 'Moved' : 'Copied'} ${file.name} to ${targetHost}:${targetPath}${retryCount > 0 ? ` (after ${retryCount} ${retryCount === 1 ? 'retry' : 'retries'})` : ''}`,
+                        extendedDetails: {
+                            fileSize: file.content.length,
+                            bandwidth: job.bandwidth,
+                            throughput: (file.content.length / ((Date.now() - startTime) / 1000)),
+                            retryCount
+                        }
                     });
+
+                    // 増分処理: 処理済みファイルを記録
+                    const loadMode = job.loadMode || 'full';
+                    if (loadMode === 'incremental' || loadMode === 'initial_and_incremental') {
+                        insert('_sys_subscription_state', {
+                            jobId: job.id,
+                            jobType: 'collection',
+                            fileName: file.name,
+                            timestamp: Date.now()
+                        });
+                    }
+
+                    // Trigger Subscriptions
+                    if (job.targetType === 'topic' && job.targetTopicId && job.triggerSubscriptions) {
+                        const subscriberJobs = delivery.jobs.filter(dj => dj.sourceType === 'topic' && dj.sourceTopicId === job.targetTopicId && dj.enabled);
+                        subscriberJobs.forEach(dj => {
+                            // ref 経由で最新の executeDeliveryJob を呼び出す（循環依存を回避）
+                            executeDeliveryJobRef.current?.(dj.id).catch(console.error);
+                        });
+                    }
+
+                    success = true;
+                } catch {
+                    if (retryCount < maxRetries) {
+                        // リトライ待機（exponential backoff）
+                        const delayTime = retryDelayMs * Math.pow(backoffMultiplier, retryCount);
+                        updateLog(logId, {
+                            details: `Retrying ${file.name}... (attempt ${retryCount + 2}/${maxRetries + 1})`
+                        });
+                        await new Promise(resolve => setTimeout(resolve, delayTime));
+                        retryCount++;
+                    } else {
+                        // 最大リトライ回数に達した
+                        break;
+                    }
                 }
-            } catch {
-                const errMsg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}'`;
-                setErrors(prev => [...new Set([...prev, errMsg])]);
+            }
+
+            // 最終的に失敗した場合
+            if (!success) {
+                const errMsg = `Collection Job ${job.name}: Failed to move to '${targetHost}:${targetPath}' after ${retryCount} ${retryCount === 1 ? 'retry' : 'retries'}`;
+                if (!continueOnError) {
+                    setErrors(prev => [...new Set([...prev, errMsg])]);
+                }
                 updateLog(logId, {
                     status: 'failed',
                     endTime: Date.now(),
                     recordsOutput: 0,
                     errorMessage: errMsg,
-                    details: `File: ${file.name}`
+                    details: `File: ${file.name}`,
+                    extendedDetails: {
+                        retryCount,
+                        continueOnError
+                    }
                 });
-            } finally {
-                unlockFile(sourceHost, sourcePath, file.name);
-                toggleStep(`transfer_1_${job.id}`, false);
-                collectionLocks.current[job.id] = false;
             }
+
+            // クリーンアップ
+            unlockFile(sourceHost, sourcePath, file.name);
+            toggleStep(`transfer_1_${job.id}`, false);
+            collectionLocks.current[job.id] = false;
         } catch {
             collectionLocks.current[job.id] = false;
         }

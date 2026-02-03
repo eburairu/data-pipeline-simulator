@@ -68,6 +68,25 @@ export const validateCollectionJob = (job: CollectionJob): ValidationError[] => 
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (!isValidRegex(job.filterRegex)) errors.push({ id: job.id, field: 'filterRegex', message: 'Invalid Regular Expression' });
+
+  // Phase 1: リトライ設定のバリデーション
+  if (job.retryConfig) {
+    if (job.retryConfig.maxRetries < 0) errors.push({ id: job.id, field: 'retryConfig.maxRetries', message: 'Max Retries must be >= 0' });
+    if (job.retryConfig.retryDelayMs < 0) errors.push({ id: job.id, field: 'retryConfig.retryDelayMs', message: 'Retry Delay must be >= 0' });
+    if (job.retryConfig.backoffMultiplier !== undefined && job.retryConfig.backoffMultiplier < 1) {
+      errors.push({ id: job.id, field: 'retryConfig.backoffMultiplier', message: 'Backoff Multiplier must be >= 1' });
+    }
+  }
+
+  // Phase 2-4: 追加機能のバリデーション（基本的なチェックのみ）
+  if (job.parallelBatchSize !== undefined && job.parallelBatchSize < 1) {
+    errors.push({ id: job.id, field: 'parallelBatchSize', message: 'Parallel Batch Size must be >= 1' });
+  }
+
+  if (job.cdcEnabled && job.cdcConfig && !job.cdcConfig.sourceTableId) {
+    errors.push({ id: job.id, field: 'cdcConfig.sourceTableId', message: 'CDC Source Table is required when CDC is enabled' });
+  }
+
   return errors;
 };
 
