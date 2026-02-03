@@ -84,6 +84,8 @@ npm run dev
 *   [Data Integration機能仕様](.specify/specs/003-dataintegration-features/spec.md)
 *   [ETL拡張仕様](.specify/specs/004-etl-enhancements/spec.md)
 *   [システムリファクタリング仕様](.specify/specs/005-system-refactoring/spec.md)
+*   [コードベース改善仕様](.specify/specs/006-codebase-improvements/spec.md)
+*   [CDI Router修正仕様](.specify/specs/007-cdi-router-fix/spec.md)
 
 ## 技術スタック
 
