@@ -34,7 +34,7 @@ describe('MappingEngine Reject File', () => {
                     type: 'source',
                     name: 'Source',
                     position: { x: 0, y: 0 },
-                    config: { connectionId: 'conn1' }
+                    config: { connectionId: 'conn1', path: '/in' }
                 },
                 {
                     id: validId,
@@ -69,7 +69,7 @@ describe('MappingEngine Reject File', () => {
         const result = await executeMappingTaskRecursive(
             task,
             mapping,
-            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }],
+            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
             mockFs,
             mockDb,
@@ -124,7 +124,7 @@ describe('MappingEngine Reject File', () => {
                     type: 'source',
                     name: 'Source',
                     position: { x: 0, y: 0 },
-                    config: { connectionId: 'conn1' }
+                    config: { connectionId: 'conn1', path: '/in' }
                 },
                 {
                     id: exprId,
@@ -159,7 +159,7 @@ describe('MappingEngine Reject File', () => {
         const result = await executeMappingTaskRecursive(
             task,
             mapping,
-            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }],
+            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
             mockFs,
             mockDb,
@@ -196,7 +196,7 @@ describe('MappingEngine Reject File', () => {
                     type: 'source',
                     name: 'My Source Node',
                     position: { x: 0, y: 0 },
-                    config: { connectionId: 'conn1' }
+                    config: { connectionId: 'conn1', path: '/in' }
                 }
             ],
             links: []
@@ -215,7 +215,7 @@ describe('MappingEngine Reject File', () => {
         const result = await executeMappingTaskRecursive(
             task,
             mapping,
-            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }],
+            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
             mockFs,
             mockDb,

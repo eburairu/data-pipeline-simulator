@@ -122,9 +122,11 @@ export interface CollectionJob {
   id: string;
   name: string;
   sourceConnectionId: string;
+  sourcePath: string;
   filterRegex: string;
   targetType?: 'host' | 'topic';
   targetConnectionId?: string;
+  targetPath?: string;
   targetTopicId?: string;
   bandwidth: number;
   renamePattern: string;
@@ -163,8 +165,10 @@ export interface DeliveryJob {
   name: string;
   sourceType?: 'host' | 'topic';
   sourceConnectionId?: string;
+  sourcePath?: string;
   sourceTopicId?: string;
   targetConnectionId: string;
+  targetPath: string;
   filterRegex: string;
   bandwidth: number;
   processingTime: number;
@@ -209,10 +213,7 @@ export interface ConnectionDefinition {
   id: string;
   name: string;
   type: ConnectionType;
-  host?: string;
-  path?: string;
-  databaseName?: string;
-  tableName?: string;
+  host: string;
 }
 
 export interface DashboardItem {

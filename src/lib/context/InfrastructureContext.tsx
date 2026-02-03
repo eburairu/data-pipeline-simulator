@@ -30,41 +30,37 @@ export const InfrastructureProvider: React.FC<{ children: ReactNode }> = ({ chil
       id: 'conn_raw',
       name: 'Raw Data Source (File)',
       type: 'file',
-      host: 'localhost',
-      path: '/internal'
+      host: 'localhost'
     },
     {
       id: 'conn_raw_db',
       name: 'Raw Database',
       type: 'database',
-      tableName: 'raw_data'
+      host: 'localhost'
     },
     {
       id: 'conn_summary_db',
       name: 'Summary Database',
       type: 'database',
-      tableName: 'summary_data'
+      host: 'localhost'
     },
     {
         id: 'conn_src_host1',
         name: 'Source (Host1)',
         type: 'file',
-        host: 'host1',
-        path: '/source'
+        host: 'host1'
     },
     {
         id: 'conn_incoming',
         name: 'Incoming Folder',
         type: 'file',
-        host: 'localhost',
-        path: '/incoming'
+        host: 'localhost'
     },
     {
         id: 'conn_internal',
         name: 'Internal Folder',
         type: 'file',
-        host: 'localhost',
-        path: '/internal'
+        host: 'localhost'
     }
   ]);
 

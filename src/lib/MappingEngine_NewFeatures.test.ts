@@ -27,7 +27,7 @@ describe('MappingEngine New Features', () => {
         const mapping: Mapping = {
             id: 'm_ws', name: 'WS Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1' } } as Transformation,
+                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
                 {
                     id: 't_ws', type: 'webService', name: 'Get User', position: { x: 0, y: 0 },
                     config: {
@@ -59,7 +59,7 @@ describe('MappingEngine New Features', () => {
         // MappingEngine expects JSON content or CSV. Let's use JSON for simplicity in Source
         mockFs.readFile.mockReturnValue(JSON.stringify(inputData));
 
-        const mockConn = { id: 'c1', type: 'file', host: 'h1', path: 'p1' } as ConnectionDefinition;
+        const mockConn = { id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition;
 
         const { stats } = await executeMappingTask(task, mapping, [mockConn], mockTables, mockFs, mockDb, {});
 
@@ -76,7 +76,7 @@ describe('MappingEngine New Features', () => {
          const mapping: Mapping = {
             id: 'm_hp', name: 'HP Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1' } } as Transformation,
+                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
                 {
                     id: 't_hp', type: 'hierarchyParser', name: 'Parse JSON', position: { x: 0, y: 0 },
                     config: {
@@ -87,7 +87,7 @@ describe('MappingEngine New Features', () => {
                         ]
                     }
                 } as Transformation,
-                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2' } } as Transformation
+                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2', path: '/out' } } as Transformation
             ],
             links: [
                 { id: 'l1', sourceId: 't_src', targetId: 't_hp' },
@@ -102,8 +102,8 @@ describe('MappingEngine New Features', () => {
         mockFs.readFile.mockReturnValue(JSON.stringify([inputRow]));
 
         const conns = [
-            { id: 'c1', type: 'file', host: 'h1', path: 'p1' } as ConnectionDefinition,
-            { id: 'c2', type: 'file', host: 'h1', path: 'out' } as ConnectionDefinition
+            { id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition,
+            { id: 'c2', name: 'Conn2', type: 'file', host: 'h1' } as ConnectionDefinition
         ];
 
         const { stats } = await executeMappingTask(task, mapping, conns, mockTables, mockFs, mockDb, {});
@@ -123,7 +123,7 @@ describe('MappingEngine New Features', () => {
          const mapping: Mapping = {
             id: 'm_err', name: 'Error Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1' } } as Transformation,
+                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
                  {
                     id: 't_val', type: 'validator', name: 'Validator', position: { x: 0, y: 0 },
                     config: {
@@ -146,7 +146,7 @@ describe('MappingEngine New Features', () => {
         // Provide 2 invalid rows to trigger error count = 2 > 1
         mockFs.readFile.mockReturnValue('val\ninvalid\nalso_invalid\nvalid');
 
-        const conns = [{ id: 'c1', type: 'file', host: 'h1', path: 'p1' } as ConnectionDefinition];
+        const conns = [{ id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition];
 
         // Should throw
         await expect(executeMappingTask(task, mapping, conns, mockTables, mockFs, mockDb, {})).rejects.toThrow(/Execution halted/);
@@ -156,14 +156,14 @@ describe('MappingEngine New Features', () => {
          const mapping: Mapping = {
             id: 'm_param', name: 'Param Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1' } } as Transformation,
+                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
                 {
                     id: 't_exp', type: 'expression', name: 'Add Param', position: { x: 0, y: 0 },
                     config: {
                         fields: [{ name: 'out', expression: "MY_PARAM" }] // Expect substitution
                     }
                 } as Transformation,
-                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2' } } as Transformation
+                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2', path: '/out' } } as Transformation
             ],
             links: [
                 { id: 'l1', sourceId: 't_src', targetId: 't_exp' },
@@ -184,8 +184,8 @@ describe('MappingEngine New Features', () => {
         });
 
         const conns = [
-            { id: 'c1', type: 'file', host: 'h1', path: 'p1' } as ConnectionDefinition,
-            { id: 'c2', type: 'file', host: 'h1', path: 'out' } as ConnectionDefinition
+            { id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition,
+            { id: 'c2', name: 'Conn2', type: 'file', host: 'h1' } as ConnectionDefinition
         ];
 
         const { stats } = await executeMappingTask(task, mapping, conns, mockTables, mockFs, mockDb, {});

@@ -43,7 +43,7 @@ describe('MappingEngine Router', () => {
                 name: 'Source',
                 type: 'source',
                 position: { x: 0, y: 0 },
-                config: { connectionId: 'conn_source', filenameColumn: 'filename' }
+                config: { connectionId: 'conn_source', path: '/in', filenameColumn: 'filename' }
             },
             {
                 id: 'router1',
@@ -63,21 +63,21 @@ describe('MappingEngine Router', () => {
                 name: 'Target A',
                 type: 'target',
                 position: { x: 200, y: -50 },
-                config: { connectionId: 'conn_target_a' }
+                config: { connectionId: 'conn_target_a', path: '/out/a' }
             },
             {
                 id: 'targetB',
                 name: 'Target B',
                 type: 'target',
                 position: { x: 200, y: 0 },
-                config: { connectionId: 'conn_target_b' }
+                config: { connectionId: 'conn_target_b', path: '/out/b' }
             },
             {
                 id: 'targetDefault',
                 name: 'Target Default',
                 type: 'target',
                 position: { x: 200, y: 50 },
-                config: { connectionId: 'conn_target_default' }
+                config: { connectionId: 'conn_target_default', path: '/out/default' }
             }
         ];
 
@@ -105,10 +105,10 @@ describe('MappingEngine Router', () => {
         };
 
         const connections: ConnectionDefinition[] = [
-            { id: 'conn_source', name: 'Source', type: 'file', host: 'localhost', path: '/in' },
-            { id: 'conn_target_a', name: 'Target A', type: 'file', host: 'localhost', path: '/out/a' },
-            { id: 'conn_target_b', name: 'Target B', type: 'file', host: 'localhost', path: '/out/b' },
-            { id: 'conn_target_default', name: 'Target Default', type: 'file', host: 'localhost', path: '/out/default' }
+            { id: 'conn_source', name: 'Source', type: 'file', host: 'localhost' },
+            { id: 'conn_target_a', name: 'Target A', type: 'file', host: 'localhost' },
+            { id: 'conn_target_b', name: 'Target B', type: 'file', host: 'localhost' },
+            { id: 'conn_target_default', name: 'Target Default', type: 'file', host: 'localhost' }
         ];
 
         // Execute

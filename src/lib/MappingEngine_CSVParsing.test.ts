@@ -32,7 +32,7 @@ describe('MappingEngine CSV Parsing Error', () => {
                     type: 'source',
                     name: 'Source',
                     position: { x: 0, y: 0 },
-                    config: { connectionId: 'conn1' }
+                    config: { connectionId: 'conn1', path: '/in' }
                 }
             ],
             links: []
@@ -60,7 +60,7 @@ describe('MappingEngine CSV Parsing Error', () => {
         const result = await executeMappingTaskRecursive(
             task,
             mapping,
-            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }],
+            [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
             mockFs,
             mockDb,

@@ -28,12 +28,12 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
 
-  const getCount = useCallback((conn: ConnectionDefinition) => {
+  const getCount = useCallback((conn: ConnectionDefinition, path?: string, tableName?: string) => {
     try {
-      if (conn.type === 'file') {
-        return listFiles(conn.host!, conn.path!).length;
-      } else if (conn.type === 'database') {
-        return select(conn.tableName!).length;
+      if (conn.type === 'file' && path) {
+        return listFiles(conn.host, path).length;
+      } else if (conn.type === 'database' && tableName) {
+        return select(tableName).length;
       }
       return 0;
     } catch {
@@ -57,9 +57,10 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     // Helper to generate keys
     const getLegacyKey = (host: string, path: string) => `legacy:${host}:${path}`;
-    const getConnectionKey = (conn: ConnectionDefinition) => {
-      if (conn.type === 'file') return `legacy:${conn.host}:${conn.path}`; // Reuse legacy format to merge nodes
-      return `db:${conn.tableName}`;
+    const getConnectionKey = (conn: ConnectionDefinition, path?: string, tableName?: string) => {
+      if (conn.type === 'file' && path) return `legacy:${conn.host}:${path}`; // Reuse legacy format to merge nodes
+      if (conn.type === 'database' && tableName) return `db:${tableName}`;
+      return `conn:${conn.id}`; // Fallback to connection ID
     };
 
     const addLegacyStorageNode = (host: string, path: string, colIndex: number, rowIndex: number) => {
@@ -87,8 +88,8 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       return node;
     };
 
-    const addConnectionStorageNode = (conn: ConnectionDefinition, colIndex: number = 0, rowIndex: number = 0) => {
-      const key = getConnectionKey(conn);
+    const addConnectionStorageNode = (conn: ConnectionDefinition, colIndex: number = 0, rowIndex: number = 0, path?: string, tableName?: string) => {
+      const key = getConnectionKey(conn, path, tableName);
       if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
 
       const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
@@ -97,9 +98,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         type: 'storage',
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
         data: {
-          label: conn.type === 'database' ? `DB: ${conn.tableName}` : `${conn.host}:${conn.path}`,
+          label: conn.type === 'database' ? `DB: ${tableName || conn.name}` : `${conn.host}:${path || '?'}`,
           type: conn.type === 'database' ? 'db' : 'fs',
-          count: getCount(conn)
+          count: getCount(conn, path, tableName)
         },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
@@ -124,18 +125,18 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     collection.jobs.forEach(j => {
       if (j.targetType === 'topic' && j.targetTopicId) {
           otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
-      } else if (j.targetConnectionId) {
+      } else if (j.targetConnectionId && j.targetPath) {
           const conn = connections.find(c => c.id === j.targetConnectionId);
-          if (conn && conn.type === 'file' && conn.host && conn.path) {
-              otherKeys.add(getLegacyKey(conn.host, conn.path));
+          if (conn && conn.type === 'file') {
+              otherKeys.add(getLegacyKey(conn.host, j.targetPath));
           }
       }
     });
     delivery.jobs.forEach(j => {
-      if (j.targetConnectionId) {
+      if (j.targetConnectionId && j.targetPath) {
           const conn = connections.find(c => c.id === j.targetConnectionId);
-          if (conn && conn.type === 'file' && conn.host && conn.path) {
-              otherKeys.add(getLegacyKey(conn.host, conn.path));
+          if (conn && conn.type === 'file') {
+              otherKeys.add(getLegacyKey(conn.host, j.targetPath));
           }
       }
     });
@@ -170,14 +171,14 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       let targetHost = '', targetPath = '';
       if (job.targetType === 'topic' && job.targetTopicId) {
           targetHost = 'localhost'; targetPath = `/topics/${job.targetTopicId}`;
-      } else {
+      } else if (job.targetPath) {
           const conn = connections.find(c => c.id === job.targetConnectionId);
-          if (conn && conn.type === 'file') { targetHost = conn.host!; targetPath = conn.path!; }
+          if (conn && conn.type === 'file') { targetHost = conn.host; targetPath = job.targetPath; }
       }
 
       let sourceHost = '', sourcePath = '';
       const srcConn = connections.find(c => c.id === job.sourceConnectionId);
-      if (srcConn && srcConn.type === 'file') { sourceHost = srcConn.host!; sourcePath = srcConn.path!; }
+      if (srcConn && srcConn.type === 'file' && job.sourcePath) { sourceHost = srcConn.host; sourcePath = job.sourcePath; }
 
       const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
       const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
@@ -198,14 +199,14 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       let sourceHost = '', sourcePath = '';
       if (job.sourceType === 'topic' && job.sourceTopicId) {
           sourceHost = 'localhost'; sourcePath = `/topics/${job.sourceTopicId}`;
-      } else {
+      } else if (job.sourcePath) {
           const conn = connections.find(c => c.id === job.sourceConnectionId);
-          if (conn && conn.type === 'file') { sourceHost = conn.host!; sourcePath = conn.path!; }
+          if (conn && conn.type === 'file') { sourceHost = conn.host; sourcePath = job.sourcePath; }
       }
 
       let targetHost = '', targetPath = '';
       const tgtConn = connections.find(c => c.id === job.targetConnectionId);
-      if (tgtConn && tgtConn.type === 'file') { targetHost = tgtConn.host!; targetPath = tgtConn.path!; }
+      if (tgtConn && tgtConn.type === 'file' && job.targetPath) { targetHost = tgtConn.host; targetPath = job.targetPath; }
 
       const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
       const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
@@ -248,7 +249,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         if (conn) {
           // Determine layout hint: if it's a file connection that might already exist from legacy, it will be reused.
           // If it's a DB, it's new.
-          const node = addConnectionStorageNode(conn, 3, taskRowIndex);
+          const node = addConnectionStorageNode(conn, 3, taskRowIndex, conf.path, conf.tableName);
           sourceNodes.push(node);
         }
       });
@@ -257,7 +258,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         const conf = tgt.config as TargetConfig;
         const conn = connections.find(c => c.id === conf.connectionId);
         if (conn) {
-          const node = addConnectionStorageNode(conn, 5, taskRowIndex);
+          const node = addConnectionStorageNode(conn, 5, taskRowIndex, conf.path, conf.tableName);
           targetNodes.push(node);
         }
       });

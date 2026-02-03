@@ -58,11 +58,13 @@ export const validateCollectionJob = (job: CollectionJob): ValidationError[] => 
   if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
 
   if (!job.sourceConnectionId) errors.push({ id: job.id, field: 'sourceConnectionId', message: 'Source Connection is required' });
+  if (!job.sourcePath || !job.sourcePath.trim()) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
 
   if (job.targetType === 'topic') {
       if (!job.targetTopicId) errors.push({ id: job.id, field: 'targetTopicId', message: 'Target Topic is required' });
   } else {
       if (!job.targetConnectionId) errors.push({ id: job.id, field: 'targetConnectionId', message: 'Target Connection is required' });
+      if (!job.targetPath || !job.targetPath.trim()) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
   }
 
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
@@ -98,9 +100,11 @@ export const validateDeliveryJob = (job: DeliveryJob): ValidationError[] => {
       if (!job.sourceTopicId) errors.push({ id: job.id, field: 'sourceTopicId', message: 'Source Topic is required' });
   } else {
       if (!job.sourceConnectionId) errors.push({ id: job.id, field: 'sourceConnectionId', message: 'Source Connection is required' });
+      if (!job.sourcePath || !job.sourcePath.trim()) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
   }
 
   if (!job.targetConnectionId) errors.push({ id: job.id, field: 'targetConnectionId', message: 'Target Connection is required' });
+  if (!job.targetPath || !job.targetPath.trim()) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
   if (job.bandwidth <= 0) errors.push({ id: job.id, field: 'bandwidth', message: 'Bandwidth must be > 0' });
   if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
   if (job.processingTime < 0) errors.push({ id: job.id, field: 'processingTime', message: 'Latency cannot be negative' });
@@ -129,12 +133,7 @@ export const validateTopic = (topic: Topic): ValidationError[] => {
 export const validateConnection = (conn: ConnectionDefinition): ValidationError[] => {
     const errors: ValidationError[] = [];
     if (!conn.name.trim()) errors.push({ id: conn.id, field: 'name', message: 'Connection Name is required' });
-    if (conn.type === 'file') {
-        if (!conn.host) errors.push({ id: conn.id, field: 'host', message: 'Host is required' });
-        if (!conn.path) errors.push({ id: conn.id, field: 'path', message: 'Path is required' });
-    } else if (conn.type === 'database') {
-        if (!conn.tableName) errors.push({ id: conn.id, field: 'tableName', message: 'Table Name is required' });
-    }
+    if (!conn.host) errors.push({ id: conn.id, field: 'host', message: 'Host is required' });
     return errors;
 };
 

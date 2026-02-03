@@ -57,12 +57,16 @@ export const useSimulationEngine = (
         if (!job) return;
 
         const sourceConn = connections.find(c => c.id === job.sourceConnectionId);
-        if (!sourceConn || sourceConn.type !== 'file' || !sourceConn.host || !sourceConn.path) {
+        if (!sourceConn || sourceConn.type !== 'file' || !sourceConn.host) {
             setErrors(prev => [...new Set([...prev, `Collection Job ${job.name}: Invalid Source Connection`])]);
             return;
         }
+        if (!job.sourcePath) {
+            setErrors(prev => [...new Set([...prev, `Collection Job ${job.name}: Source Path is required`])]);
+            return;
+        }
         const sourceHost = sourceConn.host;
-        const sourcePath = sourceConn.path;
+        const sourcePath = job.sourcePath;
 
         let targetHost = '';
         let targetPath = '';
@@ -72,12 +76,16 @@ export const useSimulationEngine = (
             targetPath = `/topics/${job.targetTopicId}`;
         } else {
             const targetConn = connections.find(c => c.id === job.targetConnectionId);
-            if (!targetConn || targetConn.type !== 'file' || !targetConn.host || !targetConn.path) {
+            if (!targetConn || targetConn.type !== 'file' || !targetConn.host) {
                 setErrors(prev => [...new Set([...prev, `Collection Job ${job.name}: Invalid Target Connection`])]);
                 return;
             }
+            if (!job.targetPath) {
+                setErrors(prev => [...new Set([...prev, `Collection Job ${job.name}: Target Path is required`])]);
+                return;
+            }
             targetHost = targetConn.host;
-            targetPath = targetConn.path;
+            targetPath = job.targetPath;
         }
 
         if (collectionLocks.current[job.id]) return;
@@ -259,21 +267,29 @@ export const useSimulationEngine = (
                 sourcePath = `/topics/${job.sourceTopicId}`;
             } else {
                 const sourceConn = connections.find(c => c.id === job.sourceConnectionId);
-                if (!sourceConn || sourceConn.type !== 'file' || !sourceConn.host || !sourceConn.path) {
+                if (!sourceConn || sourceConn.type !== 'file' || !sourceConn.host) {
                     setErrors(prev => [...new Set([...prev, `Delivery Job ${job.name}: Invalid Source Connection`])]);
                     return;
                 }
+                if (!job.sourcePath) {
+                    setErrors(prev => [...new Set([...prev, `Delivery Job ${job.name}: Source Path is required`])]);
+                    return;
+                }
                 sourceHost = sourceConn.host;
-                sourcePath = sourceConn.path;
+                sourcePath = job.sourcePath;
             }
 
             const targetConn = connections.find(c => c.id === job.targetConnectionId);
-            if (!targetConn || targetConn.type !== 'file' || !targetConn.host || !targetConn.path) {
+            if (!targetConn || targetConn.type !== 'file' || !targetConn.host) {
                 setErrors(prev => [...new Set([...prev, `Delivery Job ${job.name}: Invalid Target Connection`])]);
                 return;
             }
+            if (!job.targetPath) {
+                setErrors(prev => [...new Set([...prev, `Delivery Job ${job.name}: Target Path is required`])]);
+                return;
+            }
             const targetHost = targetConn.host;
-            const targetPath = targetConn.path;
+            const targetPath = job.targetPath;
 
             let currentFiles = listFiles(sourceHost, sourcePath);
             if (currentFiles.length === 0) return;

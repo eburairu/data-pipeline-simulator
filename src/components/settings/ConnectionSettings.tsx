@@ -9,8 +9,7 @@ const ConnectionSettings: React.FC = () => {
     addConnection({
       name: 'New Connection',
       type: 'file',
-      host: hosts.length > 0 ? hosts[0].name : 'localhost',
-      path: hosts.length > 0 && hosts[0].directories.length > 0 ? hosts[0].directories[0] : '/'
+      host: hosts.length > 0 ? hosts[0].name : 'localhost'
     });
   };
 
@@ -20,32 +19,17 @@ const ConnectionSettings: React.FC = () => {
 
   const handleTypeChange = (id: string, newType: ConnectionType) => {
     // Reset specific fields when type changes
-    if (newType === 'database') {
-        updateConnection(id, { type: newType, host: undefined, path: undefined, tableName: 'new_table' });
-    } else {
-        const defaultHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: ['/'] };
-        updateConnection(id, {
-            type: newType,
-            host: defaultHost.name,
-            path: defaultHost.directories[0],
-            tableName: undefined,
-            databaseName: undefined
-        });
-    }
+    const defaultHost = hosts.length > 0 ? hosts[0].name : 'localhost';
+    updateConnection(id, { type: newType, host: defaultHost });
   };
 
-  const handleHostChange = (id: string, newHostName: string) => {
-      const selectedHost = hosts.find(h => h.name === newHostName);
-      const newPath = selectedHost && selectedHost.directories.length > 0 ? selectedHost.directories[0] : '';
-      updateConnection(id, { host: newHostName, path: newPath });
-  };
 
   return (
     <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
       <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
         <Server className="w-5 h-5" /> Connections
       </h3>
-      <p className="text-xs text-gray-500">Define connections to file systems or databases.</p>
+      <p className="text-xs text-gray-500">Define host connections. Specific paths/tables are configured in each job.</p>
 
       <div className="space-y-4">
         {connections.map((conn) => (
@@ -86,49 +70,20 @@ const ConnectionSettings: React.FC = () => {
                    </div>
                 </div>
 
-                {conn.type === 'file' && (
-                     <div className="grid grid-cols-2 gap-3 bg-blue-50 p-2 rounded border border-blue-100">
-                       <div>
-                         <label className="block text-xs font-medium text-gray-500">Host</label>
-                         <select
-                            value={conn.host || ''}
-                            onChange={(e) => handleHostChange(conn.id, e.target.value)}
-                            className="w-full border rounded p-1 text-sm bg-white"
-                         >
-                            {hosts.map(h => (
-                                <option key={h.name} value={h.name}>{h.name}</option>
-                            ))}
-                         </select>
-                       </div>
-                       <div>
-                         <label className="block text-xs font-medium text-gray-500">Directory</label>
-                         <select
-                            value={conn.path || ''}
-                            onChange={(e) => handleChange(conn.id, { path: e.target.value })}
-                            className="w-full border rounded p-1 text-sm bg-white"
-                         >
-                            {hosts.find(h => h.name === conn.host)?.directories.map(dir => (
-                                <option key={dir} value={dir}>{dir}</option>
-                            )) || <option value="">Select Host First</option>}
-                         </select>
-                       </div>
-                    </div>
-                )}
-
-                {conn.type === 'database' && (
-                    <div className="grid grid-cols-2 gap-3 bg-purple-50 p-2 rounded border border-purple-100">
-                        <div>
-                             <label className="block text-xs font-medium text-gray-500">Table Name (Default)</label>
-                             <input
-                                type="text"
-                                value={conn.tableName || ''}
-                                onChange={(e) => handleChange(conn.id, { tableName: e.target.value })}
-                                className="w-full border rounded p-1 text-sm"
-                                placeholder="e.g. raw_data"
-                             />
-                        </div>
-                    </div>
-                )}
+                <div className={`grid grid-cols-1 gap-3 p-2 rounded border ${conn.type === 'file' ? 'bg-blue-50 border-blue-100' : 'bg-purple-50 border-purple-100'}`}>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500">Host</label>
+                    <select
+                      value={conn.host || ''}
+                      onChange={(e) => handleChange(conn.id, { host: e.target.value })}
+                      className="w-full border rounded p-1 text-sm bg-white"
+                    >
+                      {hosts.map(h => (
+                        <option key={h.name} value={h.name}>{h.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
              </div>
           </div>
         ))}

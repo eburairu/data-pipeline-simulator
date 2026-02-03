@@ -159,18 +159,18 @@ const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, del
   collection.jobs.forEach((job) => {
     if (job.targetType === 'topic') return;
     const conn = connections.find(c => c.id === job.targetConnectionId);
-    if (conn && conn.type === 'file' && conn.host && conn.path) {
-      const key = `${conn.host}:${conn.path}`;
-      if (!incomingPaths.has(key)) { incomingPaths.add(key); incomingStorages.push({ host: conn.host, path: conn.path, type: 'incoming' }); }
+    if (conn && conn.type === 'file' && conn.host && job.targetPath) {
+      const key = `${conn.host}:${job.targetPath}`;
+      if (!incomingPaths.has(key)) { incomingPaths.add(key); incomingStorages.push({ host: conn.host, path: job.targetPath, type: 'incoming' }); }
     }
   });
   const internalPaths = new Set<string>();
   const internalStorages: { host: string, path: string, type: 'internal' }[] = [];
   delivery.jobs.forEach((job) => {
     const conn = connections.find(c => c.id === job.targetConnectionId);
-    if (conn && conn.type === 'file' && conn.host && conn.path) {
-      const key = `${conn.host}:${conn.path}`;
-      if (!internalPaths.has(key)) { internalPaths.add(key); internalStorages.push({ host: conn.host, path: conn.path, type: 'internal' }); }
+    if (conn && conn.type === 'file' && conn.host && job.targetPath) {
+      const key = `${conn.host}:${job.targetPath}`;
+      if (!internalPaths.has(key)) { internalPaths.add(key); internalStorages.push({ host: conn.host, path: job.targetPath, type: 'internal' }); }
     }
   });
 

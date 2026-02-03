@@ -13,12 +13,16 @@ export interface BaseTransformation {
 
 export interface SourceConfig {
   connectionId: string;
+  path?: string;
+  tableName?: string;
   deleteAfterRead?: boolean;
   filenameColumn?: string;
 }
 
 export interface TargetConfig {
   connectionId: string;
+  path?: string;
+  tableName?: string;
   truncate?: boolean;
   updateColumns?: string[];
   deduplicationKeys?: string[];
@@ -69,6 +73,8 @@ export interface JoinerConfig {
 
 export interface LookupConfig {
   connectionId: string;
+  path?: string;
+  tableName?: string;
   lookupKeys: string[];
   referenceKeys: string[];
   returnFields: string[];
