@@ -92,6 +92,8 @@ export interface DeliveryJob {
   processingTime: number;
   executionInterval: number;
   enabled: boolean;
+  /** If true, delete source file after successful transfer. Default: true (move). If false, copy the file. Only applies when sourceType is 'host'. */
+  deleteSourceAfterTransfer?: boolean;
 }
 
 export interface DeliverySettings {

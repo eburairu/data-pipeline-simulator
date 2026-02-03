@@ -256,18 +256,29 @@ export const useSimulationEngine = (
                 await delay(processingTime);
 
                 if (job.sourceType === 'topic') {
+                    // Topic source always copies (subscription model)
                     writeFile(targetHost, targetPath, file.name, file.content);
                     insert('_sys_subscription_state', { jobId: job.id, fileName: file.name, timestamp: Date.now() });
                 } else {
-                    moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath);
+                    // Host source: check if source file should be deleted after transfer (default: true = move)
+                    const shouldDeleteSource = job.deleteSourceAfterTransfer !== false;
+
+                    if (shouldDeleteSource) {
+                        // Move file (delete source after copy)
+                        moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath);
+                    } else {
+                        // Copy file (keep source)
+                        writeFile(targetHost, targetPath, file.name, file.content);
+                    }
                 }
                 setErrors(prev => prev.filter(e => !e.includes(`Delivery Job ${job.name}`)));
 
+                const shouldDeleteSource = job.sourceType === 'topic' ? false : (job.deleteSourceAfterTransfer !== false);
                 updateLog(logId, {
                     status: 'success',
                     endTime: Date.now(),
                     recordsOutput: 1,
-                    details: `Delivered ${file.name} to ${targetHost}:${targetPath}`,
+                    details: `${job.sourceType === 'topic' ? 'Copied' : (shouldDeleteSource ? 'Moved' : 'Copied')} ${file.name} to ${targetHost}:${targetPath}`,
                     extendedDetails: {
                         fileSize: file.content.length,
                         bandwidth: job.bandwidth,
