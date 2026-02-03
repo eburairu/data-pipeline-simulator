@@ -71,6 +71,7 @@ describe('Validation Logic', () => {
       id: 'job1',
       name: 'Test Job',
       sourceConnectionId: 'conn1',
+      sourcePath: '/data',
       filterRegex: '.*',
       bandwidth: 100,
       renamePattern: '',
@@ -78,6 +79,7 @@ describe('Validation Logic', () => {
       enabled: true,
       targetType: 'host',
       targetConnectionId: 'conn2',
+      targetPath: '/output',
     };
 
     it('should validate valid host target job', () => {
@@ -119,7 +121,9 @@ describe('Validation Logic', () => {
       name: 'Test Job',
       sourceType: 'host',
       sourceConnectionId: 'conn1',
+      sourcePath: '/data',
       targetConnectionId: 'conn2',
+      targetPath: '/output',
       filterRegex: '.*',
       bandwidth: 100,
       processingTime: 100,

@@ -125,19 +125,22 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
     const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
-    const connectionsUsingDir = connections.filter(c => c.type === 'file' && c.host === hostName && c.path === path).map(c => c.id);
 
-    const inCollection = collection.jobs.some(j =>
-      (connectionsUsingDir.includes(j.sourceConnectionId)) ||
-      (j.targetType === 'host' && j.targetConnectionId && connectionsUsingDir.includes(j.targetConnectionId))
-    );
-    const inDelivery = delivery.jobs.some(j =>
-      (j.sourceType === 'host' && j.sourceConnectionId && connectionsUsingDir.includes(j.sourceConnectionId)) ||
-      (j.targetConnectionId && connectionsUsingDir.includes(j.targetConnectionId))
-    );
+    const inCollection = collection.jobs.some(j => {
+      const srcConn = connections.find(c => c.id === j.sourceConnectionId);
+      const tgtConn = j.targetConnectionId ? connections.find(c => c.id === j.targetConnectionId) : null;
+      return (srcConn?.host === hostName && j.sourcePath === path) ||
+             (tgtConn?.host === hostName && j.targetPath === path);
+    });
+    const inDelivery = delivery.jobs.some(j => {
+      const srcConn = j.sourceConnectionId ? connections.find(c => c.id === j.sourceConnectionId) : null;
+      const tgtConn = connections.find(c => c.id === j.targetConnectionId);
+      return (srcConn?.host === hostName && j.sourcePath === path) ||
+             (tgtConn?.host === hostName && j.targetPath === path);
+    });
     const inEtl = etl.sourceHost === hostName && etl.sourcePath === path;
 
-    return inDataSource || inCollection || inDelivery || inEtl || connectionsUsingDir.length > 0;
+    return inDataSource || inCollection || inDelivery || inEtl;
   }, [dataSource, collection, delivery, etl, connections]);
 
   const saveSettings = useCallback(() => {

@@ -99,14 +99,13 @@ export const IdempotencyTemplate: PipelineTemplate = {
                 id: connSrcId,
                 name: 'Idempotency Source File',
                 type: 'file',
-                host: hostName,
-                path: sourcePath
+                host: hostName
             },
             {
                 id: connTgtId,
                 name: 'Idempotency Target DB',
                 type: 'database',
-                tableName: tableName
+                host: 'localhost'
             }
         ]);
 
@@ -120,12 +119,12 @@ export const IdempotencyTemplate: PipelineTemplate = {
             id: mappingId,
             name: 'Idempotency Load (Dedup)',
             transformations: [
-                { 
-                    id: tSrcId, 
-                    type: 'source', 
-                    name: 'Read CSV', 
-                    position: { x: 50, y: 100 }, 
-                    config: { connectionId: connSrcId, deleteAfterRead: true } 
+                {
+                    id: tSrcId,
+                    type: 'source',
+                    name: 'Read CSV',
+                    position: { x: 50, y: 100 },
+                    config: { connectionId: connSrcId, path: sourcePath, deleteAfterRead: true }
                 },
                 { 
                     id: tDedupId, 
@@ -135,17 +134,18 @@ export const IdempotencyTemplate: PipelineTemplate = {
                                         config: { keys: ['id'], caseInsensitive: false }
                      
                 },
-                { 
-                    id: tTgtId, 
-                    type: 'target', 
-                    name: 'Upsert to DB', 
-                    position: { x: 550, y: 100 }, 
-                    config: { 
+                {
+                    id: tTgtId,
+                    type: 'target',
+                    name: 'Upsert to DB',
+                    position: { x: 550, y: 100 },
+                    config: {
                         connectionId: connTgtId,
+                        tableName: tableName,
                         deduplicationKeys: ['id'],
                         duplicateBehavior: 'update',
                         updateColumns: ['id']
-                    } 
+                    }
                 }
             ],
             links: [

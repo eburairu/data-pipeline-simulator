@@ -250,7 +250,7 @@ const processTarget = async (
 
     if (targetConn) {
         if (targetConn.type === 'database') {
-            const tableName = targetConn.tableName || 'output';
+            const tableName = node.config.tableName || 'output';
             const tableDef = tables.find(t => t.name === tableName);
             const updateCols = node.config.updateColumns || [];
 
@@ -339,6 +339,7 @@ const processTarget = async (
                 }
             }
         } else if (targetConn.type === 'file') {
+            const path = node.config.path || '/';
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `output_${timestamp}.json`;
             const cleanBatch = batch.map(r => {
@@ -347,7 +348,7 @@ const processTarget = async (
                 return c;
             });
             const content = JSON.stringify(cleanBatch, null, 2);
-            fs.writeFile(targetConn.host!, targetConn.path!, filename, content);
+            fs.writeFile(targetConn.host, path, filename, content);
             processedBatch.push(...cleanBatch);
         }
     } else {
@@ -420,7 +421,8 @@ const processLookup = (
     const conn = connections.find(c => c.id === node.config.connectionId);
     if (!conn || conn.type !== 'database') return batch;
 
-    const allLookupRecords = db.select(conn.tableName || '');
+    const tableName = node.config.tableName || 'lookup_table';
+    const allLookupRecords = db.select(tableName);
     return batch.map(row => {
         const match = allLookupRecords.find(r => {
             const d = extractData(r);
@@ -956,12 +958,13 @@ export const executeMappingTaskRecursive = async (
         await delay(100);
 
         if (conn.type === 'file') {
-            const files = fs.listFiles(conn.host!, conn.path!);
+            const path = config.path || '/';
+            const files = fs.listFiles(conn.host, path);
             const processedSet = newState.processedFiles as Set<string> | undefined || new Set<string>();
             const file = files.find(f => !processedSet.has(`${task.id}:${f.name}`));
 
             if (file) {
-                const content = fs.readFile(conn.host!, conn.path!, file.name);
+                const content = fs.readFile(conn.host, path, file.name);
                 if (file.name.endsWith('.csv')) {
                     try {
                         const lines = content.split(/\r?\n/);
@@ -1004,11 +1007,12 @@ export const executeMappingTaskRecursive = async (
                 (newState.processedFiles as Set<string>).add(`${task.id}:${file.name}`);
 
                 if (config.deleteAfterRead) {
-                    fs.deleteFile(conn.host!, file.name, conn.path!);
+                    fs.deleteFile(conn.host, file.name, path);
                 }
             }
         } else if (conn.type === 'database') {
-            const raw = db.select(conn.tableName || '');
+            const tableName = config.tableName || 'default_table';
+            const raw = db.select(tableName);
             const lastTs = newState.lastProcessedTimestamp as number | undefined || 0;
             
             // Database records might have insertedAt

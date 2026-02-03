@@ -31,7 +31,7 @@ describe('MappingEngine Advanced Features', () => {
             id: 'm_seq',
             name: 'Sequence Mapping',
             transformations: [
-                { id: sourceId, type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'conn1' } },
+                { id: sourceId, type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'conn1', path: '/in' } },
                 {
                     id: seqId, type: 'sequence', name: 'Seq', position: { x: 100, y: 0 },
                     config: { sequenceField: 'my_id', startValue: 100, incrementBy: 10 }
@@ -48,7 +48,7 @@ describe('MappingEngine Advanced Features', () => {
             enabled: true
         };
 
-        const connections = [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }];
+        const connections = [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }];
 
         // Mock File
         (mockFs.listFiles as any).mockReturnValue([{ name: 'data1.csv' }]);
@@ -85,7 +85,7 @@ describe('MappingEngine Advanced Features', () => {
             id: 'm_expr',
             name: 'Expr Mapping',
             transformations: [
-                { id: sourceId, type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'conn1' } },
+                { id: sourceId, type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'conn1', path: '/in' } },
                 {
                     id: exprId, type: 'expression', name: 'Expr', position: { x: 100, y: 0 },
                     config: {
@@ -101,7 +101,7 @@ describe('MappingEngine Advanced Features', () => {
         };
 
         const task: MappingTask = { id: 't_expr', name: 'Expr Task', mappingId: 'm_expr', executionInterval: 1000, enabled: true };
-        const connections = [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local', path: '/in' }];
+        const connections = [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }];
 
         (mockFs.listFiles as any).mockReturnValue([{ name: 'data.csv' }]);
         (mockFs.readFile as any).mockReturnValue('dummy\n1');
@@ -116,10 +116,10 @@ describe('MappingEngine Advanced Features', () => {
         const targetId = 'tgt1';
         mapping.transformations.push({
             id: targetId, type: 'target', name: 'Target', position: { x: 200, y: 0 },
-            config: { connectionId: 'conn_out' }
+            config: { connectionId: 'conn_out', path: '/out' }
         });
         mapping.links.push({ id: 'l2', sourceId: exprId, targetId: targetId });
-        connections.push({ id: 'conn_out', name: 'OutConn', type: 'file', host: 'local', path: '/out' } as any);
+        connections.push({ id: 'conn_out', name: 'OutConn', type: 'file', host: 'local' } as any);
 
         await executeMappingTaskRecursive(task, mapping, connections as any, [], mockFs, mockDb, state);
 
@@ -143,17 +143,18 @@ describe('MappingEngine Advanced Features', () => {
             id: 'm_lkp',
             name: 'LKP Mapping',
             transformations: [
-                { id: sourceId, type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'conn_src' } },
+                { id: sourceId, type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'conn_src', path: '/in' } },
                 {
                     id: lkpId, type: 'lookup', name: 'Lookup', position: { x: 100, y: 0 },
                     config: {
                         connectionId: 'conn_db',
+                        tableName: 'users',
                         lookupKeys: ['id'],
                         referenceKeys: ['user_id'],
                         returnFields: ['email']
                     }
                 },
-                { id: targetId, type: 'target', name: 'Target', position: { x: 200, y: 0 }, config: { connectionId: 'conn_out' } }
+                { id: targetId, type: 'target', name: 'Target', position: { x: 200, y: 0 }, config: { connectionId: 'conn_out', path: '/out' } }
             ],
             links: [
                 { id: 'l1', sourceId: sourceId, targetId: lkpId },
@@ -163,9 +164,9 @@ describe('MappingEngine Advanced Features', () => {
 
         const task: MappingTask = { id: 't_lkp', name: 'LKP Task', mappingId: 'm_lkp', executionInterval: 1000, enabled: true };
         const connections = [
-            { id: 'conn_src', name: 'Src', type: 'file', host: 'local', path: '/in' },
-            { id: 'conn_db', name: 'DB', type: 'database', tableName: 'users' },
-            { id: 'conn_out', name: 'Out', type: 'file', host: 'local', path: '/out' }
+            { id: 'conn_src', name: 'Src', type: 'file', host: 'local' },
+            { id: 'conn_db', name: 'DB', type: 'database', host: 'localhost' },
+            { id: 'conn_out', name: 'Out', type: 'file', host: 'local' }
         ];
 
         // Mock Source
