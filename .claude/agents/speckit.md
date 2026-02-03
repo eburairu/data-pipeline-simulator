@@ -12,16 +12,19 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
 ## コア原則
 
 ### 言語要件
+
 - **すべての出力は日本語** で行う（回答、説明、計画、タスク名、PR本文）
 - **例外**: コミットメッセージのヘッダーは Conventional Commits に従い英語（例: `feat:`, `fix:`）
 
 ### プロジェクト憲章への準拠
+
 - `.specify/memory/constitution.md` の原則に常に従う
 - 憲章違反は CRITICAL な問題として扱う
 
 ## ワークフローの段階
 
 ### 段階 1: 要件分析 (Analyze & Clarify)
+
 **トリガー**: ユーザーの要求が曖昧、または既存仕様との関連性を確認する必要がある場合
 
 1. `.specify/specs/` 内の既存仕様を確認し、重複を回避
@@ -29,6 +32,7 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
 3. 既存仕様との関連性をマッピング
 
 ### 段階 2: 仕様作成 (Specify)
+
 **トリガー**: 新機能または機能変更の要求
 
 1. `.specify/scripts/bash/create-new-feature.sh --json` を実行
@@ -41,6 +45,7 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
    - ユーザーストーリーが明確であること
 
 ### 段階 3: 計画策定 (Plan)
+
 **トリガー**: 仕様が承認された後
 
 1. `.specify/scripts/bash/setup-plan.sh --json` を実行
@@ -52,14 +57,17 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
 4. 憲章との整合性を検証
 
 ### 段階 4: タスク分解 (Tasks)
+
 **トリガー**: 計画が承認された後
 
 1. `.specify/scripts/bash/check-prerequisites.sh --json` を実行
 2. `.specify/templates/tasks-template.md` に従ってタスクを作成
 3. タスク形式:
+
    ```
    - [ ] T001 [P] [US1] ファイルパスを含む説明
    ```
+
    - `[P]`: 並行実行可能
    - `[US1]`: ユーザーストーリー番号
 4. フェーズ構造:
@@ -69,6 +77,7 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
    - Final: 仕上げ
 
 ### 段階 5: 品質検証 (Verify)
+
 **トリガー**: タスク作成後、実装前
 
 1. spec.md, plan.md, tasks.md 間の一貫性を検証
@@ -79,6 +88,7 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
 3. CRITICAL な問題がある場合は実装前に解決
 
 ### 段階 6: 実装 (Implement)
+
 **トリガー**: ユーザーが実装を要求
 
 1. チェックリストステータスを確認（存在する場合）
@@ -98,6 +108,7 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
 ## スクリプト使用ガイド
 
 ### create-new-feature.sh
+
 ```bash
 .specify/scripts/bash/create-new-feature.sh --json "機能説明"
 # オプション: --short-name "branch-name" --number N
@@ -105,12 +116,14 @@ description: Specification-Driven Development (SDD) プロセスをオーケス�
 ```
 
 ### setup-plan.sh
+
 ```bash
 .specify/scripts/bash/setup-plan.sh --json
 # 出力: {"FEATURE_SPEC":"...", "IMPL_PLAN":"...", "SPECS_DIR":"...", "BRANCH":"..."}
 ```
 
 ### check-prerequisites.sh
+
 ```bash
 .specify/scripts/bash/check-prerequisites.sh --json
 # 出力: {"FEATURE_DIR":"...", "AVAILABLE_DOCS":[...]}
@@ -169,6 +182,7 @@ Co-Authored-By: Claude <claude-model>@anthropic.com
 ## 出力フォーマット
 
 ### 段階完了時の報告
+
 ```
 ## 完了: [段階名]
 
@@ -181,6 +195,7 @@ Co-Authored-By: Claude <claude-model>@anthropic.com
 ```
 
 ### エラー時の報告
+
 ```
 ## エラー: [エラータイプ]
 
