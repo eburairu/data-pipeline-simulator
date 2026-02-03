@@ -21,6 +21,8 @@ export const useSimulationEngine = (
     const mappingStates = useRef<Record<string, ExecutionState>>({});
     const mappingLocks = useRef<Record<string, boolean>>({});
     const fileLocks = useRef<Set<string>>(new Set());
+    // executeDeliveryJob への安定した参照（循環依存を回避）
+    const executeDeliveryJobRef = useRef<((id: string) => Promise<void>) | undefined>(undefined);
 
     const getFileLockKey = useCallback((host: string, path: string, fileName: string) => `${host}:${path}/${fileName}`, []);
     const isFileLocked = useCallback((host: string, path: string, fileName: string) => fileLocks.current.has(getFileLockKey(host, path, fileName)), [getFileLockKey]);
@@ -143,8 +145,8 @@ export const useSimulationEngine = (
                 if (job.targetType === 'topic' && job.targetTopicId && job.triggerSubscriptions) {
                     const subscriberJobs = delivery.jobs.filter(dj => dj.sourceType === 'topic' && dj.sourceTopicId === job.targetTopicId && dj.enabled);
                     subscriberJobs.forEach(dj => {
-                        // Trigger async without awaiting to not block collection job
-                        executeDeliveryJob(dj.id).catch(console.error);
+                        // ref 経由で最新の executeDeliveryJob を呼び出す（循環依存を回避）
+                        executeDeliveryJobRef.current?.(dj.id).catch(console.error);
                     });
                 }
             } catch {
@@ -165,7 +167,7 @@ export const useSimulationEngine = (
         } catch {
             collectionLocks.current[job.id] = false;
         }
-    }, [collection.jobs, collection.processingTime, connections, listFiles, isFileLocked, lockFile, addLog, toggleStep, moveFile, updateLog, unlockFile, setErrors]);
+    }, [collection.jobs, collection.processingTime, connections, listFiles, isFileLocked, lockFile, addLog, toggleStep, moveFile, updateLog, unlockFile, setErrors, delivery.jobs]);
 
     const executeDeliveryJob = useCallback(async (jobId: string) => {
         const job = delivery.jobs.find(j => j.id === jobId);
@@ -282,6 +284,9 @@ export const useSimulationEngine = (
             deliveryLocks.current[job.id] = false;
         }
     }, [delivery.jobs, connections, listFiles, select, isFileLocked, lockFile, toggleStep, addLog, writeFile, insert, moveFile, updateLog, unlockFile, setErrors]);
+
+    // ref を更新して、executeCollectionJob から最新の executeDeliveryJob を呼び出せるようにする
+    executeDeliveryJobRef.current = executeDeliveryJob;
 
     const executeMappingJob = useCallback(async (taskId: string, parentLogId?: string): Promise<{ input: number, output: number } | null> => {
         const task = mappingTasks.find(t => t.id === taskId);
