@@ -126,14 +126,23 @@ export const useSimulationEngine = (
                 const renamePattern = job.renamePattern || '${fileName}';
                 const newFileName = processTemplate(renamePattern, context);
 
-                moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath, newFileName);
+                // Check if source file should be deleted after transfer (default: true = move)
+                const shouldDeleteSource = job.deleteSourceAfterTransfer !== false;
+
+                if (shouldDeleteSource) {
+                    // Move file (delete source after copy)
+                    moveFile(file.name, sourceHost, sourcePath, targetHost, targetPath, newFileName);
+                } else {
+                    // Copy file (keep source)
+                    writeFile(targetHost, targetPath, newFileName, file.content);
+                }
                 setErrors(prev => prev.filter(e => !e.includes(`Collection Job ${job.name}`)));
 
                 updateLog(logId, {
                     status: 'success',
                     endTime: Date.now(),
                     recordsOutput: 1,
-                    details: `Moved ${file.name} to ${targetHost}:${targetPath}`,
+                    details: `${shouldDeleteSource ? 'Moved' : 'Copied'} ${file.name} to ${targetHost}:${targetPath}`,
                     extendedDetails: {
                         fileSize: file.content.length,
                         bandwidth: job.bandwidth,
@@ -342,11 +351,11 @@ export const useSimulationEngine = (
                     deleteFile: deleteFile,
                     writeFile: writeFile
                 },
-                { 
-                    select: (t) => select(t) as unknown as (DataRow | DbRecord)[], 
-                    insert, 
-                    update, 
-                    delete: remove 
+                {
+                    select: (t) => select(t) as unknown as (DataRow | DbRecord)[],
+                    insert,
+                    update,
+                    delete: remove
                 },
                 mappingStates.current[task.id],
                 observer
@@ -439,7 +448,7 @@ export const useSimulationEngine = (
                     }
                 }
             }
-            
+
             updateLog(logId, {
                 status: 'success',
                 endTime: Date.now(),

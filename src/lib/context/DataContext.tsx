@@ -90,7 +90,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        
+
         const migratedDS = migrateDataSourceSettings(parsed);
         if (migratedDS) setDataSource(migratedDS);
 
@@ -106,15 +106,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const addTopic = useCallback((name: string, retentionPeriod: number) => {
-      setTopics(prev => [...prev, { id: `topic_${Date.now()}`, name, retentionPeriod }]);
+    setTopics(prev => [...prev, { id: `topic_${Date.now()}`, name, retentionPeriod }]);
   }, []);
 
   const removeTopic = useCallback((id: string) => {
-      setTopics(prev => prev.filter(t => t.id !== id));
+    setTopics(prev => prev.filter(t => t.id !== id));
   }, []);
 
   const updateTopic = useCallback((id: string, name: string, retentionPeriod: number) => {
-      setTopics(prev => prev.map(t => t.id === id ? { ...t, name, retentionPeriod } : t));
+    setTopics(prev => prev.map(t => t.id === id ? { ...t, name, retentionPeriod } : t));
   }, []);
 
   const addTable = useCallback((name: string) => {

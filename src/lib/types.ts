@@ -71,6 +71,8 @@ export interface CollectionJob {
   enabled: boolean;
   processingTime?: number;
   triggerSubscriptions?: boolean;
+  /** If true, delete source file after successful transfer. Default: true (move). If false, copy the file. */
+  deleteSourceAfterTransfer?: boolean;
 }
 
 export interface CollectionSettings {
