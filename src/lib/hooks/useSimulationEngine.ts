@@ -202,7 +202,13 @@ export const useSimulationEngine = (
 
             if (job.sourceType === 'topic') {
                 const processedRecords = select('_sys_subscription_state');
-                const processedSet = new Set(processedRecords.map((r) => (r as any).data?.fileName).filter(Boolean));
+                // jobId でフィルタリングして、このジョブが処理済みのファイルのみをスキップ
+                const processedSet = new Set(
+                    processedRecords
+                        .filter((r) => (r as any).data?.jobId === job.id)
+                        .map((r) => (r as any).data?.fileName)
+                        .filter(Boolean)
+                );
                 currentFiles = currentFiles.filter(f => !processedSet.has(f.name));
             }
             if (currentFiles.length === 0) return;
