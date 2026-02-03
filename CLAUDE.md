@@ -1,254 +1,254 @@
-# CLAUDE.md - AI Assistant Guidelines for Data Pipeline Simulator
+# CLAUDE.md - Data Pipeline Simulator AIアシスタントガイドライン
 
-This document provides essential context for AI assistants (Claude Code, etc.) working on this codebase.
+このドキュメントは、AIアシスタント（Claude Code等）がこのコードベースで作業する際に必要なコンテキストを提供します。
 
-## Project Overview
+## プロジェクト概要
 
-Data Pipeline Simulator is a React-based web application that simulates ETL (Extract-Transform-Load) data pipelines. It provides visual simulation of data generation, collection, transformation (via mapping engine), and delivery workflows.
+Data Pipeline Simulatorは、ETL（Extract-Transform-Load）データパイプラインをシミュレートするReactベースのWebアプリケーションです。データ生成、収集、変換（マッピングエンジン経由）、配信ワークフローの視覚的なシミュレーションを提供します。
 
-**Version**: 1.1.0
-**Primary Language**: Japanese (日本語)
+**バージョン**: 1.1.0
+**主要言語**: 日本語
 
-## Language Requirements (重要)
+## 言語要件（重要）
 
-**All outputs MUST be in Japanese.** This includes:
-- Responses, explanations, and plans
-- Code comments
-- Task names and descriptions
-- PR/commit body text
+**すべての出力は日本語で行う必要があります。** これには以下が含まれます：
+- 回答、説明、計画
+- コードコメント
+- タスク名と説明
+- PR/コミットの本文
 
-**Exception**: Commit message headers follow Conventional Commits in English (e.g., `feat:`, `fix:`).
+**例外**: コミットメッセージのヘッダーはConventional Commitsに従い英語で記述します（例：`feat:`, `fix:`）。
 
-## Tech Stack
+## 技術スタック
 
-| Category | Technology |
-|----------|------------|
-| Framework | React 19 + TypeScript 5.9 |
-| Build Tool | Vite 7.2 |
-| Styling | Tailwind CSS 4.x |
-| Visualization | ReactFlow 11.x, Recharts 3.x, dagre |
-| Icons | lucide-react |
-| Testing | Vitest 4.x + @testing-library/react |
-| Release | semantic-release (automated) |
+| カテゴリ | 技術 |
+|----------|------|
+| フレームワーク | React 19 + TypeScript 5.9 |
+| ビルドツール | Vite 7.2 |
+| スタイリング | Tailwind CSS 4.x |
+| 可視化 | ReactFlow 11.x, Recharts 3.x, dagre |
+| アイコン | lucide-react |
+| テスト | Vitest 4.x + @testing-library/react |
+| リリース | semantic-release（自動化） |
 
-## Project Structure
+## プロジェクト構造
 
 ```
 src/
-├── App.tsx                      # Main app component, simulation control
-├── main.tsx                     # Entry point
+├── App.tsx                      # メインアプリコンポーネント、シミュレーション制御
+├── main.tsx                     # エントリーポイント
 ├── components/
-│   ├── PipelineFlow.tsx         # ReactFlow visualization
-│   ├── BiDashboard.tsx          # BI analytics dashboard
-│   ├── JobMonitor.tsx           # Job execution monitoring
-│   ├── Documentation.tsx        # In-app documentation
-│   ├── common/                  # Shared components (ErrorBoundary)
-│   ├── nodes/                   # ReactFlow node components
-│   ├── settings/                # 14 settings panel components
-│   │   ├── MappingDesigner.tsx  # ETL mapping visual designer
-│   │   ├── TaskFlowDesigner.tsx # Task orchestration
+│   ├── PipelineFlow.tsx         # ReactFlow可視化
+│   ├── BiDashboard.tsx          # BI分析ダッシュボード
+│   ├── JobMonitor.tsx           # ジョブ実行監視
+│   ├── Documentation.tsx        # アプリ内ドキュメント
+│   ├── common/                  # 共有コンポーネント（ErrorBoundary）
+│   ├── nodes/                   # ReactFlowノードコンポーネント
+│   ├── settings/                # 14個の設定パネルコンポーネント
+│   │   ├── MappingDesigner.tsx  # ETLマッピングビジュアルデザイナー
+│   │   ├── TaskFlowDesigner.tsx # タスクオーケストレーション
 │   │   └── ...
-│   └── views/                   # Data display views
+│   └── views/                   # データ表示ビュー
 ├── lib/
-│   ├── MappingEngine.ts         # Core ETL execution engine (1000+ lines)
-│   ├── MappingTypes.ts          # ETL type definitions
-│   ├── ExpressionFunctions.ts   # ETL expression evaluation
-│   ├── DataGenerator.ts         # Test data generation
-│   ├── VirtualFileSystem.tsx    # In-memory file system
-│   ├── VirtualDB.tsx            # In-memory database
-│   ├── SettingsContext.tsx      # Global settings state
-│   ├── JobMonitorContext.tsx    # Job tracking state
-│   ├── context/                 # Additional contexts
+│   ├── MappingEngine.ts         # コアETL実行エンジン（1000行以上）
+│   ├── MappingTypes.ts          # ETL型定義
+│   ├── ExpressionFunctions.ts   # ETL式評価
+│   ├── DataGenerator.ts         # テストデータ生成
+│   ├── VirtualFileSystem.tsx    # インメモリファイルシステム
+│   ├── VirtualDB.tsx            # インメモリデータベース
+│   ├── SettingsContext.tsx      # グローバル設定状態
+│   ├── JobMonitorContext.tsx    # ジョブ追跡状態
+│   ├── context/                 # 追加コンテキスト
 │   ├── hooks/
-│   │   ├── useSimulationEngine.ts  # Main simulation orchestration
-│   │   └── useSimulationTimers.ts  # Timing control
-│   ├── i18n/                    # Internationalization
-│   ├── types.ts                 # Centralized type definitions
-│   ├── validation.ts            # Settings validation
-│   └── *.test.ts                # Unit tests (11 files)
-└── assets/                      # Static assets
+│   │   ├── useSimulationEngine.ts  # メインシミュレーションオーケストレーション
+│   │   └── useSimulationTimers.ts  # タイミング制御
+│   ├── i18n/                    # 国際化
+│   ├── types.ts                 # 集中型定義
+│   ├── validation.ts            # 設定バリデーション
+│   └── *.test.ts                # ユニットテスト（11ファイル）
+└── assets/                      # 静的アセット
 
-.specify/                        # Specification framework
-├── memory/constitution.md       # Project principles
-├── specs/                       # Feature specifications (001-007)
-└── templates/                   # Spec templates
+.specify/                        # 仕様フレームワーク
+├── memory/constitution.md       # プロジェクト原則
+├── specs/                       # 機能仕様（001-007）
+└── templates/                   # 仕様テンプレート
 
 .github/workflows/               # CI/CD
-├── release.yml                  # Semantic release
-└── deploy.yml                   # GitHub Pages deployment
+├── release.yml                  # セマンティックリリース
+└── deploy.yml                   # GitHub Pagesデプロイ
 ```
 
-## Essential Commands
+## 必須コマンド
 
 ```bash
-# Development
-npm run dev          # Start dev server (http://localhost:5173)
+# 開発
+npm run dev          # 開発サーバー起動（http://localhost:5173）
 
-# MANDATORY before commits
-npm test             # Run unit tests (vitest)
-npm run build        # TypeScript check + production build
+# コミット前に必須
+npm test             # ユニットテスト実行（vitest）
+npm run build        # TypeScriptチェック + 本番ビルド
 
-# Other
-npm run lint         # ESLint check
-npm run preview      # Preview production build
+# その他
+npm run lint         # ESLintチェック
+npm run preview      # 本番ビルドのプレビュー
 ```
 
-## Verification Process (必須)
+## 検証プロセス（必須）
 
-**CRITICAL**: Before ANY commit or PR, you MUST run:
+**重要**: コミットやPRの前に、必ず以下を実行してください：
 
 ```bash
 npm test && npm run build
 ```
 
-- `npm test` validates logic correctness
-- `npm run build` catches TypeScript errors (TS errors are NOT caught by tests alone)
+- `npm test` はロジックの正確性を検証します
+- `npm run build` はTypeScriptエラーをキャッチします（TSエラーはテストだけでは検出されません）
 
-Both commands must pass before committing.
+両方のコマンドがパスしてからコミットしてください。
 
-## Key Files to Understand
+## 理解すべき重要ファイル
 
-| File | Purpose |
-|------|---------|
-| `src/App.tsx` | Main application orchestrator, simulation control |
-| `src/lib/MappingEngine.ts` | ETL transformation engine (21+ transformation types) |
-| `src/lib/MappingTypes.ts` | Type definitions for all ETL operations |
-| `src/lib/hooks/useSimulationEngine.ts` | Core simulation logic |
-| `src/lib/SettingsContext.tsx` | Global state management |
-| `src/components/settings/MappingDesigner.tsx` | Visual ETL designer |
-| `.specify/specs/` | Feature specifications |
+| ファイル | 目的 |
+|----------|------|
+| `src/App.tsx` | メインアプリケーションオーケストレーター、シミュレーション制御 |
+| `src/lib/MappingEngine.ts` | ETL変換エンジン（21種類以上の変換タイプ） |
+| `src/lib/MappingTypes.ts` | すべてのETL操作の型定義 |
+| `src/lib/hooks/useSimulationEngine.ts` | コアシミュレーションロジック |
+| `src/lib/SettingsContext.tsx` | グローバル状態管理 |
+| `src/components/settings/MappingDesigner.tsx` | ビジュアルETLデザイナー |
+| `.specify/specs/` | 機能仕様 |
 
-## ETL Transformation Types
+## ETL変換タイプ
 
-The MappingEngine supports these transformations:
-- **Basic**: Source, Target, Filter, Expression
-- **Aggregation**: Aggregator, Sorter, Rank, Sequence
-- **Joins**: Joiner, Lookup (with caching), Union
-- **Data Processing**: Router, Normalizer, Deduplicator, Pivot, Unpivot
-- **Advanced**: SQL, WebService, HierarchyParser, Cleansing, UpdateStrategy
+MappingEngineは以下の変換をサポートしています：
+- **基本**: Source, Target, Filter, Expression
+- **集計**: Aggregator, Sorter, Rank, Sequence
+- **結合**: Joiner, Lookup（キャッシュ付き）, Union
+- **データ処理**: Router, Normalizer, Deduplicator, Pivot, Unpivot
+- **高度**: SQL, WebService, HierarchyParser, Cleansing, UpdateStrategy
 
-## Coding Conventions
+## コーディング規約
 
 ### TypeScript
-- **Strict mode enabled** - no implicit any
-- Avoid `any` type - use specific types or generics
-- Define types in `MappingTypes.ts` or `types.ts`
+- **Strictモード有効** - 暗黙のanyは禁止
+- `any`型を避ける - 具体的な型またはジェネリクスを使用
+- 型は`MappingTypes.ts`または`types.ts`で定義
 
 ### React
-- Functional components with hooks
-- Use Context API for global state
-- Wrap components with ErrorBoundary for isolation
-- Extract complex logic into custom hooks
+- フックを使用した関数コンポーネント
+- グローバル状態にはContext APIを使用
+- 分離のためコンポーネントをErrorBoundaryでラップ
+- 複雑なロジックはカスタムフックに抽出
 
-### Comments
-- All code comments in Japanese
-- Update existing English comments to Japanese when encountered
+### コメント
+- すべてのコードコメントは日本語で記述
+- 既存の英語コメントは発見次第日本語に更新
 
-### Testing
-- Test files co-located in `src/lib/`
-- Use Vitest + @testing-library/react
-- Core logic (MappingEngine, DataGenerator) has comprehensive tests
+### テスト
+- テストファイルは`src/lib/`に配置
+- Vitest + @testing-library/reactを使用
+- コアロジック（MappingEngine, DataGenerator）には包括的なテストあり
 
-## Commit Messages (Conventional Commits)
+## コミットメッセージ（Conventional Commits）
 
 ```
-<type>(<scope>): <description in English>
+<type>(<scope>): <英語での説明>
 
-<body in Japanese>
+<日本語での本文>
 ```
 
-### Types
-| Type | Description | Version Impact |
-|------|-------------|----------------|
-| `feat` | New feature | Minor (1.x.0) |
-| `fix` | Bug fix | Patch (1.0.x) |
-| `docs` | Documentation only | None |
-| `refactor` | Code restructuring | None |
-| `test` | Test changes | None |
-| `perf` | Performance improvement | Patch |
-| `chore` | Build/tool changes | None |
+### タイプ
+| タイプ | 説明 | バージョン影響 |
+|--------|------|----------------|
+| `feat` | 新機能 | マイナー (1.x.0) |
+| `fix` | バグ修正 | パッチ (1.0.x) |
+| `docs` | ドキュメントのみ | なし |
+| `refactor` | コード再構築 | なし |
+| `test` | テスト変更 | なし |
+| `perf` | パフォーマンス改善 | パッチ |
+| `chore` | ビルド/ツール変更 | なし |
 
-### Breaking Changes
+### 破壊的変更
 ```
 feat!: description
 
-BREAKING CHANGE: explanation in Japanese
+BREAKING CHANGE: 日本語での説明
 ```
 
-## Development Workflow
+## 開発ワークフロー
 
-1. Create feature branch from `main`
-2. Implement changes
-3. Run `npm test && npm run build` (MANDATORY)
-4. Commit following Conventional Commits
-5. Create PR
-6. After merge, semantic-release auto-handles versioning
+1. `main`からフィーチャーブランチを作成
+2. 変更を実装
+3. `npm test && npm run build`を実行（必須）
+4. Conventional Commitsに従ってコミット
+5. PRを作成
+6. マージ後、semantic-releaseが自動的にバージョニングを処理
 
-## Architecture Patterns
+## アーキテクチャパターン
 
-### State Management
+### 状態管理
 - React Context API + useReducer
-- `SettingsContext` - Global application settings
-- `JobMonitorContext` - Job execution tracking
-- `VirtualFileSystem` / `VirtualDB` - Simulated storage
+- `SettingsContext` - グローバルアプリケーション設定
+- `JobMonitorContext` - ジョブ実行追跡
+- `VirtualFileSystem` / `VirtualDB` - シミュレートされたストレージ
 
-### Component Design
-- Separation: UI components vs. business logic (hooks/lib)
-- Props-driven configuration
-- ErrorBoundary for fault isolation
+### コンポーネント設計
+- UIコンポーネントとビジネスロジック（hooks/lib）の分離
+- Propsドリブンの設定
+- 障害分離のためのErrorBoundary
 
-### File System Simulation
-- In-memory file system with host/path hierarchy
-- File locking for concurrent access
-- Supports multi-host configuration
+### ファイルシステムシミュレーション
+- ホスト/パス階層を持つインメモリファイルシステム
+- 並行アクセスのためのファイルロック
+- マルチホスト構成をサポート
 
-## Specification System (.specify/)
+## 仕様システム（.specify/）
 
-Feature specifications follow a structured format:
-- `spec.md` - Feature requirements
-- `tasks.md` - Task breakdown
-- `plan.md` - Implementation plan
-- `checklist.md` - Acceptance criteria
+機能仕様は構造化されたフォーマットに従います：
+- `spec.md` - 機能要件
+- `tasks.md` - タスク分解
+- `plan.md` - 実装計画
+- `checklist.md` - 受け入れ基準
 
-Current specs: 001 (initial) through 007 (CDI router fix)
+現在の仕様: 001（初期）から007（CDIルーター修正）
 
-## Common Tasks
+## 共通タスク
 
-### Adding a New Transformation Type
-1. Add type definition to `MappingTypes.ts`
-2. Implement in `MappingEngine.ts`
-3. Add UI in `MappingDesigner.tsx`
-4. Write tests in `MappingEngine.test.ts`
+### 新しい変換タイプの追加
+1. `MappingTypes.ts`に型定義を追加
+2. `MappingEngine.ts`に実装
+3. `MappingDesigner.tsx`にUIを追加
+4. `MappingEngine.test.ts`にテストを記述
 
-### Adding a New Settings Panel
-1. Create component in `src/components/settings/`
-2. Register in `SettingsPanel.tsx`
-3. Add state to `SettingsContext.tsx`
-4. Add validation in `validation.ts`
+### 新しい設定パネルの追加
+1. `src/components/settings/`にコンポーネントを作成
+2. `SettingsPanel.tsx`に登録
+3. `SettingsContext.tsx`に状態を追加
+4. `validation.ts`にバリデーションを追加
 
-### Modifying Simulation Logic
-1. Core logic in `useSimulationEngine.ts`
-2. Timer control in `useSimulationTimers.ts`
-3. Test changes with `npm test`
+### シミュレーションロジックの変更
+1. コアロジックは`useSimulationEngine.ts`
+2. タイマー制御は`useSimulationTimers.ts`
+3. `npm test`で変更をテスト
 
-## Troubleshooting
+## トラブルシューティング
 
-### Build Fails with TS Errors
-- Run `npm run build` to see full error output
-- Common issues: unused variables, type mismatches
-- Fix all errors before committing
+### TSエラーでビルドが失敗する場合
+- `npm run build`を実行して完全なエラー出力を確認
+- よくある問題：未使用の変数、型の不一致
+- コミット前にすべてのエラーを修正
 
-### Tests Pass but Build Fails
-- Tests don't catch all TypeScript errors
-- Always run both `npm test` AND `npm run build`
+### テストはパスするがビルドが失敗する場合
+- テストはすべてのTypeScriptエラーをキャッチしません
+- 常に`npm test`と`npm run build`の両方を実行
 
-### ReactFlow Layout Issues
-- Check `dagre` layout configuration
-- Verify node dimensions in ProcessNode/StorageNode
+### ReactFlowレイアウトの問題
+- `dagre`レイアウト設定を確認
+- ProcessNode/StorageNodeのノードサイズを確認
 
-## Additional Documentation
+## 追加ドキュメント
 
-- `README.md` - User documentation (Japanese)
-- `AGENTS.md` - AI agent guidelines (detailed Japanese rules)
-- `CONTRIBUTING.md` - Contribution guide
-- `.specify/memory/constitution.md` - Project principles
+- `README.md` - ユーザードキュメント（日本語）
+- `AGENTS.md` - AIエージェントガイドライン（詳細な日本語ルール）
+- `CONTRIBUTING.md` - コントリビューションガイド
+- `.specify/memory/constitution.md` - プロジェクト原則
