@@ -85,7 +85,9 @@
     - フロー全体を視覚的にデザインできること（Task Flow Designer）。
 
 #### 可視化 (Visualization)
-- **FR-V01 (実行時)**: Dashboard上のPipeline Flowにおいて、実行中のMapping Taskを可視化すること。
+- **FR-V01 (実行時)**: Dashboard上のPipeline Flowにおいて、実行中のMapping TaskおよびTask Flowを可視化すること。
+    - Task Flow内のタスク間の依存関係をエッジとして表示する。
+    - Mapping Taskが入出力するデータソース（ファイル、DBテーブル）をノードとして表示し、接続関係を可視化する。
 - **FR-V02 (詳細ビュー)**: 特定のMapping Taskをクリックまたは選択した際に、その内部のTransformationフローと現在のステータス（Row Count）を表示すること。
 - **FR-V03 (タスクフロー)**: Task Flow Designerにおいて、タスク間の依存関係をDAGとして可視化・編集可能にすること。
 
