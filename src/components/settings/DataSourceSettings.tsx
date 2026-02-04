@@ -226,11 +226,15 @@ const DataSourceSettings: React.FC = () => {
                             value={job.connectionId}
                             onChange={(e) => {
                                 const newConnId = e.target.value;
+                                // 新しいコネクションのホストを取得し、最初のディレクトリをデフォルト設定
+                                const newConn = connections.find(c => c.id === newConnId);
+                                const newHost = newConn ? hosts.find(h => h.name === newConn.host) : null;
+                                const defaultPath = newHost && newHost.directories.length > 0 ? newHost.directories[0] : '';
                                 setDataSource(prev => ({
                                     ...prev,
-                                    jobs: prev.jobs.map(j => 
-                                        j.id === job.id 
-                                        ? { ...j, connectionId: newConnId, path: '' } 
+                                    jobs: prev.jobs.map(j =>
+                                        j.id === job.id
+                                        ? { ...j, connectionId: newConnId, path: defaultPath }
                                         : j
                                     )
                                 }));
