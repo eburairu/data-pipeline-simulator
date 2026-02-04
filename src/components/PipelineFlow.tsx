@@ -323,33 +323,94 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
 
     // --- 4. Render Task Flows ---
+
+    // TaskFlowに含まれるすべてのタスクが使用するSource/Targetを収集するヘルパー関数
+    const getTaskFlowDataSources = (flow: typeof taskFlows[0]) => {
+      const sources = new Set<string>();
+      const targets = new Set<string>();
+
+      flow.taskIds.forEach(taskId => {
+        const task = mappingTasks.find(t => t.id === taskId);
+        if (!task?.enabled) return;
+
+        const mapping = mappings.find(m => m.id === task.mappingId);
+        if (!mapping) return;
+
+        mapping.transformations.filter(t => t.type === 'source').forEach(src => {
+          const conf = src.config as SourceConfig;
+          const conn = connections.find(c => c.id === conf.connectionId);
+          if (conn) sources.add(getConnectionKey(conn, conf.path, conf.tableName));
+        });
+
+        mapping.transformations.filter(t => t.type === 'target').forEach(tgt => {
+          const conf = tgt.config as TargetConfig;
+          const conn = connections.find(c => c.id === conf.connectionId);
+          if (conn) targets.add(getConnectionKey(conn, conf.path, conf.tableName));
+        });
+      });
+
+      return { sources, targets };
+    };
+
     taskFlows.forEach(flow => {
       if (!flow.enabled) return;
-      
+
       const flowId = `process-flow-${flow.id}`;
-      
+
       // Represent Flow as a specialized process node
       calculatedNodes.push({
         id: flowId,
         type: 'process',
         position: { x: TASK_START_X + 500, y: 50 },
-        data: { 
-            label: `Flow: ${flow.name}`, 
+        data: {
+            label: `Flow: ${flow.name}`,
             isProcessing: activeSteps.includes(`task_flow_${flow.id}`),
             icon: <GitBranch size={16} className="text-indigo-600" />
         }
       });
 
-      // Connect Flow to its contained tasks
+      // Connect Flow to its contained tasks (制御フロー - 紫色破線)
       flow.taskIds.forEach(taskId => {
         const targetTaskId = `process-task-${taskId}`;
         if (calculatedNodes.some(n => n.id === targetTaskId)) {
-          calculatedEdges.push({ 
-            id: `e-${flowId}-${targetTaskId}`, 
-            source: flowId, 
-            target: targetTaskId, 
+          calculatedEdges.push({
+            id: `e-${flowId}-${targetTaskId}`,
+            source: flowId,
+            target: targetTaskId,
             animated: true,
-            style: { stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' } 
+            label: 'contains',
+            style: { stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }
+          });
+        }
+      });
+
+      // TaskFlowからデータソースへの接続（データフロー - インディゴ実線）
+      const { sources, targets } = getTaskFlowDataSources(flow);
+
+      sources.forEach(sourceKey => {
+        const storageNode = keyNodeMap.get(sourceKey);
+        if (storageNode) {
+          calculatedEdges.push({
+            id: `e-flow-src-${flow.id}-${storageNode.id}`,
+            source: storageNode.id,
+            target: flowId,
+            animated: false,
+            style: { stroke: '#4f46e5', strokeWidth: 1.5 },
+            label: 'reads'
+          });
+        }
+      });
+
+      targets.forEach(targetKey => {
+        const storageNode = keyNodeMap.get(targetKey);
+        if (storageNode) {
+          calculatedEdges.push({
+            id: `e-flow-tgt-${flow.id}-${storageNode.id}`,
+            source: flowId,
+            target: storageNode.id,
+            animated: false,
+            style: { stroke: '#4f46e5', strokeWidth: 1.5 },
+            label: 'writes'
           });
         }
       });
