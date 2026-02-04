@@ -14,7 +14,7 @@ export const useSimulationTimers = (
         checkTopicRetention: () => void;
     }
 ) => {
-    const { dataSource, collection, delivery, mappingTasks, taskFlows } = useSettings();
+    const { dataSource, collection, delivery, mappingTasks, taskFlows, connections } = useSettings();
     const { writeFile } = useFileSystem();
     const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
@@ -27,10 +27,11 @@ export const useSimulationTimers = (
         if (!isRunning.generator) return;
         const timers = dataSource.jobs.map(job => {
             if (!job.enabled) return null;
-            const def = dataSource.definitions.find(d => d.id === job.dataSourceId);
-            if (!def) return null;
+            const conn = connections.find(c => c.id === job.connectionId);
+            if (!conn || conn.type !== 'file' || !conn.host || !job.path) return null;
+            
             return setInterval(() => {
-                const ctx = { hostname: def.host, timestamp: new Date() };
+                const ctx = { hostname: conn.host, timestamp: new Date() };
                 let content = '';
                 if (job.mode === 'schema' && job.schema) {
                     const { content: newContent, nextSequenceState } = generateDataFromSchema(
@@ -44,11 +45,11 @@ export const useSimulationTimers = (
                 } else {
                     content = processTemplate(job.fileContent, ctx);
                 }
-                writeFile(def.host, def.path, processTemplate(job.fileNamePattern, ctx), content);
+                writeFile(conn.host, job.path, processTemplate(job.fileNamePattern, ctx), content);
             }, job.executionInterval);
         }).filter(Boolean) as ReturnType<typeof setInterval>[];
         return () => timers.forEach(clearInterval);
-    }, [isRunning.generator, dataSource, writeFile]);
+    }, [isRunning.generator, dataSource, writeFile, connections]);
 
     // Transfer Timers (Collection)
     useEffect(() => {

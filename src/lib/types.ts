@@ -15,13 +15,6 @@ export interface Schema {
   fields: FieldDefinition[];
 }
 
-export interface DataSourceDefinition {
-  id: string;
-  name: string;
-  host: string;
-  path: string;
-}
-
 export type GeneratorType = 'static' | 'randomInt' | 'randomFloat' | 'sin' | 'cos' | 'sequence' | 'uuid' | 'list' | 'timestamp';
 
 export interface ColumnSchema {
@@ -34,7 +27,8 @@ export interface ColumnSchema {
 export interface GenerationJob {
   id: string;
   name: string;
-  dataSourceId: string;
+  connectionId: string;
+  path: string;
   fileNamePattern: string;
   fileContent: string;
   mode?: 'template' | 'schema';
@@ -45,7 +39,6 @@ export interface GenerationJob {
 }
 
 export interface DataSourceSettings {
-  definitions: DataSourceDefinition[];
   jobs: GenerationJob[];
 }
 

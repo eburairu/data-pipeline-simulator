@@ -107,8 +107,8 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
   } = usePipeline();
 
   const isHostInUse = useCallback((hostName: string) => {
-    const inDataSource = dataSource.definitions.some(d => d.host === hostName);
     const connectionsUsingHost = connections.filter(c => c.type === 'file' && c.host === hostName).map(c => c.id);
+    const inDataSource = dataSource.jobs.some(j => connectionsUsingHost.includes(j.connectionId));
 
     const inCollection = collection.jobs.some(j =>
       (connectionsUsingHost.includes(j.sourceConnectionId)) ||
@@ -124,7 +124,8 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [dataSource, collection, delivery, etl, connections]);
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
-    const inDataSource = dataSource.definitions.some(d => d.host === hostName && d.path === path);
+    const connectionsUsingHost = connections.filter(c => c.type === 'file' && c.host === hostName).map(c => c.id);
+    const inDataSource = dataSource.jobs.some(j => connectionsUsingHost.includes(j.connectionId) && j.path === path);
 
     const inCollection = collection.jobs.some(j => {
       const srcConn = connections.find(c => c.id === j.sourceConnectionId);

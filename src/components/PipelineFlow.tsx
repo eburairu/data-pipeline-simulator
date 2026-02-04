@@ -114,8 +114,15 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     // --- 1. Render Legacy Pipeline (Data Source, Collection, Delivery) ---
     // (Keeping this for compatibility with existing UI)
 
-    const sourceKeys = Array.from(new Set(dataSource.definitions.map(d => getLegacyKey(d.host, d.path))));
-    sourceKeys.forEach((key, i) => {
+    const sourceKeys = new Set<string>();
+    dataSource.jobs.forEach(job => {
+        const conn = connections.find(c => c.id === job.connectionId);
+        if (conn && conn.type === 'file' && conn.host && job.path) {
+            sourceKeys.add(getLegacyKey(conn.host, job.path));
+        }
+    });
+
+    Array.from(sourceKeys).forEach((key, i) => {
       const parts = key.split(':');
       addLegacyStorageNode(parts[1], parts[2], 1, i);
     });
@@ -152,9 +159,10 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     // Legacy Process Nodes
     dataSource.jobs.forEach((job) => {
       if (!job.enabled) return;
-      const def = dataSource.definitions.find(d => d.id === job.dataSourceId);
-      if (!def) return;
-      const targetNode = keyNodeMap.get(getLegacyKey(def.host, def.path));
+      const conn = connections.find(c => c.id === job.connectionId);
+      if (!conn || conn.type !== 'file' || !conn.host || !job.path) return;
+
+      const targetNode = keyNodeMap.get(getLegacyKey(conn.host, job.path));
       if (!targetNode) return;
 
       const id = `process-gen-${job.id}`;

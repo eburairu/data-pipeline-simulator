@@ -1,7 +1,7 @@
 import React from 'react';
-import { useSettings, type DataSourceDefinition, type GenerationJob, type ColumnSchema, type GeneratorType } from '../../lib/SettingsContext';
-import { validateDataSourceDefinition, validateGenerationJob, type ValidationError } from '../../lib/validation';
-import { Trash2, Plus, FolderOpen, FileText, AlignJustify, List } from 'lucide-react';
+import { useSettings, type GenerationJob, type ColumnSchema, type GeneratorType } from '../../lib/SettingsContext';
+import { validateGenerationJob, type ValidationError } from '../../lib/validation';
+import { Trash2, Plus, FileText, AlignJustify, List } from 'lucide-react';
 
 const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list', 'timestamp'];
 
@@ -140,50 +140,7 @@ const SchemaEditor: React.FC<{
 };
 
 const DataSourceSettings: React.FC = () => {
-  const { dataSource, setDataSource, hosts } = useSettings();
-
-  // --- Definition Handlers ---
-
-  const handleDefChange = (id: string, field: keyof DataSourceDefinition, value: any) => {
-    setDataSource({
-      ...dataSource,
-      definitions: dataSource.definitions.map(def =>
-        def.id === id ? { ...def, [field]: value } : def
-      )
-    });
-  };
-
-  const handleDefHostChange = (id: string, newHostName: string) => {
-    const selectedHost = hosts.find(h => h.name === newHostName);
-    const newPath = selectedHost && selectedHost.directories.length > 0 ? selectedHost.directories[0] : '';
-
-    setDataSource({
-      ...dataSource,
-      definitions: dataSource.definitions.map(def =>
-        def.id === id ? { ...def, host: newHostName, path: newPath } : def
-      )
-    });
-  };
-
-  const addDefinition = () => {
-    const defaultHost = hosts.length > 0 ? hosts[0] : { name: 'localhost', directories: [] };
-    const defaultPath = defaultHost.directories.length > 0 ? defaultHost.directories[0] : '/source';
-
-    const newDef: DataSourceDefinition = {
-      id: `ds_def_${Date.now()}`,
-      name: `Location ${dataSource.definitions.length + 1}`,
-      host: defaultHost.name,
-      path: defaultPath,
-    };
-    setDataSource({ ...dataSource, definitions: [...dataSource.definitions, newDef] });
-  };
-
-  const removeDefinition = (id: string) => {
-    setDataSource({
-      ...dataSource,
-      definitions: dataSource.definitions.filter(d => d.id !== id)
-    });
-  };
+  const { dataSource, setDataSource, hosts, connections } = useSettings();
 
   // --- Job Handlers ---
 
@@ -197,12 +154,17 @@ const DataSourceSettings: React.FC = () => {
   };
 
   const addJob = () => {
-    const defaultDefId = dataSource.definitions.length > 0 ? dataSource.definitions[0].id : '';
+    // Default to first file connection
+    const fileConnections = connections.filter(c => c.type === 'file');
+    const defaultConn = fileConnections.length > 0 ? fileConnections[0] : null;
+    const defaultHost = defaultConn ? hosts.find(h => h.name === defaultConn.host) : null;
+    const defaultPath = defaultHost && defaultHost.directories.length > 0 ? defaultHost.directories[0] : '/source';
 
     const newJob: GenerationJob = {
       id: `gen_job_${Date.now()}`,
       name: `Generator ${dataSource.jobs.length + 1}`,
-      dataSourceId: defaultDefId,
+      connectionId: defaultConn?.id || '',
+      path: defaultPath,
       fileNamePattern: '${host}_data_${timestamp}.csv',
       fileContent: 'sample,data,123',
       mode: 'schema',
@@ -224,85 +186,20 @@ const DataSourceSettings: React.FC = () => {
   return (
     <div className="space-y-6 p-4 border rounded bg-white shadow-sm">
       <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
-          <FolderOpen className="w-5 h-5"/> Data Source Locations
-      </h2>
-      <p className="text-sm text-gray-500">Define the physical locations (Host & Path) where files will be generated or monitored.</p>
-
-      <div className="space-y-4">
-        {dataSource.definitions.map((def) => {
-          const errors = validateDataSourceDefinition(def);
-          const hasError = (field: string) => errors.some(e => e.field === field);
-          const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
-
-          return (
-            <div key={def.id} className="border p-4 rounded-md bg-gray-50 relative">
-               <div className="absolute top-2 right-2">
-                  <button onClick={() => removeDefinition(def.id)} className="text-red-500 hover:text-red-700" title="Delete Location">
-                    <Trash2 size={18} />
-                  </button>
-               </div>
-               <div className="grid gap-3">
-                   <div>
-                     <label className="block text-xs font-medium text-gray-500">Location Name</label>
-                     <input
-                        type="text"
-                        value={def.name}
-                        onChange={(e) => handleDefChange(def.id, 'name', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('name')}
-                     />
-                   </div>
-                   <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500">Host</label>
-                            <select
-                                value={def.host}
-                                onChange={(e) => handleDefHostChange(def.id, e.target.value)}
-                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('host') ? 'border-red-500 bg-red-50' : ''}`}
-                                title={getErrorMsg('host')}
-                            >
-                                {hosts.map(h => (
-                                    <option key={h.name} value={h.name}>{h.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500">Path</label>
-                            <select
-                                value={def.path}
-                                onChange={(e) => handleDefChange(def.id, 'path', e.target.value)}
-                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('path') ? 'border-red-500 bg-red-50' : ''}`}
-                                title={getErrorMsg('path')}
-                            >
-                                {hosts.find(h => h.name === def.host)?.directories.map(dir => (
-                                    <option key={dir} value={dir}>{dir}</option>
-                                )) || <option value="">Select Host First</option>}
-                            </select>
-                        </div>
-                   </div>
-               </div>
-            </div>
-          );
-        })}
-        <button
-          onClick={addDefinition}
-          className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-500 hover:text-blue-500 transition-colors"
-        >
-          <Plus size={20} /> Add Location
-        </button>
-      </div>
-
-      <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 flex items-center gap-2 mt-8">
           <FileText className="w-5 h-5"/> File Generation Jobs
       </h2>
-      <p className="text-sm text-gray-500">Configure rules for generating files into the Data Source Locations defined above.</p>
+      <p className="text-sm text-gray-500">Configure rules for generating files into the Data Source Locations defined by File Connections.</p>
 
       <div className="space-y-4">
         {dataSource.jobs.map((job) => {
-          const errors = validateGenerationJob(job, dataSource.definitions);
+          const errors = validateGenerationJob(job);
           const hasError = (field: string) => errors.some(e => e.field === field);
           const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
           const currentMode = job.mode || 'template';
+
+          // Get host for current connection to list directories
+          const currentConn = connections.find(c => c.id === job.connectionId);
+          const currentHost = currentConn ? hosts.find(h => h.name === currentConn.host) : null;
 
           return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
@@ -312,28 +209,46 @@ const DataSourceSettings: React.FC = () => {
                 </button>
              </div>
              <div className="grid gap-3">
-                <div className="grid grid-cols-2 gap-3">
+               <div>
+                 <label className="block text-xs font-medium text-gray-500">Job Name</label>
+                 <input
+                    type="text"
+                    value={job.name}
+                    onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
+                    className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
+                    title={getErrorMsg('name')}
+                 />
+               </div>
+               <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Job Name</label>
-                     <input
-                        type="text"
-                        value={job.name}
-                        onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('name')}
-                     />
+                        <label className="block text-xs font-medium text-gray-500">Target Connection (File)</label>
+                        <select
+                            value={job.connectionId}
+                            onChange={(e) => {
+                                handleJobChange(job.id, 'connectionId', e.target.value);
+                                handleJobChange(job.id, 'path', '');
+                            }}
+                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('connectionId') ? 'border-red-500 bg-red-50' : ''}`}
+                            title={getErrorMsg('connectionId')}
+                        >
+                            <option value="">Select Connection...</option>
+                            {connections.filter(c => c.type === 'file').map(conn => (
+                                <option key={conn.id} value={conn.id}>{conn.name} ({conn.host})</option>
+                            ))}
+                        </select>
                    </div>
                    <div>
-                        <label className="block text-xs font-medium text-gray-500">Target Location</label>
+                        <label className="block text-xs font-medium text-gray-500">Target Path</label>
                         <select
-                            value={job.dataSourceId}
-                            onChange={(e) => handleJobChange(job.id, 'dataSourceId', e.target.value)}
-                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('dataSourceId') ? 'border-red-500 bg-red-50' : ''}`}
-                            title={getErrorMsg('dataSourceId')}
+                            value={job.path}
+                            onChange={(e) => handleJobChange(job.id, 'path', e.target.value)}
+                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('path') ? 'border-red-500 bg-red-50' : ''}`}
+                            title={getErrorMsg('path')}
+                            disabled={!job.connectionId}
                         >
-                            <option value="">Select Target...</option>
-                            {dataSource.definitions.map(def => (
-                                <option key={def.id} value={def.id}>{def.name} ({def.host}:{def.path})</option>
+                            <option value="">Select Path...</option>
+                            {currentHost?.directories.map(dir => (
+                                <option key={dir} value={dir}>{dir}</option>
                             ))}
                         </select>
                    </div>
