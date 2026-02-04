@@ -157,7 +157,7 @@ export const useSimulationEngine = (
                     const context = {
                         hostname: sourceHost,
                         timestamp: new Date(),
-                        collectionHost: targetHost,
+                        collectionHost: sourceHost,  // 収集元（データ生成元）のホスト名
                         fileName: file.name
                     };
                     const renamePattern = job.renamePattern || '${fileName}';
