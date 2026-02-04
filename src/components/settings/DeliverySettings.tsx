@@ -4,7 +4,7 @@ import { validateDeliveryJob } from '../../lib/validation';
 import { Trash2, Plus } from 'lucide-react';
 
 const DeliverySettings: React.FC = () => {
-   const { delivery, setDelivery, topics, connections } = useSettings();
+   const { delivery, setDelivery, topics, connections, hosts } = useSettings();
 
    const handleJobChange = (id: string, field: keyof DeliveryJob, value: any) => {
       const newJobs = delivery.jobs.map(job =>
@@ -19,10 +19,13 @@ const DeliverySettings: React.FC = () => {
 
          if (type === 'host') {
             const defaultConn = connections.find(c => c.type === 'file');
+            const defaultHost = defaultConn ? hosts.find(h => h.name === defaultConn.host) : null;
+            const defaultPath = defaultHost && defaultHost.directories.length > 0 ? defaultHost.directories[0] : '/';
             return {
                ...job,
                sourceType: type,
                sourceConnectionId: job.sourceConnectionId || defaultConn?.id || '',
+               sourcePath: defaultPath,
                sourceTopicId: undefined
             };
          } else {
@@ -37,19 +40,49 @@ const DeliverySettings: React.FC = () => {
       setDelivery({ ...delivery, jobs: newJobs });
    };
 
+   const handleSourceConnectionChange = (id: string, connectionId: string) => {
+      const newConn = connections.find(c => c.id === connectionId);
+      const newHost = newConn ? hosts.find(h => h.name === newConn.host) : null;
+      const defaultPath = newHost && newHost.directories.length > 0 ? newHost.directories[0] : '';
+
+      const newJobs = delivery.jobs.map(job =>
+         job.id === id ? { ...job, sourceConnectionId: connectionId, sourcePath: defaultPath } : job
+      );
+      setDelivery({ ...delivery, jobs: newJobs });
+   };
+
+   const handleTargetConnectionChange = (id: string, connectionId: string) => {
+      const newConn = connections.find(c => c.id === connectionId);
+      const newHost = newConn ? hosts.find(h => h.name === newConn.host) : null;
+      const defaultPath = newHost && newHost.directories.length > 0 ? newHost.directories[0] : '';
+
+      const newJobs = delivery.jobs.map(job =>
+         job.id === id ? { ...job, targetConnectionId: connectionId, targetPath: defaultPath } : job
+      );
+      setDelivery({ ...delivery, jobs: newJobs });
+   };
+
    const addJob = () => {
       const fileConns = connections.filter(c => c.type === 'file');
       const defaultConn = fileConns.length > 0 ? fileConns[0] : undefined;
       const secondConn = fileConns.length > 1 ? fileConns[1] : defaultConn;
+
+      // ソースコネクションのデフォルトパスを取得
+      const sourceHost = defaultConn ? hosts.find(h => h.name === defaultConn.host) : null;
+      const sourcePath = sourceHost && sourceHost.directories.length > 0 ? sourceHost.directories[0] : '/';
+
+      // ターゲットコネクションのデフォルトパスを取得
+      const targetHost = secondConn ? hosts.find(h => h.name === secondConn.host) : null;
+      const targetPath = targetHost && targetHost.directories.length > 0 ? targetHost.directories[0] : '/';
 
       const newJob: DeliveryJob = {
          id: `del_job_${Date.now()}`,
          name: `Delivery ${delivery.jobs.length + 1}`,
          sourceType: 'host',
          sourceConnectionId: defaultConn?.id || '',
-         sourcePath: '/',
+         sourcePath: sourcePath,
          targetConnectionId: secondConn?.id || defaultConn?.id || '',
-         targetPath: '/',
+         targetPath: targetPath,
          filterRegex: '.*',
          bandwidth: 100,
          processingTime: 1000,
@@ -145,33 +178,43 @@ const DeliverySettings: React.FC = () => {
                               </div>
                            ) : (
                               <div>
-                                 <div className="grid grid-cols-2 gap-3 mb-2">
-                                    <div>
-                                       <label className="block text-xs font-medium text-gray-500">Source Connection</label>
-                                       <select
-                                          value={job.sourceConnectionId || ''}
-                                          onChange={(e) => handleJobChange(job.id, 'sourceConnectionId', e.target.value)}
-                                          className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceConnectionId') ? 'border-red-500 bg-red-50' : ''}`}
-                                          title={getErrorMsg('sourceConnectionId')}
-                                       >
-                                          <option value="">Select Connection</option>
-                                          {fileConnections.map(c => (
-                                             <option key={c.id} value={c.id}>{c.name} ({c.host})</option>
-                                          ))}
-                                       </select>
-                                    </div>
-                                    <div>
-                                       <label className="block text-xs font-medium text-gray-500">Source Path</label>
-                                       <input
-                                          type="text"
-                                          value={job.sourcePath || ''}
-                                          onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
-                                          className={`w-full border rounded p-1 text-sm ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
-                                          title={getErrorMsg('sourcePath')}
-                                          placeholder="/data"
-                                       />
-                                    </div>
-                                 </div>
+                                 {(() => {
+                                    const sourceConn = connections.find(c => c.id === job.sourceConnectionId);
+                                    const sourceHost = sourceConn ? hosts.find(h => h.name === sourceConn.host) : null;
+                                    return (
+                                       <div className="grid grid-cols-2 gap-3 mb-2">
+                                          <div>
+                                             <label className="block text-xs font-medium text-gray-500">Source Connection</label>
+                                             <select
+                                                value={job.sourceConnectionId || ''}
+                                                onChange={(e) => handleSourceConnectionChange(job.id, e.target.value)}
+                                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceConnectionId') ? 'border-red-500 bg-red-50' : ''}`}
+                                                title={getErrorMsg('sourceConnectionId')}
+                                             >
+                                                <option value="">Select Connection</option>
+                                                {fileConnections.map(c => (
+                                                   <option key={c.id} value={c.id}>{c.name} ({c.host})</option>
+                                                ))}
+                                             </select>
+                                          </div>
+                                          <div>
+                                             <label className="block text-xs font-medium text-gray-500">Source Path</label>
+                                             <select
+                                                value={job.sourcePath || ''}
+                                                onChange={(e) => handleJobChange(job.id, 'sourcePath', e.target.value)}
+                                                className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourcePath') ? 'border-red-500 bg-red-50' : ''}`}
+                                                title={getErrorMsg('sourcePath')}
+                                                disabled={!job.sourceConnectionId}
+                                             >
+                                                <option value="">Select Path...</option>
+                                                {sourceHost?.directories.map(dir => (
+                                                   <option key={dir} value={dir}>{dir}</option>
+                                                ))}
+                                             </select>
+                                          </div>
+                                       </div>
+                                    );
+                                 })()}
                                  <div className="mt-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                        <input
@@ -190,33 +233,43 @@ const DeliverySettings: React.FC = () => {
                            )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                           <div>
-                              <label className="block text-xs font-medium text-gray-500">Target Connection</label>
-                              <select
-                                 value={job.targetConnectionId || ''}
-                                 onChange={(e) => handleJobChange(job.id, 'targetConnectionId', e.target.value)}
-                                 className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetConnectionId') ? 'border-red-500 bg-red-50' : ''}`}
-                                 title={getErrorMsg('targetConnectionId')}
-                              >
-                                 <option value="">Select Connection</option>
-                                 {fileConnections.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name} ({c.host})</option>
-                                 ))}
-                              </select>
-                           </div>
-                           <div>
-                              <label className="block text-xs font-medium text-gray-500">Target Path</label>
-                              <input
-                                 type="text"
-                                 value={job.targetPath}
-                                 onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
-                                 className={`w-full border rounded p-1 text-sm ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
-                                 title={getErrorMsg('targetPath')}
-                                 placeholder="/output"
-                              />
-                           </div>
-                        </div>
+                        {(() => {
+                           const targetConn = connections.find(c => c.id === job.targetConnectionId);
+                           const targetHost = targetConn ? hosts.find(h => h.name === targetConn.host) : null;
+                           return (
+                              <div className="grid grid-cols-2 gap-3">
+                                 <div>
+                                    <label className="block text-xs font-medium text-gray-500">Target Connection</label>
+                                    <select
+                                       value={job.targetConnectionId || ''}
+                                       onChange={(e) => handleTargetConnectionChange(job.id, e.target.value)}
+                                       className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetConnectionId') ? 'border-red-500 bg-red-50' : ''}`}
+                                       title={getErrorMsg('targetConnectionId')}
+                                    >
+                                       <option value="">Select Connection</option>
+                                       {fileConnections.map(c => (
+                                          <option key={c.id} value={c.id}>{c.name} ({c.host})</option>
+                                       ))}
+                                    </select>
+                                 </div>
+                                 <div>
+                                    <label className="block text-xs font-medium text-gray-500">Target Path</label>
+                                    <select
+                                       value={job.targetPath}
+                                       onChange={(e) => handleJobChange(job.id, 'targetPath', e.target.value)}
+                                       className={`w-full border rounded p-1 text-sm bg-white ${hasError('targetPath') ? 'border-red-500 bg-red-50' : ''}`}
+                                       title={getErrorMsg('targetPath')}
+                                       disabled={!job.targetConnectionId}
+                                    >
+                                       <option value="">Select Path...</option>
+                                       {targetHost?.directories.map(dir => (
+                                          <option key={dir} value={dir}>{dir}</option>
+                                       ))}
+                                    </select>
+                                 </div>
+                              </div>
+                           );
+                        })()}
                         <div className="grid grid-cols-2 gap-3">
                            <div>
                               <label className="block text-xs font-medium text-gray-500">Bandwidth (chars/sec)</label>
