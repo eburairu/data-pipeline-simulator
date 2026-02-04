@@ -151,7 +151,20 @@ interface MappingDesignerProps {
 }
 
 const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readOnly = false, initialMappingId }) => {
-    const { mappings, addMapping, updateMapping, removeMapping, connections } = useSettings();
+    const { mappings, addMapping, updateMapping, removeMapping, connections, hosts, tables } = useSettings();
+
+    // 接続IDから接続情報を取得し、タイプに応じたパス/テーブル選択肢を返す
+    const getConnectionInfo = useCallback((connectionId: string) => {
+        const connection = connections.find(c => c.id === connectionId);
+        if (!connection) return null;
+
+        if (connection.type === 'file') {
+            const host = hosts.find(h => h.name === connection.host);
+            return { type: 'file' as const, directories: host?.directories || [] };
+        } else {
+            return { type: 'database' as const, tables: tables };
+        }
+    }, [connections, hosts, tables]);
     const [editingMapping, setEditingMapping] = useState<Mapping | null>(null);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
@@ -509,12 +522,56 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                                 disabled={readOnly}
                                 className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
                                 value={(node.config as SourceConfig).connectionId}
-                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    connectionId: e.target.value,
+                                    path: undefined,
+                                    tableName: undefined
+                                })}
                             >
                                 <option value="">Select Connection</option>
                                 {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
+                        {(() => {
+                            const connInfo = getConnectionInfo((node.config as SourceConfig).connectionId);
+                            if (!connInfo) return null;
+
+                            if (connInfo.type === 'file') {
+                                return (
+                                    <div>
+                                        <label className="block text-xs text-gray-500">パス</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={(node.config as SourceConfig).path || ''}
+                                            onChange={e => updateTransformationConfig(node.id, { path: e.target.value })}
+                                        >
+                                            <option value="">パスを選択</option>
+                                            {connInfo.directories.map(dir => (
+                                                <option key={dir} value={dir}>{dir}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div>
+                                        <label className="block text-xs text-gray-500">テーブル</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={(node.config as SourceConfig).tableName || ''}
+                                            onChange={e => updateTransformationConfig(node.id, { tableName: e.target.value })}
+                                        >
+                                            <option value="">テーブルを選択</option>
+                                            {connInfo.tables.map(t => (
+                                                <option key={t.id} value={t.name}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            }
+                        })()}
                         <div>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -557,12 +614,56 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                                 disabled={readOnly}
                                 className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
                                 value={(node.config as TargetConfig).connectionId}
-                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    connectionId: e.target.value,
+                                    path: undefined,
+                                    tableName: undefined
+                                })}
                             >
                                 <option value="">接続を選択</option>
                                 {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
+                        {(() => {
+                            const connInfo = getConnectionInfo((node.config as TargetConfig).connectionId);
+                            if (!connInfo) return null;
+
+                            if (connInfo.type === 'file') {
+                                return (
+                                    <div>
+                                        <label className="block text-xs text-gray-500">パス</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={(node.config as TargetConfig).path || ''}
+                                            onChange={e => updateTransformationConfig(node.id, { path: e.target.value })}
+                                        >
+                                            <option value="">パスを選択</option>
+                                            {connInfo.directories.map(dir => (
+                                                <option key={dir} value={dir}>{dir}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div>
+                                        <label className="block text-xs text-gray-500">テーブル</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={(node.config as TargetConfig).tableName || ''}
+                                            onChange={e => updateTransformationConfig(node.id, { tableName: e.target.value })}
+                                        >
+                                            <option value="">テーブルを選択</option>
+                                            {connInfo.tables.map(t => (
+                                                <option key={t.id} value={t.name}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            }
+                        })()}
                         <div>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
@@ -1425,12 +1526,56 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                                 disabled={readOnly}
                                 className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
                                 value={(node.config as LookupConfig).connectionId}
-                                onChange={e => updateTransformationConfig(node.id, { connectionId: e.target.value })}
+                                onChange={e => updateTransformationConfig(node.id, {
+                                    connectionId: e.target.value,
+                                    path: undefined,
+                                    tableName: undefined
+                                })}
                             >
                                 <option value="">接続を選択</option>
                                 {connections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
+                        {(() => {
+                            const connInfo = getConnectionInfo((node.config as LookupConfig).connectionId);
+                            if (!connInfo) return null;
+
+                            if (connInfo.type === 'file') {
+                                return (
+                                    <div>
+                                        <label className="block text-xs text-gray-500">パス</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={(node.config as LookupConfig).path || ''}
+                                            onChange={e => updateTransformationConfig(node.id, { path: e.target.value })}
+                                        >
+                                            <option value="">パスを選択</option>
+                                            {connInfo.directories.map(dir => (
+                                                <option key={dir} value={dir}>{dir}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            } else {
+                                return (
+                                    <div>
+                                        <label className="block text-xs text-gray-500">テーブル</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                                            value={(node.config as LookupConfig).tableName || ''}
+                                            onChange={e => updateTransformationConfig(node.id, { tableName: e.target.value })}
+                                        >
+                                            <option value="">テーブルを選択</option>
+                                            {connInfo.tables.map(t => (
+                                                <option key={t.id} value={t.name}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );
+                            }
+                        })()}
                         <div>
                             <label className="block text-xs text-gray-500 mb-1">ルックアップキー</label>
                             {(node.config as LookupConfig).lookupKeys.map((key, idx) => (
