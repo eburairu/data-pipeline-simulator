@@ -3,7 +3,6 @@ import type {
     TableDefinition, 
     ConnectionDefinition, 
     Host,
-    DataSourceDefinition,
     GenerationJob
 } from './SettingsContext';
 import type { Mapping, MappingTask, TaskFlow } from './MappingTypes';
@@ -44,19 +43,16 @@ export const IdempotencyTemplate: PipelineTemplate = {
             return prev.map(h => h.name === hostName ? { ...h, directories: [...h.directories, sourcePath] } : h);
         });
 
-        // 2. Data Source
-        const dsDefId = `ds_def${idSuffix}${timestamp}`;
-        const newDsDef: DataSourceDefinition = {
-            id: dsDefId,
-            name: 'Idempotency Test Source',
-            host: hostName,
-            path: sourcePath
-        };
+        // Pre-define connection IDs
+        const connSrcId = `conn_src${idSuffix}${timestamp}`;
+        const connTgtId = `conn_tgt${idSuffix}${timestamp}`;
 
+        // 2. Data Source
         const newDsJob: GenerationJob = {
             id: `gen_job${idSuffix}${timestamp}`,
             name: 'Generate Duplicates',
-            dataSourceId: dsDefId,
+            connectionId: connSrcId,
+            path: sourcePath,
             fileNamePattern: 'data_${timestamp}.csv',
             fileContent: '',
             mode: 'schema',
@@ -71,7 +67,6 @@ export const IdempotencyTemplate: PipelineTemplate = {
         };
 
         setDataSource(prev => ({
-            definitions: [...prev.definitions, newDsDef],
             jobs: [...prev.jobs, newDsJob]
         }));
 
@@ -90,9 +85,6 @@ export const IdempotencyTemplate: PipelineTemplate = {
         setTables(prev => [...prev, newTable]);
 
         // 4. Connections
-        const connSrcId = `conn_src${idSuffix}${timestamp}`;
-        const connTgtId = `conn_tgt${idSuffix}${timestamp}`;
-        
         setConnections(prev => [
             ...prev,
             {
@@ -169,7 +161,6 @@ export const IdempotencyTemplate: PipelineTemplate = {
         const idSuffix = '_idem_';
         
         setDataSource(prev => ({
-            definitions: prev.definitions.filter(d => !d.id.includes(idSuffix)),
             jobs: prev.jobs.filter(j => !j.id.includes(idSuffix))
         }));
 

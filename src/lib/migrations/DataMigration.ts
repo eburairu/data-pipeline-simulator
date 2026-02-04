@@ -1,31 +1,39 @@
-import { type DataSourceSettings, type DataSourceDefinition, type GenerationJob, type BiDashboardSettings } from '../types';
+import { type DataSourceSettings, type GenerationJob, type BiDashboardSettings } from '../types';
 
 export const migrateDataSourceSettings = (parsed: any): DataSourceSettings | null => {
   if (!parsed.dataSource) return null;
 
+  // New format check
+  if (parsed.dataSource.jobs && !parsed.dataSource.definitions) {
+      return parsed.dataSource as DataSourceSettings;
+  }
+
+  // Migration from format with definitions
   if (parsed.dataSource.definitions && parsed.dataSource.jobs) {
-    return parsed.dataSource as DataSourceSettings;
-  } else if (Array.isArray(parsed.dataSource.jobs)) {
-    // Legacy migration logic (v1 -> v2)
-    const newDefinitions: DataSourceDefinition[] = [];
-    const newJobs: GenerationJob[] = [];
+    const definitions = parsed.dataSource.definitions as any[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    parsed.dataSource.jobs.forEach((oldJob: any) => {
-      const defId = `ds_def_${oldJob.id}`;
-      newDefinitions.push({
-        id: defId,
-        name: `${oldJob.name} Location`,
-        host: oldJob.host,
-        path: oldJob.sourcePath
-      });
-      newJobs.push({
+    const newJobs: GenerationJob[] = parsed.dataSource.jobs.map((job: any) => {
+        const def = definitions.find(d => d.id === job.dataSourceId);
+        return {
+            ...job,
+            connectionId: '', // User needs to re-select
+            path: def ? def.path : '',
+        } as GenerationJob;
+    });
+    return { jobs: newJobs };
+  }
+  
+  // Legacy array check (very old)
+  if (Array.isArray(parsed.dataSource.jobs)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const newJobs: GenerationJob[] = parsed.dataSource.jobs.map((oldJob: any) => ({
         ...oldJob,
-        dataSourceId: defId,
+        connectionId: '',
+        path: oldJob.sourcePath || '',
         mode: oldJob.mode || 'template',
         rowCount: oldJob.rowCount || 1
-      });
-    });
-    return { definitions: newDefinitions, jobs: newJobs };
+    }));
+    return { jobs: newJobs };
   }
   return null;
 };

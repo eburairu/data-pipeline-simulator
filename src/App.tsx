@@ -18,7 +18,7 @@ import { processTemplate } from './lib/templateUtils';
 import { generateDataFromSchema } from './lib/DataGenerator';
 import { StorageView } from './components/views/StorageView';
 import { DatabaseView } from './components/views/DatabaseView';
-import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition, DataSourceDefinition } from './lib/types';
+import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition } from './lib/types';
 
 // eslint-disable-next-line react-refresh/only-export-components
 const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type: JobType) => void) => void }> = ({ setRetryHandler }) => {
@@ -55,9 +55,9 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const handleCreateSourceFile = () => {
     dataSource.jobs.forEach(job => {
       if (!job.enabled) return;
-      const d = dataSource.definitions.find(def => def.id === job.dataSourceId);
-      if (d) {
-        const ctx = { hostname: d.host, timestamp: new Date() };
+      const conn = connections.find(c => c.id === job.connectionId);
+      if (conn && conn.type === 'file' && conn.host && job.path) {
+        const ctx = { hostname: conn.host, timestamp: new Date() };
         let content = '';
         if (job.mode === 'schema' && job.schema) {
           const { content: newContent, nextSequenceState } = generateDataFromSchema(
@@ -71,7 +71,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         } else {
           content = processTemplate(job.fileContent, ctx);
         }
-        writeFile(d.host, d.path, processTemplate(job.fileNamePattern, ctx), content);
+        writeFile(conn.host, job.path, processTemplate(job.fileNamePattern, ctx), content);
       }
     });
   };
@@ -152,7 +152,20 @@ interface StorageViewsProps {
 
 const StorageViews: React.FC<StorageViewsProps> = ({ dataSource, collection, delivery, topics, connections, listFiles }) => {
   const { t } = useTranslation();
-  const sourceStorages = dataSource.definitions.map((d: DataSourceDefinition) => ({ name: d.name, host: d.host, path: d.path, type: 'source' as const }));
+  
+  const sourceStorages: { name: string, host: string, path: string, type: 'source' }[] = [];
+  const sourceKeys = new Set<string>();
+  dataSource.jobs.forEach(job => {
+      const conn = connections.find(c => c.id === job.connectionId);
+      if (conn && conn.type === 'file' && conn.host && job.path) {
+          const key = `${conn.host}:${job.path}`;
+          if (!sourceKeys.has(key)) {
+              sourceKeys.add(key);
+              sourceStorages.push({ name: `Source (${conn.host})`, host: conn.host, path: job.path, type: 'source' as const });
+          }
+      }
+  });
+
   const topicStorages = topics.map((t) => ({ name: t.name, host: 'localhost', path: `/topics/${t.id}`, type: 'topic' as const }));
   const incomingPaths = new Set<string>();
   const incomingStorages: { host: string, path: string, type: 'incoming' }[] = [];

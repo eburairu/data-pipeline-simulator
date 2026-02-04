@@ -26,19 +26,12 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [dataSource, setDataSource] = useState<DataSourceSettings>({
-    definitions: [
-      {
-        id: 'ds_def_1',
-        name: 'Default Source Location',
-        host: 'host1',
-        path: '/source'
-      }
-    ],
     jobs: [
       {
         id: 'gen_job_1',
         name: 'Default Source Generator',
-        dataSourceId: 'ds_def_1',
+        connectionId: 'conn_src_host1',
+        path: '/source',
         fileNamePattern: '${host}_data_${timestamp}.csv',
         fileContent: 'col1,col2,col3\nsample,data,123',
         mode: 'schema',
