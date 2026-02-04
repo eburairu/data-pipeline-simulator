@@ -145,12 +145,12 @@ const DataSourceSettings: React.FC = () => {
   // --- Job Handlers ---
 
   const handleJobChange = (id: string, field: keyof GenerationJob, value: any) => {
-    setDataSource({
-      ...dataSource,
-      jobs: dataSource.jobs.map(job =>
+    setDataSource(prev => ({
+      ...prev,
+      jobs: prev.jobs.map(job =>
         job.id === id ? { ...job, [field]: value } : job
       )
-    });
+    }));
   };
 
   const addJob = () => {
@@ -176,11 +176,11 @@ const DataSourceSettings: React.FC = () => {
       executionInterval: 1000,
       enabled: true,
     };
-    setDataSource({ ...dataSource, jobs: [...dataSource.jobs, newJob] });
+    setDataSource(prev => ({ ...prev, jobs: [...prev.jobs, newJob] }));
   };
 
   const removeJob = (id: string) => {
-    setDataSource({ ...dataSource, jobs: dataSource.jobs.filter(j => j.id !== id) });
+    setDataSource(prev => ({ ...prev, jobs: prev.jobs.filter(j => j.id !== id) }));
   };
 
   return (
@@ -225,8 +225,15 @@ const DataSourceSettings: React.FC = () => {
                         <select
                             value={job.connectionId}
                             onChange={(e) => {
-                                handleJobChange(job.id, 'connectionId', e.target.value);
-                                handleJobChange(job.id, 'path', '');
+                                const newConnId = e.target.value;
+                                setDataSource(prev => ({
+                                    ...prev,
+                                    jobs: prev.jobs.map(j => 
+                                        j.id === job.id 
+                                        ? { ...j, connectionId: newConnId, path: '' } 
+                                        : j
+                                    )
+                                }));
                             }}
                             className={`w-full border rounded p-1 text-sm bg-white ${hasError('connectionId') ? 'border-red-500 bg-red-50' : ''}`}
                             title={getErrorMsg('connectionId')}
