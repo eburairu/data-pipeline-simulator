@@ -67,27 +67,72 @@ export interface ExecutionState {
     processedFiles?: Set<string>;
     lastProcessedTimestamp?: number;
     sequences?: Record<string, number>; // Persist sequence values by Node ID
+    variables?: Record<string, any>; // Persist mapping variables
     [key: string]: unknown;
+}
+
+export interface VariableContext {
+    current: Record<string, any>;
+    initial: Record<string, any>;
+    minValues: Record<string, any>;
+    maxValues: Record<string, any>;
 }
 
 export type ExecutionObserver = (stats: ExecutionStats) => void;
 
 // Helper to evaluate conditions/expressions safely-ish
-const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): DataValue => {
+const evaluateExpression = (
+    record: DataRow,
+    expression: string,
+    parameters: Record<string, string> = {},
+    variableContext?: VariableContext
+): DataValue => {
     try {
         const recordKeys = Object.keys(record);
         const recordValues = Object.values(record);
 
+        // Parameters include $$Variables for read access if simple replacement
+        // But for SETVARIABLE/GETVARIABLE we need dynamic access
         const paramKeys = Object.keys(parameters);
         const paramValues = Object.values(parameters);
 
         const funcKeys = Object.keys(ExpressionFunctions);
         const funcValues = Object.values(ExpressionFunctions);
 
+        // Inject Variable Functions
+        const varFuncs: Record<string, any> = {};
+        if (variableContext) {
+            varFuncs['SETVARIABLE'] = (name: string, val: any) => {
+                if (variableContext) {
+                    variableContext.current[name] = val;
+
+                    // Update Min/Max tracking
+                    if (val !== null && val !== undefined) {
+                        const currentMin = variableContext.minValues[name];
+                        if (currentMin === undefined || val < currentMin) {
+                            variableContext.minValues[name] = val;
+                        }
+
+                        const currentMax = variableContext.maxValues[name];
+                        if (currentMax === undefined || val > currentMax) {
+                            variableContext.maxValues[name] = val;
+                        }
+                    }
+                }
+                return val;
+            };
+            varFuncs['GETVARIABLE'] = (name: string) => {
+                return variableContext.current[name];
+            };
+        }
+
+        const extraKeys = Object.keys(varFuncs);
+        const extraValues = Object.values(varFuncs);
+
         // Create a function with keys as arguments
-        // Order: Record Fields, Parameters, Functions
-        const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
-        return func(...recordValues, ...paramValues, ...funcValues) as DataValue;
+        // Order: Record Fields, Parameters, Functions, VariableFuncs
+        const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, ...extraKeys, `return ${expression};`);
+        return func(...recordValues, ...paramValues, ...funcValues, ...extraValues) as DataValue;
     } catch {
         // console.warn(`Expression evaluation failed: ${expression}`, e);
         return null;
@@ -135,15 +180,25 @@ const getValueByPath = (obj: unknown, path: string): DataValue => {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const processFilter = (node: FilterTransformation, batch: DataRow[], parameters: Record<string, string>): DataRow[] => {
-    return batch.filter(row => evaluateExpression(row, node.config.condition, parameters));
+const processFilter = (
+    node: FilterTransformation,
+    batch: DataRow[],
+    parameters: Record<string, string>,
+    variableContext?: VariableContext
+): DataRow[] => {
+    return batch.filter(row => evaluateExpression(row, node.config.condition, parameters, variableContext));
 };
 
-const processExpression = (node: ExpressionTransformation, batch: DataRow[], parameters: Record<string, string>): DataRow[] => {
+const processExpression = (
+    node: ExpressionTransformation,
+    batch: DataRow[],
+    parameters: Record<string, string>,
+    variableContext?: VariableContext
+): DataRow[] => {
     return batch.map(row => {
         const newRow = { ...row };
         node.config.fields.forEach(f => {
-            newRow[f.name] = evaluateExpression(row, f.expression, parameters);
+            newRow[f.name] = evaluateExpression(row, f.expression, parameters, variableContext);
         });
         return newRow;
     });
@@ -440,7 +495,12 @@ const processLookup = (
     });
 };
 
-const processRouter = (node: RouterTransformation, batch: DataRow[], parameters: Record<string, string>): Record<string, DataRow[]> => {
+const processRouter = (
+    node: RouterTransformation,
+    batch: DataRow[],
+    parameters: Record<string, string>,
+    variableContext?: VariableContext
+): Record<string, DataRow[]> => {
     const results: Record<string, DataRow[]> = {};
     node.config.routes.forEach(r => results[r.groupName] = []);
     results[node.config.defaultGroup] = [];
@@ -448,7 +508,7 @@ const processRouter = (node: RouterTransformation, batch: DataRow[], parameters:
     batch.forEach(row => {
         let routed = false;
         for (const route of node.config.routes) {
-            if (evaluateExpression(row, route.condition, parameters)) {
+            if (evaluateExpression(row, route.condition, parameters, variableContext)) {
                 results[route.groupName].push(row);
                 routed = true;
                 break;
@@ -574,11 +634,16 @@ const processSequence = (node: SequenceTransformation, batch: DataRow[], state: 
     });
 };
 
-const processUpdateStrategy = (node: UpdateStrategyTransformation, batch: DataRow[], parameters: Record<string, string>): DataRow[] => {
+const processUpdateStrategy = (
+    node: UpdateStrategyTransformation,
+    batch: DataRow[],
+    parameters: Record<string, string>,
+    variableContext?: VariableContext
+): DataRow[] => {
     return batch.map(row => {
         let strategy = node.config.defaultStrategy;
         for (const cond of node.config.conditions) {
-            if (evaluateExpression(row, cond.condition, parameters)) {
+            if (evaluateExpression(row, cond.condition, parameters, variableContext)) {
                 strategy = cond.strategy;
                 break;
             }
@@ -659,7 +724,12 @@ const processSql = async (node: SqlTransformation, batch: DataRow[], _db: DbOps,
     return batch; // Current implementation is a pass-through
 };
 
-const processWebService = async (node: WebServiceTransformation, batch: DataRow[], parameters: Record<string, string>): Promise<DataRow[]> => {
+const processWebService = async (
+    node: WebServiceTransformation,
+    batch: DataRow[],
+    parameters: Record<string, string>,
+    _variableContext?: VariableContext // Added for consistency, though maybe not used in substituteParams
+): Promise<DataRow[]> => {
     const url = substituteParams(node.config.url, parameters);
     // Simulate network delay
     await delay(50);
@@ -702,7 +772,8 @@ const traverseAsync = async (
     state: ExecutionState,
     parameters: Record<string, string>,
     _task: MappingTask,
-    observer?: ExecutionObserver
+    observer?: ExecutionObserver,
+    variableContext?: VariableContext
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
@@ -747,11 +818,11 @@ const traverseAsync = async (
         try {
             switch (nextNode.type) {
                 case 'filter': {
-                    processedBatch = processFilter(nextNode, batch, parameters);
+                    processedBatch = processFilter(nextNode, batch, parameters, variableContext);
                     break;
                 }
                 case 'expression': {
-                    processedBatch = processExpression(nextNode, batch, parameters);
+                    processedBatch = processExpression(nextNode, batch, parameters, variableContext);
                     break;
                 }
                 case 'aggregator': {
@@ -780,7 +851,7 @@ const traverseAsync = async (
                     break;
                 }
                 case 'router': {
-                    const routed = processRouter(nextNode, batch, parameters);
+                    const routed = processRouter(nextNode, batch, parameters, variableContext);
                     processedBatch = routed;
                     break;
                 }
@@ -806,7 +877,7 @@ const traverseAsync = async (
                     break;
                 }
                 case 'updateStrategy': {
-                    processedBatch = processUpdateStrategy(nextNode, batch, parameters);
+                    processedBatch = processUpdateStrategy(nextNode, batch, parameters, variableContext);
                     break;
                 }
                 case 'cleansing': {
@@ -830,7 +901,7 @@ const traverseAsync = async (
                     break;
                 }
                 case 'webService': {
-                    processedBatch = await processWebService(nextNode, batch, parameters);
+                    processedBatch = await processWebService(nextNode, batch, parameters, variableContext);
                     break;
                 }
                 case 'hierarchyParser': {
@@ -870,7 +941,7 @@ const traverseAsync = async (
         if (observer) observer({ ...stats });
 
         if (outputCount > 0) {
-            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, _task, observer);
+            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, _task, observer, variableContext);
         }
     }
 };
@@ -887,7 +958,7 @@ export const executeMappingTaskRecursive = async (
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
     const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
-    const newState = { ...state, sequences: { ...(state.sequences || {}) } };
+    const newState = { ...state, sequences: { ...(state.sequences || {}) }, variables: { ...(state.variables || {}) } };
 
     // Resolve Parameter File
     const fileParameters: Record<string, string> = {};
@@ -931,13 +1002,60 @@ export const executeMappingTaskRecursive = async (
 
     // Resolve Parameters
     const startTime = new Date();
-    const parameters = {
+    const parameters: Record<string, any> = {
         'SYSDATE': startTime.toISOString(),
         'SESSSTARTTIME': startTime.toISOString(),
         ...(mapping.parameters || {}),
         ...fileParameters,
         ...(task.parameters || {})
     };
+
+    // Initialize Variables
+    const variableContext: VariableContext = {
+        current: {},
+        initial: {},
+        minValues: {},
+        maxValues: {}
+    };
+    if (mapping.variables) {
+        mapping.variables.forEach(v => {
+            const persistedVal = newState.variables?.[v.name];
+            // Default logic: priority state > default > null
+            let initialVal = persistedVal !== undefined ? persistedVal : (v.defaultValue || null);
+
+            // Type conversion for initial value
+            if (initialVal !== null && v.datatype === 'number') {
+                const num = Number(initialVal);
+                if (!isNaN(num)) initialVal = num;
+            }
+
+            variableContext.initial[v.name] = initialVal;
+            variableContext.current[v.name] = initialVal;
+
+            // Initialize min/max with initial value?
+            // If we want "min/max encountered during session", we start empty or with initial?
+            // Informatica compares "Final Current Value" vs "Initial Value".
+            // BUT here we decided to track "Session Min/Max".
+            // If we start with initial, then min(initial, val1, val2) is correct.
+            if (initialVal !== null && initialVal !== undefined) {
+                variableContext.minValues[v.name] = initialVal;
+                variableContext.maxValues[v.name] = initialVal;
+            }
+
+            // Also add to parameters for easy access like $$Var in expressions
+            // If parameter file defined $$Var, it might override this?
+            // In IDMC, parameter file can override start value of variables.
+            // Check if already in parameters
+            if (parameters[v.name] === undefined) {
+                parameters[v.name] = initialVal;
+            } else {
+                 // If parameter file overrides, update initial context too?
+                 // Usually parameter file overrides the 'Start Value'.
+                 variableContext.initial[v.name] = parameters[v.name];
+                 variableContext.current[v.name] = parameters[v.name];
+            }
+        });
+    }
 
     mapping.transformations.forEach(t => {
         stats.transformations[t.id] = { name: t.name, input: 0, output: 0, errors: 0, rejects: 0 };
@@ -1034,8 +1152,40 @@ export const executeMappingTaskRecursive = async (
         if (observer) observer({ ...stats });
 
         if (records.length > 0) {
-            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer);
+            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer, variableContext);
         }
+    }
+
+    // Persist Variables based on Aggregation Type
+    if (mapping.variables) {
+        if (!newState.variables) newState.variables = {};
+        mapping.variables.forEach(v => {
+            const initialVal = variableContext.initial[v.name];
+
+            let finalVal = variableContext.current[v.name]; // Default to last value if count or none
+
+            if (v.aggregationType === 'max') {
+                 const sessionMax = variableContext.maxValues[v.name];
+                 // Compare session max with initial
+                 if (sessionMax !== undefined) {
+                     if (initialVal !== null && initialVal !== undefined) {
+                         finalVal = (sessionMax > initialVal) ? sessionMax : initialVal;
+                     } else {
+                         finalVal = sessionMax;
+                     }
+                 }
+            } else if (v.aggregationType === 'min') {
+                 const sessionMin = variableContext.minValues[v.name];
+                 if (sessionMin !== undefined) {
+                     if (initialVal !== null && initialVal !== undefined) {
+                         finalVal = (sessionMin < initialVal) ? sessionMin : initialVal;
+                     } else {
+                         finalVal = sessionMin;
+                     }
+                 }
+            }
+            newState.variables![v.name] = finalVal;
+        });
     }
 
     if (task.badFileDir && stats.rejectRows && stats.rejectRows.length > 0) {

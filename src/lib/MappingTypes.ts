@@ -237,12 +237,20 @@ export interface MappingLink {
   routerGroup?: string;
 }
 
+export interface MappingVariable {
+  name: string;
+  datatype: 'string' | 'number' | 'date';
+  aggregationType: 'max' | 'min' | 'count';
+  defaultValue?: string;
+}
+
 export interface Mapping {
   id: string;
   name: string;
   transformations: Transformation[];
   links: MappingLink[];
   parameters?: Record<string, string>;
+  variables?: MappingVariable[];
 }
 
 export interface MappingTask {

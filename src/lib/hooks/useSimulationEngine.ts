@@ -141,6 +141,63 @@ export const useSimulationEngine = (
                 details: `Moving ${file.name}...`
             });
 
+            // Topic Schema Validation
+            if (job.targetType === 'topic' && job.targetTopicId) {
+                const topic = topics.find(t => t.id === job.targetTopicId);
+                if (topic && topic.schema && topic.schema.length > 0) {
+                    let isValid = true;
+                    let validationError = '';
+
+                    if (file.name.endsWith('.csv')) {
+                        const lines = file.content.split(/\r?\n/);
+                        if (lines.length > 0) {
+                            const headers = lines[0].split(',').map(h => h.trim());
+                            const missingCols = topic.schema.filter(col => !headers.includes(col.name));
+                            if (missingCols.length > 0) {
+                                isValid = false;
+                                validationError = `Missing columns in CSV: ${missingCols.map(c => c.name).join(', ')}`;
+                            }
+                        } else {
+                            isValid = false;
+                            validationError = 'Empty CSV file';
+                        }
+                    } else if (file.name.endsWith('.json')) {
+                        try {
+                            const parsed = JSON.parse(file.content);
+                            const data = Array.isArray(parsed) ? parsed[0] : parsed; // Check first record
+                            if (data) {
+                                const missingCols = topic.schema.filter(col => data[col.name] === undefined);
+                                if (missingCols.length > 0) {
+                                    isValid = false;
+                                    validationError = `Missing fields in JSON: ${missingCols.map(c => c.name).join(', ')}`;
+                                }
+                            }
+                        } catch {
+                            isValid = false;
+                            validationError = 'Invalid JSON format';
+                        }
+                    }
+
+                    if (!isValid) {
+                        const errMsg = `Collection Job ${job.name}: Schema Validation Failed for ${file.name}. ${validationError}`;
+                        setErrors(prev => [...new Set([...prev, errMsg])]);
+
+                        updateLog(logId, {
+                            status: 'failed',
+                            endTime: Date.now(),
+                            recordsOutput: 0,
+                            errorMessage: errMsg,
+                            details: `Validation failed against topic schema: ${topic.name}`
+                        });
+
+                        unlockFile(sourceHost, sourcePath, file.name);
+                        toggleStep(`transfer_1_${job.id}`, false);
+                        collectionLocks.current[job.id] = false;
+                        return;
+                    }
+                }
+            }
+
             // リトライ機構
             const maxRetries = job.retryConfig?.maxRetries || 0;
             const retryDelayMs = job.retryConfig?.retryDelayMs || 1000;

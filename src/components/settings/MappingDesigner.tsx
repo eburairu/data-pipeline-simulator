@@ -49,6 +49,7 @@ import {
     type RouterRoute,
     type CleansingRule,
     type ValidatorRule,
+    type MappingVariable,
 } from '../../lib/MappingTypes';
 import { type ExecutionStats } from '../../lib/MappingEngine';
 import MetricEdge from '../MetricEdge';
@@ -475,7 +476,128 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
     }, [editingMapping, nodes, edges, setNodes, rfInstance]);
 
     const renderConfigPanel = () => {
-        if (!selectedNodeId || !editingMapping) return <div className="p-4 text-gray-400 text-sm">Select a transformation to edit properties.</div>;
+        if (!editingMapping) return null;
+
+        if (!selectedNodeId) {
+            // Render Mapping Properties (Variables)
+            return (
+                <div className="p-4 space-y-4">
+                    <div className="font-bold text-sm border-b pb-2 mb-2">Mapping Properties</div>
+
+                    <div>
+                        <label className="block text-xs text-gray-500">Name</label>
+                        <input
+                            disabled={readOnly}
+                            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                            value={editingMapping.name}
+                            onChange={e => setEditingMapping({ ...editingMapping, name: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                        <label className="block text-xs font-bold text-gray-700 flex items-center gap-1">
+                            <Hash size={12} /> Mapping Variables
+                        </label>
+                        <p className="text-[10px] text-gray-400">
+                            Use variables for incremental loading. Example: $$MaxID
+                        </p>
+
+                        {(editingMapping.variables || []).map((v, idx) => (
+                            <div key={idx} className="border p-2 rounded bg-gray-50 space-y-2 relative">
+                                {!readOnly && (
+                                    <button
+                                        onClick={() => {
+                                            const newVars = (editingMapping.variables || []).filter((_, i) => i !== idx);
+                                            setEditingMapping({ ...editingMapping, variables: newVars });
+                                        }}
+                                        className="absolute top-2 right-2 text-gray-400 hover:text-red-500"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500">Name</label>
+                                        <input
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-xs"
+                                            placeholder="$$Variable"
+                                            value={v.name}
+                                            onChange={e => {
+                                                const newVars = [...(editingMapping.variables || [])];
+                                                newVars[idx] = { ...v, name: e.target.value };
+                                                setEditingMapping({ ...editingMapping, variables: newVars });
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500">Type</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-xs"
+                                            value={v.datatype}
+                                            onChange={e => {
+                                                const newVars = [...(editingMapping.variables || [])];
+                                                newVars[idx] = { ...v, datatype: e.target.value as any };
+                                                setEditingMapping({ ...editingMapping, variables: newVars });
+                                            }}
+                                        >
+                                            <option value="string">String</option>
+                                            <option value="number">Number</option>
+                                            <option value="date">Date</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500">Aggregation</label>
+                                        <select
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-xs"
+                                            value={v.aggregationType}
+                                            onChange={e => {
+                                                const newVars = [...(editingMapping.variables || [])];
+                                                newVars[idx] = { ...v, aggregationType: e.target.value as any };
+                                                setEditingMapping({ ...editingMapping, variables: newVars });
+                                            }}
+                                        >
+                                            <option value="max">Max</option>
+                                            <option value="min">Min</option>
+                                            <option value="count">Count</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500">Default Value</label>
+                                        <input
+                                            disabled={readOnly}
+                                            className="w-full border rounded p-1 text-xs"
+                                            placeholder="Initial value"
+                                            value={v.defaultValue || ''}
+                                            onChange={e => {
+                                                const newVars = [...(editingMapping.variables || [])];
+                                                newVars[idx] = { ...v, defaultValue: e.target.value };
+                                                setEditingMapping({ ...editingMapping, variables: newVars });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+
+                        {!readOnly && (
+                            <button
+                                onClick={() => {
+                                    const newVar: MappingVariable = { name: '$$NewVar', datatype: 'string', aggregationType: 'max', defaultValue: '' };
+                                    setEditingMapping({ ...editingMapping, variables: [...(editingMapping.variables || []), newVar] });
+                                }}
+                                className="text-blue-600 text-xs hover:underline flex items-center gap-1"
+                            >
+                                <Plus size={12} /> Add Variable
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        }
 
         const node = editingMapping.transformations.find(t => t.id === selectedNodeId);
         if (!node) return null;
