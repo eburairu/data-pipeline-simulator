@@ -10,17 +10,18 @@ import MappingDesigner from './MappingDesigner';
 import MappingTaskSettings from './MappingTaskSettings';
 import TaskFlowDesigner from './TaskFlowDesigner';
 import BiDashboardSettings from './BiDashboardSettings';
-import { Database, ArrowLeftRight, Workflow, Server, Activity } from 'lucide-react';
+import { Database, ArrowLeftRight, Workflow, Server, Activity, Network } from 'lucide-react';
 import { useTranslation } from '../../lib/i18n/LanguageContext';
 import { TemplateManager } from './TemplateManager';
 
-type SettingsTab = 'datasource' | 'integrationHub' | 'dataIntegration' | 'database' | 'bi';
+type SettingsTab = 'infrastructure' | 'datasource' | 'integrationHub' | 'dataIntegration' | 'database' | 'bi';
 
 const SettingsPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('datasource');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('infrastructure');
   const { t } = useTranslation();
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'infrastructure', label: 'Infrastructure', icon: <Network size={16} /> },
     { id: 'datasource', label: 'Data Source', icon: <Server size={16} /> },
     { id: 'integrationHub', label: 'Data Hub', icon: <ArrowLeftRight size={16} /> },
     { id: 'dataIntegration', label: 'Data Integration', icon: <Workflow size={16} /> },
@@ -54,9 +55,15 @@ const SettingsPanel: React.FC = () => {
 
       {/* Tab Content */}
       <div className="pt-2">
-        {activeTab === 'datasource' && (
+        {activeTab === 'infrastructure' && (
           <div className="space-y-6">
             <InfrastructureSettings />
+            <ConnectionSettings />
+          </div>
+        )}
+
+        {activeTab === 'datasource' && (
+          <div className="space-y-6">
             <DataSourceSettings />
           </div>
         )}
@@ -73,7 +80,6 @@ const SettingsPanel: React.FC = () => {
 
         {activeTab === 'dataIntegration' && (
           <div className="space-y-6">
-            <ConnectionSettings />
             <MappingDesigner />
             <MappingTaskSettings />
             <TaskFlowDesigner />
