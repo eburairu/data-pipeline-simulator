@@ -279,22 +279,43 @@ function App() {
             {saveResult && (
               <div className={`mb-4 p-3 rounded ${saveResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">{saveResult.success ? '設定を保存しました' : '保存に失敗しました'}</p>
-                    {saveResult.errors && saveResult.errors.length > 0 && (
-                      <ul className="mt-2 text-sm list-disc list-inside space-y-1">
-                        {saveResult.errors.map((err, i) => (
-                          <li key={i}>
-                            <span className="font-medium">{err.field}</span>: {err.message}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    {saveResult.errors && saveResult.errors.length > 0 && (() => {
+                      // セクションごとにエラーをグループ化
+                      const grouped = saveResult.errors.reduce((acc, err) => {
+                        const section = err.section || 'Other';
+                        if (!acc[section]) acc[section] = [];
+                        acc[section].push(err);
+                        return acc;
+                      }, {} as Record<string, ValidationError[]>);
+
+                      return (
+                        <div className="mt-3 space-y-3">
+                          {Object.entries(grouped).map(([section, errors]) => (
+                            <div key={section} className="bg-red-100 rounded p-2">
+                              <p className="font-semibold text-sm mb-1">{section}</p>
+                              <ul className="text-sm space-y-1 ml-2">
+                                {errors.map((err, i) => (
+                                  <li key={i} className="flex gap-1">
+                                    <span className="text-red-400">•</span>
+                                    <span>
+                                      {err.itemName && <span className="font-medium">[{err.itemName}] </span>}
+                                      {err.message}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   {!saveResult.success && (
                     <button
                       onClick={() => setSaveResult(null)}
-                      className="text-red-500 hover:text-red-700 text-lg leading-none"
+                      className="text-red-500 hover:text-red-700 text-xl leading-none ml-2"
                     >
                       ×
                     </button>
