@@ -4,6 +4,8 @@ export interface ValidationError {
   id?: string; // Job ID if applicable
   field: string;
   message: string;
+  section?: string;   // セクション名（タブ名）
+  itemName?: string;  // ジョブ名やアイテム名
 }
 
 const isValidRegex = (pattern: string): boolean => {
@@ -126,39 +128,60 @@ export const validateConnection = (conn: ConnectionDefinition): ValidationError[
     return errors;
 };
 
+// エラーにセクション情報を付与するヘルパー関数
+const addSectionInfo = (
+  errors: ValidationError[],
+  section: string,
+  itemName?: string
+): ValidationError[] => {
+  return errors.map(err => ({ ...err, section, itemName: itemName || err.itemName }));
+};
+
 export const validateAllSettings = (
   dataSource: DataSourceSettings,
   collection: CollectionSettings,
   delivery: DeliverySettings,
   etl: EtlSettings,
   topics: Topic[],
-  connections: ConnectionDefinition[] = [] // Optional for backward compatibility if needed, but we pass it
+  connections: ConnectionDefinition[] = []
 ): ValidationError[] => {
   let errors: ValidationError[] = [];
 
+  // Data Source (File Generation)
   dataSource.jobs.forEach(job => {
-    errors = [...errors, ...validateGenerationJob(job)];
+    const jobErrors = validateGenerationJob(job);
+    errors = [...errors, ...addSectionInfo(jobErrors, 'Data Source', job.name)];
   });
 
+  // Collection
   if (collection.processingTime < 0) {
-    errors.push({ field: 'collection.processingTime', message: 'Processing time cannot be negative' });
+    errors.push({ field: 'processingTime', message: 'Processing time cannot be negative', section: 'Collection' });
   }
   collection.jobs.forEach(job => {
-    errors = [...errors, ...validateCollectionJob(job)];
+    const jobErrors = validateCollectionJob(job);
+    errors = [...errors, ...addSectionInfo(jobErrors, 'Collection', job.name)];
   });
 
+  // Delivery
   delivery.jobs.forEach(job => {
-    errors = [...errors, ...validateDeliveryJob(job)];
+    const jobErrors = validateDeliveryJob(job);
+    errors = [...errors, ...addSectionInfo(jobErrors, 'Delivery', job.name)];
   });
 
-  errors = [...errors, ...validateEtlSettings(etl)];
+  // ETL
+  const etlErrors = validateEtlSettings(etl);
+  errors = [...errors, ...addSectionInfo(etlErrors, 'ETL')];
 
+  // Topics
   topics.forEach(topic => {
-      errors = [...errors, ...validateTopic(topic)];
+    const topicErrors = validateTopic(topic);
+    errors = [...errors, ...addSectionInfo(topicErrors, 'Topics', topic.name)];
   });
 
+  // Connections
   connections.forEach(conn => {
-      errors = [...errors, ...validateConnection(conn)];
+    const connErrors = validateConnection(conn);
+    errors = [...errors, ...addSectionInfo(connErrors, 'Connections', conn.name)];
   });
 
   return errors;
