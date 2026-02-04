@@ -324,14 +324,14 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     // --- 4. Render Task Flows ---
 
-    // TaskFlowに含まれるすべてのタスクが使用するSource/Targetを収集するヘルパー関数
-    const getTaskFlowDataSources = (flow: typeof taskFlows[0]) => {
+    // TaskFlowに含まれるすべてのタスクが使用するSource/Targetを収集し、必要ならノードを作成するヘルパー関数
+    const collectTaskFlowDataSources = (flow: typeof taskFlows[0]) => {
       const sources = new Set<string>();
       const targets = new Set<string>();
 
       flow.taskIds.forEach(taskId => {
         const task = mappingTasks.find(t => t.id === taskId);
-        if (!task?.enabled) return;
+        if (!task) return;
 
         const mapping = mappings.find(m => m.id === task.mappingId);
         if (!mapping) return;
@@ -339,13 +339,25 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         mapping.transformations.filter(t => t.type === 'source').forEach(src => {
           const conf = src.config as SourceConfig;
           const conn = connections.find(c => c.id === conf.connectionId);
-          if (conn) sources.add(getConnectionKey(conn, conf.path, conf.tableName));
+          if (conn) {
+            // ノードが存在しない場合は作成する
+            if (!keyNodeMap.has(getConnectionKey(conn, conf.path, conf.tableName))) {
+              addConnectionStorageNode(conn, 3, taskRowIndex++, conf.path, conf.tableName);
+            }
+            sources.add(getConnectionKey(conn, conf.path, conf.tableName));
+          }
         });
 
         mapping.transformations.filter(t => t.type === 'target').forEach(tgt => {
           const conf = tgt.config as TargetConfig;
           const conn = connections.find(c => c.id === conf.connectionId);
-          if (conn) targets.add(getConnectionKey(conn, conf.path, conf.tableName));
+          if (conn) {
+            // ノードが存在しない場合は作成する
+            if (!keyNodeMap.has(getConnectionKey(conn, conf.path, conf.tableName))) {
+              addConnectionStorageNode(conn, 5, taskRowIndex++, conf.path, conf.tableName);
+            }
+            targets.add(getConnectionKey(conn, conf.path, conf.tableName));
+          }
         });
       });
 
@@ -384,8 +396,37 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         }
       });
 
+      // TaskFlow内のタスク間の依存関係を表示（赤色破線）
+      flow.taskIds.forEach(taskId => {
+        const task = mappingTasks.find(t => t.id === taskId);
+        if (!task?.dependencies) return;
+
+        const targetTaskId = `process-task-${taskId}`;
+        task.dependencies.forEach(depId => {
+          // 依存元もTaskFlow内に含まれている場合のみ表示
+          if (flow.taskIds.includes(depId)) {
+            const sourceTaskId = `process-task-${depId}`;
+            // 両方のノードが存在する場合のみエッジを追加
+            if (calculatedNodes.some(n => n.id === sourceTaskId) && calculatedNodes.some(n => n.id === targetTaskId)) {
+              // 重複チェック（Task Dependenciesセクションで追加済みの場合はスキップ）
+              const edgeId = `e-flow-dep-${flow.id}-${depId}-${taskId}`;
+              if (!calculatedEdges.some(e => e.id === edgeId || e.id === `e-dep-${depId}-${taskId}`)) {
+                calculatedEdges.push({
+                  id: edgeId,
+                  source: sourceTaskId,
+                  target: targetTaskId,
+                  animated: true,
+                  label: 'depends on',
+                  style: { stroke: '#ef4444', strokeWidth: 1.5, strokeDasharray: '3,3' }
+                });
+              }
+            }
+          }
+        });
+      });
+
       // TaskFlowからデータソースへの接続（データフロー - インディゴ実線）
-      const { sources, targets } = getTaskFlowDataSources(flow);
+      const { sources, targets } = collectTaskFlowDataSources(flow);
 
       sources.forEach(sourceKey => {
         const storageNode = keyNodeMap.get(sourceKey);
