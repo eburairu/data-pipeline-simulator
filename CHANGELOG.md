@@ -1,3 +1,41 @@
+# [1.4.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.3.0...v1.4.0) (2026-02-04)
+
+
+### Bug Fixes
+
+* auto-select default path when changing target connection in DataSourceSettings ([6de2870](https://github.com/eburairu/data-pipeline-simulator/commit/6de2870240013e35e95a37d28951b05e2a0213b7))
+* enforce Left-to-Right layout direction on mobile for PipelineFlow ([60c69dc](https://github.com/eburairu/data-pipeline-simulator/commit/60c69dc427d88abe558020d20a5c2414ff952d2d))
+* resolve build errors due to unused types and type mismatches in MappingEngine ([cd34c2b](https://github.com/eburairu/data-pipeline-simulator/commit/cd34c2b75ec4540b8c9e840c7895ae6646cd2086))
+* resolve JobMonitor layout overflow issues on mobile ([f91ddd8](https://github.com/eburairu/data-pipeline-simulator/commit/f91ddd851c0ef03113dd468f0bfc49e3efa215d8))
+* restore JobMonitor visualizer with mobile adjustments and remove SimulationManager visualizer ([137e314](https://github.com/eburairu/data-pipeline-simulator/commit/137e3147e8f513bfa31d676a60683b41eea3a7e9))
+* show database objects and task dependencies in TaskFlow visualization ([d619137](https://github.com/eburairu/data-pipeline-simulator/commit/d6191373478c759a35c0723782328c437b6109b9))
+* use functional state updates in DataSourceSettings to prevent race conditions ([63fc310](https://github.com/eburairu/data-pipeline-simulator/commit/63fc31058e5cc4cb92e593657b32c06b60d549ea))
+* use source host for collectionHost in rename pattern ([758f4ed](https://github.com/eburairu/data-pipeline-simulator/commit/758f4ede3ac8a0b60aa3343ea4df20afed62b097))
+
+
+### Features
+
+* add `ParamInput` component for key-value editing and limit displayed records in `DatabaseView`. ([20b3de1](https://github.com/eburairu/data-pipeline-simulator/commit/20b3de1a36de871bc39fa13579014aaec185c32d))
+* add `speckit` agent for orchestrating Specification-Driven Development (SDD) processes ([d5662cb](https://github.com/eburairu/data-pipeline-simulator/commit/d5662cb7dca5b3320c50f7b792ee4f7a92510827))
+* add CDI-R collection enhancement features (Phase 1-4) ([4eb23ca](https://github.com/eburairu/data-pipeline-simulator/commit/4eb23ca21fb3d4e70306a0b87b0ec1ec9ded6b98))
+* add data flow edges between TaskFlow and data sources ([8ea2b31](https://github.com/eburairu/data-pipeline-simulator/commit/8ea2b3123c72aa073190b6c7a686d769bd23dd04))
+* CDIルータ変換修正の仕様を007として新規作成し、関連する仕様書とテンプレートを更新しました。 ([5740bee](https://github.com/eburairu/data-pipeline-simulator/commit/5740bee0dbb2da4f4e4376233a0ef07ea26f1a00))
+* Data Pipeline Simulatorの収集機能強化計画を更新し、Phase 1の完全実装とPhase 2-4の型定義・UIを追加 ([8ab46fc](https://github.com/eburairu/data-pipeline-simulator/commit/8ab46fc8a8d7c98eecf783e664506c90b103e0f6))
+* Data Pipeline Simulatorの収集機能強化計画を追加 ([c3a8d86](https://github.com/eburairu/data-pipeline-simulator/commit/c3a8d86608b7f12580488fb9730e51ba05979a26))
+* DeliveryJobにファイル転送後にソースファイルを削除するオプションを追加 ([d980c05](https://github.com/eburairu/data-pipeline-simulator/commit/d980c053364738c74e19437c2775edad02deea7a))
+* display validation error details when save fails ([0eb636f](https://github.com/eburairu/data-pipeline-simulator/commit/0eb636f064cfbd3f0a7c7e832b49c85173fcf362))
+* filter processed files by jobId in `useSimulationEngine` ([0306384](https://github.com/eburairu/data-pipeline-simulator/commit/0306384cd9162edbcadb85a08d8b5932f5b40f9b))
+* group validation errors by section with item names ([095cb24](https://github.com/eburairu/data-pipeline-simulator/commit/095cb240a23fe0ed0fe590f379640f2387dcfd73))
+* Implement a custom delete confirmation modal for database table and column deletions. ([7f1533d](https://github.com/eburairu/data-pipeline-simulator/commit/7f1533d48dd0eccf7e2f1ec53d228a513c8be4da))
+* Implement functional Router transformation for CDI simulation ([8abd993](https://github.com/eburairu/data-pipeline-simulator/commit/8abd9935dd19d43e48364efee31eced2a9be1745))
+* make source and target paths selectable in DeliverySettings ([d3ed0fa](https://github.com/eburairu/data-pipeline-simulator/commit/d3ed0facf4039e97ce82c979dbc1a7ada2e302c7))
+* remove PipelineFlow visualizer from JobMonitor tab ([7e58970](https://github.com/eburairu/data-pipeline-simulator/commit/7e5897016673b9721233b0a88b56db0f4e9f9e13))
+* update executeDeliveryJob reference to avoid circular dependency ([d1a05d8](https://github.com/eburairu/data-pipeline-simulator/commit/d1a05d85ba9c04aae4ad4bcc6224d66104478aec))
+* use stable reference for engines in timers to prevent reinitialization ([d6180fe](https://github.com/eburairu/data-pipeline-simulator/commit/d6180fef35c0377b0d3aaab30edc255fe799f168))
+* ページタイトルを"Data Pipeline Simulator"に更新 ([78eeb9f](https://github.com/eburairu/data-pipeline-simulator/commit/78eeb9fce6d966e49edf6b6767b66a2c6fbd5a04))
+* 仮想DBの永続化を廃止し、ページリロード時にデータをリセットするよう変更 ([c53f295](https://github.com/eburairu/data-pipeline-simulator/commit/c53f29595ad7925c84fddabaca8d5a011cdf550c))
+* 接続選択後のパス/テーブル選択UIを追加し、MappingDesignerを拡張 ([ada1a80](https://github.com/eburairu/data-pipeline-simulator/commit/ada1a800ebfdb1977c7bb975d82fc010a7a7b313))
+
 # [1.3.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.2.0...v1.3.0) (2026-02-04)
 
 
