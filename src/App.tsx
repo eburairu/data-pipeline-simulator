@@ -19,6 +19,7 @@ import { generateDataFromSchema } from './lib/DataGenerator';
 import { StorageView } from './components/views/StorageView';
 import { DatabaseView } from './components/views/DatabaseView';
 import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition } from './lib/types';
+import type { ValidationError } from './lib/validation';
 
 // eslint-disable-next-line react-refresh/only-export-components
 const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type: JobType) => void) => void }> = ({ setRetryHandler }) => {
@@ -219,12 +220,14 @@ function App() {
   const [activeTab, setActiveTab] = useState<'simulation' | 'dashboard' | 'monitor' | 'settings' | 'documentation'>('simulation');
   const { saveSettings } = useSettings();
   const { t, language, setLanguage } = useTranslation();
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveResult, setSaveResult] = useState<{ success: boolean; errors?: ValidationError[] } | null>(null);
 
   const handleSave = () => {
     const res = saveSettings();
-    setSaveMessage(res.success ? "Settings saved." : "Failed to save.");
-    setTimeout(() => setSaveMessage(null), 3000);
+    setSaveResult(res);
+    if (res.success) {
+      setTimeout(() => setSaveResult(null), 3000);
+    }
   }
 
   const toggleLanguage = () => {
@@ -273,7 +276,32 @@ function App() {
               <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2"><Settings size={24} /> {t('settings.title')}</h2>
               <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Save Settings</button>
             </div>
-            {saveMessage && <div className="mb-4 p-3 rounded bg-blue-50 text-blue-700">{saveMessage}</div>}
+            {saveResult && (
+              <div className={`mb-4 p-3 rounded ${saveResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-medium">{saveResult.success ? '設定を保存しました' : '保存に失敗しました'}</p>
+                    {saveResult.errors && saveResult.errors.length > 0 && (
+                      <ul className="mt-2 text-sm list-disc list-inside space-y-1">
+                        {saveResult.errors.map((err, i) => (
+                          <li key={i}>
+                            <span className="font-medium">{err.field}</span>: {err.message}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  {!saveResult.success && (
+                    <button
+                      onClick={() => setSaveResult(null)}
+                      className="text-red-500 hover:text-red-700 text-lg leading-none"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             <SettingsPanel />
           </div>
         )}
