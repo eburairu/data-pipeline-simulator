@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
-import { LayoutGrid, GitBranch, Workflow } from 'lucide-react';
+import { LayoutGrid, GitBranch, Workflow, BarChart3 } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
@@ -22,7 +22,7 @@ interface PipelineFlowProps {
 const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections } = useSettings();
+  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, biDashboard, tables } = useSettings();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -458,6 +458,62 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     });
 
 
+    // --- 5. Render BI Dashboard ---
+
+    biDashboard.items.forEach((item, index) => {
+      const dashboardId = `process-bi-${item.id}`;
+
+      // ダッシュボードノードを追加
+      calculatedNodes.push({
+        id: dashboardId,
+        type: 'process',
+        position: { x: TASK_START_X + 700, y: 50 + index * 150 },
+        data: {
+          label: `BI: ${item.title || 'Dashboard'}`,
+          isProcessing: false,
+          icon: <BarChart3 size={16} className="text-emerald-600" />
+        }
+      });
+
+      // テーブルへの接続（データソース）
+      const tableDef = tables.find(t => t.id === item.tableId);
+      if (tableDef) {
+        // テーブルノードを追加（存在しない場合のみ）
+        const tableKey = `db:${tableDef.name}`;
+        if (!keyNodeMap.has(tableKey)) {
+          const tableNodeId = `storage-${tableKey.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+          const tableNode: Node = {
+            id: tableNodeId,
+            type: 'storage',
+            position: { x: TASK_START_X + 500, y: 50 + index * 150 },
+            data: {
+              label: `DB: ${tableDef.name}`,
+              type: 'db',
+              count: select(tableDef.name).length
+            },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+          };
+          calculatedNodes.push(tableNode);
+          keyNodeMap.set(tableKey, tableNode);
+        }
+
+        // テーブルからダッシュボードへのエッジ
+        const tableNode = keyNodeMap.get(tableKey);
+        if (tableNode) {
+          calculatedEdges.push({
+            id: `e-bi-${item.id}-${tableNode.id}`,
+            source: tableNode.id,
+            target: dashboardId,
+            animated: false,
+            style: { stroke: '#10b981', strokeWidth: 1.5 },
+            label: 'visualizes'
+          });
+        }
+      }
+    });
+
+
     // --- Legacy ETL (Disabled visual) ---
     // (Old ETL visualization code removed)
 
@@ -483,7 +539,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     setEdges(calculatedEdges);
 
-  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
+  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, biDashboard, tables, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
 
   // Auto-align nodes when the flow is initialized
   const [hasAutoAligned, setHasAutoAligned] = useState(false);
