@@ -2,6 +2,17 @@
  * マッピング設定パネル用の型定義
  */
 import type { Mapping, TransformationType } from '../../../lib/MappingTypes';
+import type { ConnectionDefinition, TableDefinition } from '../../../lib/types';
+import type { Host } from '../../../lib/types';
+
+/**
+ * 接続情報の型
+ */
+export interface ConnectionInfo {
+  type: 'file' | 'database';
+  directories?: string[];
+  tables?: TableDefinition[];
+}
 
 /**
  * 変換設定パネルの共通プロパティ
@@ -19,6 +30,14 @@ export interface TransformationConfigProps<T extends TransformationType = Transf
   mapping: Mapping;
   /** 読み取り専用モード */
   readOnly?: boolean;
+  /** 利用可能な接続のリスト */
+  connections?: ConnectionDefinition[];
+  /** 利用可能なホストのリスト */
+  hosts?: Host[];
+  /** 利用可能なテーブルのリスト */
+  tables?: TableDefinition[];
+  /** 接続情報取得関数 */
+  getConnectionInfo?: (connectionId: string) => ConnectionInfo | null;
 }
 
 /**

@@ -28,8 +28,8 @@
 
 **目的**: 動的コンポーネント読み込みの基盤
 
-- [ ] T006 [US1] `src/components/settings/mapping/index.ts` に設定パネル登録メカニズムを実装
-- [ ] T007 [US3] `src/components/widgets/index.ts` にウィジェット登録メカニズムを実装
+- [x] T006 [US1] `src/components/settings/mapping/index.ts` に設定パネル登録メカニズムを実装
+- [x] T007 [US3] `src/components/widgets/index.ts` にウィジェット登録メカニズムを実装
 
 **チェックポイント**: 基盤準備完了 - 個別コンポーネント分割を開始可能
 
@@ -43,10 +43,10 @@
 
 ### 基本変換設定パネル（並行実行可能）
 
-- [ ] T008 [P] [US1] `src/components/settings/mapping/SourceConfigPanel.tsx` を作成
-- [ ] T009 [P] [US1] `src/components/settings/mapping/TargetConfigPanel.tsx` を作成
-- [ ] T010 [P] [US1] `src/components/settings/mapping/FilterConfigPanel.tsx` を作成
-- [ ] T011 [P] [US1] `src/components/settings/mapping/ExpressionConfigPanel.tsx` を作成
+- [x] T008 [P] [US1] `src/components/settings/mapping/SourceConfigPanel.tsx` を作成
+- [x] T009 [P] [US1] `src/components/settings/mapping/TargetConfigPanel.tsx` を作成
+- [x] T010 [P] [US1] `src/components/settings/mapping/FilterConfigPanel.tsx` を作成
+- [x] T011 [P] [US1] `src/components/settings/mapping/ExpressionConfigPanel.tsx` を作成
 
 ### 集計変換設定パネル（並行実行可能）
 
@@ -57,7 +57,7 @@
 
 ### 結合変換設定パネル（並行実行可能）
 
-- [ ] T016 [P] [US1] `src/components/settings/mapping/JoinerConfigPanel.tsx` を作成
+- [x] T016 [P] [US1] `src/components/settings/mapping/JoinerConfigPanel.tsx` を作成
 - [ ] T017 [P] [US1] `src/components/settings/mapping/LookupConfigPanel.tsx` を作成
 - [ ] T018 [P] [US1] `src/components/settings/mapping/UnionConfigPanel.tsx` を作成
 
