@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useJobMonitor, type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../lib/JobMonitorContext';
 import { useSettings } from '../lib/SettingsContext';
 import MappingDesigner from './settings/MappingDesigner';
 import PipelineFlow from './PipelineFlow';
+import ElapsedTimeDisplay from './common/ElapsedTimeDisplay';
 import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, X, Info, AlertTriangle, Loader2, Workflow, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 
 // Re-defining internal types locally to avoid import issues if they change
@@ -230,13 +231,9 @@ const JobMonitor: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<JobExecutionLog | null>(null);
   const [expandedFlows, setExpandedFlows] = useState<Set<string>>(new Set());
   const [showVisualizer, setShowVisualizer] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
 
-  // Force re-render to update running times
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // 注：毎秒の再レンダリングをElapsedTimeDisplayコンポーネントに移動
+  // 親コンポーネント全体の再レンダリングが不要になり、パフォーマンスが向上
 
   // Calculate active steps for PipelineFlow based on current running logs
   const activeSteps = useMemo(() => {
@@ -316,13 +313,6 @@ const JobMonitor: React.FC = () => {
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString();
-  };
-
-  const formatDuration = (start: number, end?: number) => {
-    const e = end || now;
-    const diff = e - start;
-    if (diff < 1000) return `${diff}ms`;
-    return `${(diff / 1000).toFixed(2)}s`;
   };
 
   return (
@@ -434,7 +424,11 @@ const JobMonitor: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-end shrink-0 ml-2">
                        <span className="text-xs text-gray-500 font-mono">{formatTime(log.startTime)}</span>
-                       <span className="text-[10px] text-gray-400 font-mono">{formatDuration(log.startTime, log.endTime)}</span>
+                       <ElapsedTimeDisplay
+                         startTime={log.startTime}
+                         endTime={log.endTime}
+                         className="text-[10px] text-gray-400 font-mono"
+                       />
                     </div>
                   </div>
 
@@ -555,7 +549,10 @@ const JobMonitor: React.FC = () => {
                       )}
                     </td>
                     <td className="p-3 text-right text-gray-500 font-mono text-xs">
-                      {formatDuration(log.startTime, log.endTime)}
+                      <ElapsedTimeDisplay
+                        startTime={log.startTime}
+                        endTime={log.endTime}
+                      />
                     </td>
                     <td className="p-3 text-right font-mono text-xs">
                       <span className="text-gray-600">{log.recordsInput}</span>

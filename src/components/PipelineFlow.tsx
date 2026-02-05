@@ -1,12 +1,12 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
-import dagre from 'dagre';
 import { LayoutGrid, GitBranch, Workflow, BarChart3 } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
 import { type SourceConfig, type TargetConfig } from '../lib/MappingTypes';
+import { usePipelineLayout } from '../lib/hooks/usePipelineLayout';
 import StorageNode from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
 
@@ -27,6 +27,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+
+  // dagreレイアウト計算のカスタムフック（メモ化済み）
+  const { calculateLayout } = usePipelineLayout();
 
   const getCount = useCallback((conn: ConnectionDefinition, path?: string, tableName?: string) => {
     try {
@@ -546,97 +549,17 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   useEffect(() => {
     if (rfInstance && nodes.length > 0 && edges.length > 0 && !hasAutoAligned) {
       setHasAutoAligned(true);
-      // Delay to ensure nodes are rendered
+      // ノードが描画されるのを待ってからレイアウト計算
       window.requestAnimationFrame(() => {
-        const dagreGraph = new dagre.graphlib.Graph();
-        dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-        const isMobile = window.innerWidth < 768;
-        const rankdir = 'LR'; // Force Left-to-Right layout even on mobile
-        dagreGraph.setGraph({ rankdir });
-
-        const getWidth = (node: Node) => {
-            const baseWidth = node.type === 'storage' ? 220 : 180;
-            return isMobile ? baseWidth * 0.8 : baseWidth;
-        };
-        const getHeight = (node: Node) => {
-            const baseHeight = node.type === 'storage' ? 120 : 80;
-            return isMobile ? baseHeight * 0.8 : baseHeight;
-        };
-
-        nodes.forEach((node) => {
-          dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
-        });
-        edges.forEach((edge) => {
-          dagreGraph.setEdge(edge.source, edge.target);
-        });
-
-        dagre.layout(dagreGraph);
-
-        const layoutedNodes = nodes.map((node) => {
-          const nodeWithPosition = dagreGraph.node(node.id);
-          return {
-            ...node,
-            targetPosition: Position.Left,
-            sourcePosition: Position.Right,
-            width: getWidth(node),
-            height: getHeight(node),
-            position: {
-              x: nodeWithPosition.x - getWidth(node) / 2,
-              y: nodeWithPosition.y - getHeight(node) / 2,
-            },
-          };
-        });
-
+        const layoutedNodes = calculateLayout(nodes, edges);
         setNodes(layoutedNodes);
         rfInstance.fitView({ padding: 0.2, duration: 800 });
       });
     }
-  }, [rfInstance, nodes, edges, hasAutoAligned, setNodes]);
+  }, [rfInstance, nodes, edges, hasAutoAligned, setNodes, calculateLayout]);
 
   const onLayout = useCallback(() => {
-    const dagreGraph = new dagre.graphlib.Graph();
-    dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-    const isMobile = window.innerWidth < 768;
-    const rankdir = 'LR'; // Force Left-to-Right layout even on mobile
-
-    const getWidth = (node: Node) => {
-        const baseWidth = node.type === 'storage' ? 220 : 180;
-        return isMobile ? baseWidth * 0.8 : baseWidth;
-    };
-    const getHeight = (node: Node) => {
-        const baseHeight = node.type === 'storage' ? 120 : 80;
-        return isMobile ? baseHeight * 0.8 : baseHeight;
-    };
-
-    dagreGraph.setGraph({ rankdir });
-
-    nodes.forEach((node) => {
-      dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
-    });
-
-    edges.forEach((edge) => {
-      dagreGraph.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(dagreGraph);
-
-    const layoutedNodes = nodes.map((node) => {
-      const nodeWithPosition = dagreGraph.node(node.id);
-      return {
-        ...node,
-        targetPosition: Position.Left,
-        sourcePosition: Position.Right,
-        width: getWidth(node),
-        height: getHeight(node),
-        position: {
-          x: nodeWithPosition.x - getWidth(node) / 2,
-          y: nodeWithPosition.y - getHeight(node) / 2,
-        },
-      };
-    });
-
+    const layoutedNodes = calculateLayout(nodes, edges);
     setNodes(layoutedNodes);
 
     if (rfInstance) {
@@ -644,7 +567,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         rfInstance.fitView({ padding: 0.2, duration: 800 });
       });
     }
-  }, [nodes, edges, setNodes, rfInstance]);
+  }, [nodes, edges, setNodes, rfInstance, calculateLayout]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
