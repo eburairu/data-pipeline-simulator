@@ -85,6 +85,22 @@ export { default as TargetConfigPanel } from './TargetConfigPanel';
 export { default as FilterConfigPanel } from './FilterConfigPanel';
 export { default as ExpressionConfigPanel } from './ExpressionConfigPanel';
 export { default as JoinerConfigPanel } from './JoinerConfigPanel';
+export { default as AggregatorConfigPanel } from './AggregatorConfigPanel';
+export { default as SorterConfigPanel } from './SorterConfigPanel';
+export { default as RankConfigPanel } from './RankConfigPanel';
+export { default as SequenceConfigPanel } from './SequenceConfigPanel';
+export { default as LookupConfigPanel } from './LookupConfigPanel';
+export { default as UnionConfigPanel } from './UnionConfigPanel';
+export { default as RouterConfigPanel } from './RouterConfigPanel';
+export { default as NormalizerConfigPanel } from './NormalizerConfigPanel';
+export { default as DeduplicatorConfigPanel } from './DeduplicatorConfigPanel';
+export { default as PivotConfigPanel } from './PivotConfigPanel';
+export { default as UnpivotConfigPanel } from './UnpivotConfigPanel';
+export { default as SQLConfigPanel } from './SQLConfigPanel';
+export { default as WebServiceConfigPanel } from './WebServiceConfigPanel';
+export { default as HierarchyParserConfigPanel } from './HierarchyParserConfigPanel';
+export { default as CleansingConfigPanel } from './CleansingConfigPanel';
+export { default as UpdateStrategyConfigPanel } from './UpdateStrategyConfigPanel';
 
 // デフォルトのパネル登録（初期化時に呼び出す）
 import SourceConfigPanel from './SourceConfigPanel';
@@ -92,6 +108,22 @@ import TargetConfigPanel from './TargetConfigPanel';
 import FilterConfigPanel from './FilterConfigPanel';
 import ExpressionConfigPanel from './ExpressionConfigPanel';
 import JoinerConfigPanel from './JoinerConfigPanel';
+import AggregatorConfigPanel from './AggregatorConfigPanel';
+import SorterConfigPanel from './SorterConfigPanel';
+import RankConfigPanel from './RankConfigPanel';
+import SequenceConfigPanel from './SequenceConfigPanel';
+import LookupConfigPanel from './LookupConfigPanel';
+import UnionConfigPanel from './UnionConfigPanel';
+import RouterConfigPanel from './RouterConfigPanel';
+import NormalizerConfigPanel from './NormalizerConfigPanel';
+import DeduplicatorConfigPanel from './DeduplicatorConfigPanel';
+import PivotConfigPanel from './PivotConfigPanel';
+import UnpivotConfigPanel from './UnpivotConfigPanel';
+import SQLConfigPanel from './SQLConfigPanel';
+import WebServiceConfigPanel from './WebServiceConfigPanel';
+import HierarchyParserConfigPanel from './HierarchyParserConfigPanel';
+import CleansingConfigPanel from './CleansingConfigPanel';
+import UpdateStrategyConfigPanel from './UpdateStrategyConfigPanel';
 
 /**
  * デフォルトのConfigPanelを登録する
@@ -122,6 +154,86 @@ export function registerDefaultConfigPanels(): void {
     type: 'joiner',
     component: JoinerConfigPanel,
     displayName: '結合',
+  });
+  registerConfigPanel({
+    type: 'aggregator',
+    component: AggregatorConfigPanel,
+    displayName: '集計',
+  });
+  registerConfigPanel({
+    type: 'sorter',
+    component: SorterConfigPanel,
+    displayName: 'ソート',
+  });
+  registerConfigPanel({
+    type: 'rank',
+    component: RankConfigPanel,
+    displayName: 'ランク',
+  });
+  registerConfigPanel({
+    type: 'sequence',
+    component: SequenceConfigPanel,
+    displayName: 'シーケンス',
+  });
+  registerConfigPanel({
+    type: 'lookup',
+    component: LookupConfigPanel,
+    displayName: 'ルックアップ',
+  });
+  registerConfigPanel({
+    type: 'union',
+    component: UnionConfigPanel,
+    displayName: 'ユニオン',
+  });
+  registerConfigPanel({
+    type: 'router',
+    component: RouterConfigPanel,
+    displayName: 'ルーター',
+  });
+  registerConfigPanel({
+    type: 'normalizer',
+    component: NormalizerConfigPanel,
+    displayName: '正規化',
+  });
+  registerConfigPanel({
+    type: 'deduplicator',
+    component: DeduplicatorConfigPanel,
+    displayName: '重複排除',
+  });
+  registerConfigPanel({
+    type: 'pivot',
+    component: PivotConfigPanel,
+    displayName: 'ピボット',
+  });
+  registerConfigPanel({
+    type: 'unpivot',
+    component: UnpivotConfigPanel,
+    displayName: 'アンピボット',
+  });
+  registerConfigPanel({
+    type: 'sql',
+    component: SQLConfigPanel,
+    displayName: 'SQL',
+  });
+  registerConfigPanel({
+    type: 'webService',
+    component: WebServiceConfigPanel,
+    displayName: 'Webサービス',
+  });
+  registerConfigPanel({
+    type: 'hierarchyParser',
+    component: HierarchyParserConfigPanel,
+    displayName: '階層パーサー',
+  });
+  registerConfigPanel({
+    type: 'cleansing',
+    component: CleansingConfigPanel,
+    displayName: 'クレンジング',
+  });
+  registerConfigPanel({
+    type: 'updateStrategy',
+    component: UpdateStrategyConfigPanel,
+    displayName: '更新戦略',
   });
 }
 

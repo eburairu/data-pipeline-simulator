@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
+import { STORAGE } from './constants';
 
 export interface DBRecord {
   id: string;
@@ -15,7 +16,7 @@ export interface DBFilter {
 
 // VirtualDBの設定オプション
 export interface VirtualDBOptions {
-  // レコードの上限数（デフォルト: 10000）
+  // レコードの上限数
   maxRecords?: number;
   // 上限到達時の警告を表示するか（デフォルト: true）
   showWarnings?: boolean;
@@ -23,7 +24,7 @@ export interface VirtualDBOptions {
 
 // デフォルト設定
 const DEFAULT_OPTIONS: Required<VirtualDBOptions> = {
-  maxRecords: 10000,
+  maxRecords: STORAGE.DEFAULT_RECORD_LIMIT,
   showWarnings: true,
 };
 

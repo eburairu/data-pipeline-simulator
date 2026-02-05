@@ -50,32 +50,32 @@
 
 ### 集計変換設定パネル（並行実行可能）
 
-- [ ] T012 [P] [US1] `src/components/settings/mapping/AggregatorConfigPanel.tsx` を作成
-- [ ] T013 [P] [US1] `src/components/settings/mapping/SorterConfigPanel.tsx` を作成
-- [ ] T014 [P] [US1] `src/components/settings/mapping/RankConfigPanel.tsx` を作成
-- [ ] T015 [P] [US1] `src/components/settings/mapping/SequenceConfigPanel.tsx` を作成
+- [x] T012 [P] [US1] `src/components/settings/mapping/AggregatorConfigPanel.tsx` を作成
+- [x] T013 [P] [US1] `src/components/settings/mapping/SorterConfigPanel.tsx` を作成
+- [x] T014 [P] [US1] `src/components/settings/mapping/RankConfigPanel.tsx` を作成
+- [x] T015 [P] [US1] `src/components/settings/mapping/SequenceConfigPanel.tsx` を作成
 
 ### 結合変換設定パネル（並行実行可能）
 
 - [x] T016 [P] [US1] `src/components/settings/mapping/JoinerConfigPanel.tsx` を作成
-- [ ] T017 [P] [US1] `src/components/settings/mapping/LookupConfigPanel.tsx` を作成
-- [ ] T018 [P] [US1] `src/components/settings/mapping/UnionConfigPanel.tsx` を作成
+- [x] T017 [P] [US1] `src/components/settings/mapping/LookupConfigPanel.tsx` を作成
+- [x] T018 [P] [US1] `src/components/settings/mapping/UnionConfigPanel.tsx` を作成
 
 ### データ処理変換設定パネル（並行実行可能）
 
-- [ ] T019 [P] [US1] `src/components/settings/mapping/RouterConfigPanel.tsx` を作成
-- [ ] T020 [P] [US1] `src/components/settings/mapping/NormalizerConfigPanel.tsx` を作成
-- [ ] T021 [P] [US1] `src/components/settings/mapping/DeduplicatorConfigPanel.tsx` を作成
-- [ ] T022 [P] [US1] `src/components/settings/mapping/PivotConfigPanel.tsx` を作成
-- [ ] T023 [P] [US1] `src/components/settings/mapping/UnpivotConfigPanel.tsx` を作成
+- [x] T019 [P] [US1] `src/components/settings/mapping/RouterConfigPanel.tsx` を作成
+- [x] T020 [P] [US1] `src/components/settings/mapping/NormalizerConfigPanel.tsx` を作成
+- [x] T021 [P] [US1] `src/components/settings/mapping/DeduplicatorConfigPanel.tsx` を作成
+- [x] T022 [P] [US1] `src/components/settings/mapping/PivotConfigPanel.tsx` を作成
+- [x] T023 [P] [US1] `src/components/settings/mapping/UnpivotConfigPanel.tsx` を作成
 
 ### 高度な変換設定パネル（並行実行可能）
 
-- [ ] T024 [P] [US1] `src/components/settings/mapping/SQLConfigPanel.tsx` を作成
-- [ ] T025 [P] [US1] `src/components/settings/mapping/WebServiceConfigPanel.tsx` を作成
-- [ ] T026 [P] [US1] `src/components/settings/mapping/HierarchyParserConfigPanel.tsx` を作成
-- [ ] T027 [P] [US1] `src/components/settings/mapping/CleansingConfigPanel.tsx` を作成
-- [ ] T028 [P] [US1] `src/components/settings/mapping/UpdateStrategyConfigPanel.tsx` を作成
+- [x] T024 [P] [US1] `src/components/settings/mapping/SQLConfigPanel.tsx` を作成
+- [x] T025 [P] [US1] `src/components/settings/mapping/WebServiceConfigPanel.tsx` を作成
+- [x] T026 [P] [US1] `src/components/settings/mapping/HierarchyParserConfigPanel.tsx` を作成
+- [x] T027 [P] [US1] `src/components/settings/mapping/CleansingConfigPanel.tsx` を作成
+- [x] T028 [P] [US1] `src/components/settings/mapping/UpdateStrategyConfigPanel.tsx` を作成
 
 ### MappingDesigner更新
 
