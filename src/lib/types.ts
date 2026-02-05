@@ -46,6 +46,9 @@ export interface TopicDefinition {
   id: string;
   name: string;
   retentionPeriod: number;
+  description?: string;
+  schema?: FieldDefinition[];
+  schemaEnforcement?: 'strict' | 'lenient' | 'none';
 }
 
 export type Topic = TopicDefinition;

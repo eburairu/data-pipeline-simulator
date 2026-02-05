@@ -9,7 +9,7 @@ interface DataContextType {
   topics: TopicDefinition[];
   addTopic: (name: string, retentionPeriod: number) => void;
   removeTopic: (id: string) => void;
-  updateTopic: (id: string, name: string, retentionPeriod: number) => void;
+  updateTopic: (id: string, updates: Partial<TopicDefinition>) => void;
 
   tables: TableDefinition[];
   addTable: (name: string) => void;
@@ -106,8 +106,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTopics(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const updateTopic = useCallback((id: string, name: string, retentionPeriod: number) => {
-    setTopics(prev => prev.map(t => t.id === id ? { ...t, name, retentionPeriod } : t));
+  const updateTopic = useCallback((id: string, updates: Partial<TopicDefinition>) => {
+    setTopics(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
 
   const addTable = useCallback((name: string) => {

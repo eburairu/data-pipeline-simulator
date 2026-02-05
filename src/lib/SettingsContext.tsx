@@ -39,7 +39,7 @@ interface SettingsContextType {
   topics: TopicDefinition[];
   addTopic: (name: string, retentionPeriod: number) => void;
   removeTopic: (id: string) => void;
-  updateTopic: (id: string, name: string, retentionPeriod: number) => void;
+  updateTopic: (id: string, updates: Partial<TopicDefinition>) => void;
 
   tables: TableDefinition[];
   addTable: (name: string) => void;

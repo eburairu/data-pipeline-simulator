@@ -452,7 +452,8 @@ export const useSimulationEngine = (
                     delete: remove
                 },
                 mappingStates.current[task.id],
-                observer
+                observer,
+                topics
             );
 
             mappingStates.current[task.id] = newState;

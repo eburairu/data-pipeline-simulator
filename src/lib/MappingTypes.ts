@@ -20,13 +20,15 @@ export interface SourceConfig {
 }
 
 export interface TargetConfig {
-  connectionId: string;
+  connectionId: string; // Used if targetType is 'connection' or undefined
   path?: string;
   tableName?: string;
   truncate?: boolean;
   updateColumns?: string[];
   deduplicationKeys?: string[];
   duplicateBehavior?: 'error' | 'ignore' | 'update';
+  targetType?: 'connection' | 'topic';
+  topicId?: string;
 }
 
 export interface FilterConfig {

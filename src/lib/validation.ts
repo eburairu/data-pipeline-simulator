@@ -1,4 +1,5 @@
 import type { DataSourceSettings, CollectionSettings, DeliverySettings, EtlSettings, GenerationJob, CollectionJob, DeliveryJob, Topic, ConnectionDefinition } from './SettingsContext';
+import { type DataRow, type FieldDefinition } from './types';
 
 export interface ValidationError {
   id?: string; // Job ID if applicable
@@ -118,7 +119,47 @@ export const validateTopic = (topic: Topic): ValidationError[] => {
     const errors: ValidationError[] = [];
     if (!topic.name.trim()) errors.push({ id: topic.id, field: 'name', message: 'Topic Name is required' });
     if (topic.retentionPeriod < 0) errors.push({ id: topic.id, field: 'retentionPeriod', message: 'Retention Period cannot be negative' });
+
+    if (topic.schema && topic.schema.length > 0) {
+        topic.schema.forEach((field, index) => {
+            if (!field.name.trim()) {
+                errors.push({ id: topic.id, field: `schema[${index}].name`, message: 'Field name is required' });
+            }
+        });
+    }
+
     return errors;
+};
+
+export const validateRowAgainstSchema = (
+  row: DataRow,
+  schema: FieldDefinition[] = [],
+  enforcement: 'strict' | 'lenient' | 'none' = 'none'
+): { valid: boolean; error?: string } => {
+  if (enforcement === 'none' || schema.length === 0) return { valid: true };
+
+  for (const field of schema) {
+    const value = row[field.name];
+
+    if (value !== undefined && value !== null) {
+      if (field.type === 'string' && typeof value !== 'string') return { valid: false, error: `Field '${field.name}' expected string, got ${typeof value}` };
+      if (field.type === 'number' && typeof value !== 'number') return { valid: false, error: `Field '${field.name}' expected number, got ${typeof value}` };
+      if (field.type === 'boolean' && typeof value !== 'boolean') return { valid: false, error: `Field '${field.name}' expected boolean, got ${typeof value}` };
+    }
+  }
+
+  if (enforcement === 'strict') {
+    // Check for extra fields
+    const schemaFields = new Set(schema.map(f => f.name));
+    const rowFields = Object.keys(row);
+    for (const key of rowFields) {
+      if (!schemaFields.has(key)) {
+         return { valid: false, error: `Field '${key}' is not in schema (Strict Mode)` };
+      }
+    }
+  }
+
+  return { valid: true };
 };
 
 export const validateConnection = (conn: ConnectionDefinition): ValidationError[] => {

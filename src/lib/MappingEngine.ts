@@ -25,8 +25,9 @@ import {
     type HierarchyParserTransformation,
     type SourceConfig // Used in executeMappingTaskRecursive
 } from './MappingTypes';
-import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition } from './types';
+import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition, type TopicDefinition } from './types';
 import { ExpressionFunctions } from './ExpressionFunctions';
+import { validateRowAgainstSchema } from './validation';
 
 export interface DbRecord {
     id: string;
@@ -243,116 +244,164 @@ const processTarget = async (
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats,
-    task: MappingTask
+    task: MappingTask,
+    topics: TopicDefinition[] = []
 ): Promise<DataRow[]> => {
-    const targetConn = connections.find(c => c.id === node.config.connectionId);
     const processedBatch: DataRow[] = [];
+    const targetType = node.config.targetType || 'connection';
 
-    if (targetConn) {
-        if (targetConn.type === 'database') {
-            const tableName = node.config.tableName || 'output';
-            const tableDef = tables.find(t => t.name === tableName);
-            const updateCols = node.config.updateColumns || [];
-
-            // Simulate Database IO latency per chunk (simplified as one await here)
-            await delay(20);
-
-            for (const row of batch) {
-                const strategy = (row['_strategy'] as string) || 'insert'; // Default to insert
-                const rowToProcess = { ...row };
-                delete rowToProcess['_strategy']; // Remove internal flag
-
-                if (strategy === 'reject') {
-                    stats.transformations[node.id].rejects++;
-                    continue;
-                }
-
-                // Apply field mapping (simple: match names)
-                let recordToDb = rowToProcess;
-                if (tableDef) {
-                    const filtered: DataRow = {};
-                    tableDef.columns.forEach(col => {
-                        if (Object.prototype.hasOwnProperty.call(rowToProcess, col.name)) {
-                            filtered[col.name] = rowToProcess[col.name];
-                        }
-                    });
-                    recordToDb = filtered;
-                }
-
-                let shouldInsert = true;
-                let shouldUpdate = false;
-                let matchId: string | null = null;
-
-                if (strategy === 'insert') {
-                    const dupBehavior = node.config.duplicateBehavior || 'error';
-                    const dedupKeys = node.config.deduplicationKeys || [];
-
-                    if (dedupKeys.length > 0) {
-                        const allRecords = db.select(tableName);
-                        const match = allRecords.find((r) => {
-                            const data = extractData(r);
-                            return dedupKeys.every(k => String(data[k]) === String(row[k]));
-                        }) as DbRecord | undefined;
-
-                        if (match) {
-                            shouldInsert = false;
-                            matchId = match.id;
-                                                                        if (dupBehavior === 'error') {
-                                                                            stats.transformations[node.id].errors++;
-                                                                            checkStopOnErrors(stats, task);
-                                                                            continue;
-                                                                        } else if (dupBehavior === 'ignore') {
-                            
-                                processedBatch.push(row); // Treat as success
-                                continue;
-                            } else if (dupBehavior === 'update') {
-                                shouldUpdate = true;
-                            }
-                        }
-                    }
-
-                    if (shouldUpdate && matchId) {
-                        db.update(tableName, matchId, recordToDb);
-                        processedBatch.push(row);
-                    } else if (shouldInsert) {
-                        db.insert(tableName, recordToDb);
-                        processedBatch.push(row);
-                    }
-                } else if (strategy === 'update' || strategy === 'delete') {
-                    if (updateCols.length > 0) {
-                        const allRecords = db.select(tableName);
-                        const match = allRecords.find((r) => {
-                            const data = extractData(r);
-                            return updateCols.every(col => String(data[col]) === String(row[col]));
-                        }) as DbRecord | undefined;
-
-                        if (match) {
-                            if (strategy === 'update') {
-                                db.update(tableName, match.id, recordToDb);
-                                processedBatch.push(row);
-                            } else if (strategy === 'delete') {
-                                db.delete(tableName, match.id);
-                                processedBatch.push(row);
-                            }
-                        }
-                    }
-                }
-            }
-        } else if (targetConn.type === 'file') {
-            const path = node.config.path || '/';
+    if (targetType === 'topic' && node.config.topicId) {
+        const topic = topics.find(t => t.id === node.config.topicId);
+        if (topic) {
+            const topicPath = `/topics/${topic.id}`;
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const filename = `output_${timestamp}.json`;
-            const cleanBatch = batch.map(r => {
-                const c = { ...r };
-                delete c['_strategy'];
-                return c;
-            });
-            const content = JSON.stringify(cleanBatch, null, 2);
-            fs.writeFile(targetConn.host, path, filename, content);
-            processedBatch.push(...cleanBatch);
+
+            const validBatch: DataRow[] = [];
+
+            for (const row of batch) {
+                const validation = validateRowAgainstSchema(row, topic.schema, topic.schemaEnforcement);
+                if (validation.valid) {
+                    validBatch.push(row);
+                } else {
+                    stats.transformations[node.id].errors++;
+                    if (!stats.rejectRows) stats.rejectRows = [];
+                    stats.rejectRows.push({
+                        row: row,
+                        error: `Schema Validation Failed: ${validation.error}`,
+                        transformationName: node.name
+                    });
+                }
+            }
+
+            if (validBatch.length > 0) {
+                 const cleanBatch = validBatch.map(r => {
+                    const c = { ...r };
+                    delete c['_strategy'];
+                    return c;
+                });
+                const content = JSON.stringify(cleanBatch, null, 2);
+                fs.writeFile('localhost', topicPath, filename, content);
+                processedBatch.push(...cleanBatch);
+            }
+
+            checkStopOnErrors(stats, task);
+        } else {
+             stats.transformations[node.id].errors += batch.length;
+             if (!stats.rejectRows) stats.rejectRows = [];
+             stats.rejectRows.push({
+                row: {},
+                error: `Target Topic not found: ${node.config.topicId}`,
+                transformationName: node.name
+             });
         }
     } else {
-        processedBatch.push(...batch);
+        const targetConn = connections.find(c => c.id === node.config.connectionId);
+        if (targetConn) {
+            if (targetConn.type === 'database') {
+                const tableName = node.config.tableName || 'output';
+                const tableDef = tables.find(t => t.name === tableName);
+                const updateCols = node.config.updateColumns || [];
+
+                // Simulate Database IO latency per chunk (simplified as one await here)
+                await delay(20);
+
+                for (const row of batch) {
+                    const strategy = (row['_strategy'] as string) || 'insert'; // Default to insert
+                    const rowToProcess = { ...row };
+                    delete rowToProcess['_strategy']; // Remove internal flag
+
+                    if (strategy === 'reject') {
+                        stats.transformations[node.id].rejects++;
+                        continue;
+                    }
+
+                    // Apply field mapping (simple: match names)
+                    let recordToDb = rowToProcess;
+                    if (tableDef) {
+                        const filtered: DataRow = {};
+                        tableDef.columns.forEach(col => {
+                            if (Object.prototype.hasOwnProperty.call(rowToProcess, col.name)) {
+                                filtered[col.name] = rowToProcess[col.name];
+                            }
+                        });
+                        recordToDb = filtered;
+                    }
+
+                    let shouldInsert = true;
+                    let shouldUpdate = false;
+                    let matchId: string | null = null;
+
+                    if (strategy === 'insert') {
+                        const dupBehavior = node.config.duplicateBehavior || 'error';
+                        const dedupKeys = node.config.deduplicationKeys || [];
+
+                        if (dedupKeys.length > 0) {
+                            const allRecords = db.select(tableName);
+                            const match = allRecords.find((r) => {
+                                const data = extractData(r);
+                                return dedupKeys.every(k => String(data[k]) === String(row[k]));
+                            }) as DbRecord | undefined;
+
+                            if (match) {
+                                shouldInsert = false;
+                                matchId = match.id;
+                                if (dupBehavior === 'error') {
+                                    stats.transformations[node.id].errors++;
+                                    checkStopOnErrors(stats, task);
+                                    continue;
+                                } else if (dupBehavior === 'ignore') {
+                                    processedBatch.push(row); // Treat as success
+                                    continue;
+                                } else if (dupBehavior === 'update') {
+                                    shouldUpdate = true;
+                                }
+                            }
+                        }
+
+                        if (shouldUpdate && matchId) {
+                            db.update(tableName, matchId, recordToDb);
+                            processedBatch.push(row);
+                        } else if (shouldInsert) {
+                            db.insert(tableName, recordToDb);
+                            processedBatch.push(row);
+                        }
+                    } else if (strategy === 'update' || strategy === 'delete') {
+                        if (updateCols.length > 0) {
+                            const allRecords = db.select(tableName);
+                            const match = allRecords.find((r) => {
+                                const data = extractData(r);
+                                return updateCols.every(col => String(data[col]) === String(row[col]));
+                            }) as DbRecord | undefined;
+
+                            if (match) {
+                                if (strategy === 'update') {
+                                    db.update(tableName, match.id, recordToDb);
+                                    processedBatch.push(row);
+                                } else if (strategy === 'delete') {
+                                    db.delete(tableName, match.id);
+                                    processedBatch.push(row);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (targetConn.type === 'file') {
+                const path = node.config.path || '/';
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `output_${timestamp}.json`;
+                const cleanBatch = batch.map(r => {
+                    const c = { ...r };
+                    delete c['_strategy'];
+                    return c;
+                });
+                const content = JSON.stringify(cleanBatch, null, 2);
+                fs.writeFile(targetConn.host, path, filename, content);
+                processedBatch.push(...cleanBatch);
+            }
+        } else {
+            processedBatch.push(...batch);
+        }
     }
     return processedBatch;
 };
@@ -702,7 +751,8 @@ const traverseAsync = async (
     state: ExecutionState,
     parameters: Record<string, string>,
     _task: MappingTask,
-    observer?: ExecutionObserver
+    observer?: ExecutionObserver,
+    topics: TopicDefinition[] = []
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
@@ -763,7 +813,7 @@ const traverseAsync = async (
                     break;
                 }
                 case 'target': {
-                    processedBatch = await processTarget(nextNode, batch, connections, tables, fs, db, stats, _task);
+                    processedBatch = await processTarget(nextNode, batch, connections, tables, fs, db, stats, _task, topics);
                     break;
                 }
                 case 'joiner': {
@@ -870,7 +920,7 @@ const traverseAsync = async (
         if (observer) observer({ ...stats });
 
         if (outputCount > 0) {
-            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, _task, observer);
+            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, _task, observer, topics);
         }
     }
 };
@@ -883,7 +933,8 @@ export const executeMappingTaskRecursive = async (
     fs: FileSystemOps,
     db: DbOps,
     state: ExecutionState,
-    observer?: ExecutionObserver
+    observer?: ExecutionObserver,
+    topics: TopicDefinition[] = []
 ): Promise<{ stats: ExecutionStats; newState: ExecutionState }> => {
 
     const stats: ExecutionStats = { transformations: {}, rejectRows: [], cache: {} };
@@ -1034,7 +1085,7 @@ export const executeMappingTaskRecursive = async (
         if (observer) observer({ ...stats });
 
         if (records.length > 0) {
-            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer);
+            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer, topics);
         }
     }
 
