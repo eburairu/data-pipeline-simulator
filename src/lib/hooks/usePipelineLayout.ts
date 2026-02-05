@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { type Node, type Edge, Position } from 'reactflow';
 import dagre from 'dagre';
+import { UI, NODE_DIMENSIONS, LAYOUT } from '../constants';
 
 interface LayoutOptions {
   /** レイアウト方向（デフォルト: 'LR' - 左から右）*/
@@ -23,17 +24,17 @@ interface LayoutResult {
  * レイアウト計算ロジックをメモ化し、不要な再計算を防止。
  */
 export function usePipelineLayout(options: LayoutOptions = {}): LayoutResult {
-  const { rankdir = 'LR', nodesep = 50, ranksep = 50 } = options;
+  const { rankdir = 'LR', nodesep = LAYOUT.NODE_SEP, ranksep = LAYOUT.RANK_SEP } = options;
 
   // ノードサイズの計算関数をメモ化
   const getNodeDimensions = useCallback((node: Node) => {
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const baseWidth = node.type === 'storage' ? 220 : 180;
-    const baseHeight = node.type === 'storage' ? 120 : 80;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < UI.MOBILE_BREAKPOINT;
+    const baseWidth = node.type === 'storage' ? NODE_DIMENSIONS.STORAGE_WIDTH : NODE_DIMENSIONS.PROCESS_WIDTH;
+    const baseHeight = node.type === 'storage' ? NODE_DIMENSIONS.STORAGE_HEIGHT : NODE_DIMENSIONS.PROCESS_HEIGHT;
 
     return {
-      width: isMobile ? baseWidth * 0.8 : baseWidth,
-      height: isMobile ? baseHeight * 0.8 : baseHeight,
+      width: isMobile ? baseWidth * NODE_DIMENSIONS.MOBILE_SCALE : baseWidth,
+      height: isMobile ? baseHeight * NODE_DIMENSIONS.MOBILE_SCALE : baseHeight,
     };
   }, []);
 

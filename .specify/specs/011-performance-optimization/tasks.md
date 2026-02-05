@@ -34,7 +34,7 @@
 - [x] T005 [US1] usePipelineLayout にノード/エッジの浅い比較ロジックを実装
 - [x] T006 [US1] PipelineFlow.tsx を usePipelineLayout を使用するよう更新
 - [x] T007 [US1] PipelineFlow.tsx の依存配列を最適化（不要な依存を削除）
-- [ ] T008 [US1] usePipelineLayout のユニットテストを作成
+- [x] T008 [US1] usePipelineLayout のユニットテストを作成
 
 ### 検証
 
@@ -57,7 +57,7 @@
 - [x] T012 [US2] ElapsedTimeDisplay に独自の時間更新ロジックを実装（useState + setInterval）
 - [x] T013 [US2] JobMonitor.tsx で ElapsedTimeDisplay を使用するよう更新
 - [x] T014 [US2] ジョブ行コンポーネントを React.memo でラップ
-- [ ] T015 [US2] モーダル内のログリストも最適化（仮想化または制限）
+- [x] T015 [US2] モーダル内のログリストも最適化（仮想化または制限）
 
 ### 検証
 
@@ -95,9 +95,9 @@
 **目的**: 全体的な検証と文書化
 
 - [ ] T024 [P] 各コンポーネントのパフォーマンス改善をまとめた比較レポートを作成
-- [ ] T025 npm test && npm run build で最終検証
+- [x] T025 npm test && npm run build で最終検証
 - [ ] T026 実際のシミュレーション実行でパフォーマンスを体感確認
-- [ ] T027 [P] 新規追加ファイルに日本語コメントを追加
+- [x] T027 [P] 新規追加ファイルに日本語コメントを追加
 
 ---
 

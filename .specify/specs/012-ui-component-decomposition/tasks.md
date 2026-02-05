@@ -14,11 +14,11 @@
 
 **目的**: 新しいディレクトリ構造と共通インターフェースの準備
 
-- [ ] T001 `src/components/settings/mapping/` ディレクトリを作成
-- [ ] T002 `src/components/modals/` ディレクトリを作成
-- [ ] T003 `src/components/widgets/` ディレクトリを作成
-- [ ] T004 TransformationConfigProps インターフェースを `src/components/settings/mapping/types.ts` に定義
-- [ ] T005 WidgetProps インターフェースを `src/components/widgets/types.ts` に定義
+- [x] T001 `src/components/settings/mapping/` ディレクトリを作成
+- [x] T002 `src/components/modals/` ディレクトリを作成
+- [x] T003 `src/components/widgets/` ディレクトリを作成
+- [x] T004 TransformationConfigProps インターフェースを `src/components/settings/mapping/types.ts` に定義
+- [x] T005 WidgetProps インターフェースを `src/components/widgets/types.ts` に定義
 
 **チェックポイント**: ディレクトリ構造と型定義が準備完了
 
@@ -92,11 +92,11 @@
 
 **独立テスト**: JobDetailModalが正しく開閉し、ログが表示される
 
-- [ ] T031 [US2] `src/components/modals/JobDetailModal.tsx` を作成
-- [ ] T032 [US2] JobDetailModal にログ表示ロジックを移動
-- [ ] T033 [US2] JobDetailModal にジョブ詳細情報表示を実装
-- [ ] T034 [US2] JobMonitor.tsx から JobDetailModal を使用するよう更新
-- [ ] T035 [US2] JobMonitor.tsx からモーダル関連コードを削除
+- [x] T031 [US2] `src/components/modals/JobDetailModal.tsx` を作成
+- [x] T032 [US2] JobDetailModal にログ表示ロジックを移動
+- [x] T033 [US2] JobDetailModal にジョブ詳細情報表示を実装
+- [x] T034 [US2] JobMonitor.tsx から JobDetailModal を使用するよう更新
+- [x] T035 [US2] JobMonitor.tsx からモーダル関連コードを削除
 
 **チェックポイント**: JobMonitorの分割が完了
 
