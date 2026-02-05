@@ -8,6 +8,7 @@ import PipelineFlow from './PipelineFlow';
 import ElapsedTimeDisplay from './common/ElapsedTimeDisplay';
 import JobDetailModal from './modals/JobDetailModal';
 import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, Loader2, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { STEP_KEYS } from '../lib/constants';
 
 // ジョブタイプ定義
 type JobType = 'collection' | 'delivery' | 'mapping' | 'taskflow';
@@ -28,10 +29,10 @@ const JobMonitor: React.FC = () => {
     return logs
       .filter(l => l.status === 'running')
       .map(l => {
-        if (l.jobType === 'collection') return `transfer_1_${l.jobId}`;
-        if (l.jobType === 'delivery') return `transfer_2_${l.jobId}`;
-        if (l.jobType === 'mapping') return `mapping_task_${l.jobId}`;
-        if (l.jobType === 'taskflow') return `task_flow_${l.jobId}`;
+        if (l.jobType === 'collection') return `${STEP_KEYS.COLLECTION_TRANSFER}_${l.jobId}`;
+        if (l.jobType === 'delivery') return `${STEP_KEYS.DELIVERY_TRANSFER}_${l.jobId}`;
+        if (l.jobType === 'mapping') return `${STEP_KEYS.MAPPING_TASK}_${l.jobId}`;
+        if (l.jobType === 'taskflow') return `${STEP_KEYS.TASK_FLOW}_${l.jobId}`;
         return '';
       })
       .filter(Boolean);

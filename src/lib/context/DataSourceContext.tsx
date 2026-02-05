@@ -1,8 +1,12 @@
+/**
+ * データソースコンテキスト
+ * データソース設定、トピック、テーブル定義を管理する専門Context
+ */
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
-import { type DataSourceSettings, type TopicDefinition, type TableDefinition, type BiDashboardSettings } from '../types';
-import { migrateDataSourceSettings, migrateBiDashboardSettings } from '../migrations/DataMigration';
+import { type DataSourceSettings, type TopicDefinition, type TableDefinition } from '../types';
+import { migrateDataSourceSettings } from '../migrations/DataMigration';
 
-interface DataContextType {
+interface DataSourceContextType {
   dataSource: DataSourceSettings;
   setDataSource: React.Dispatch<React.SetStateAction<DataSourceSettings>>;
 
@@ -17,14 +21,11 @@ interface DataContextType {
   addColumn: (tableId: string, columnName: string, type: string) => void;
   removeColumn: (tableId: string, columnName: string) => void;
   setTables: React.Dispatch<React.SetStateAction<TableDefinition[]>>;
-
-  biDashboard: BiDashboardSettings;
-  setBiDashboard: React.Dispatch<React.SetStateAction<BiDashboardSettings>>;
 }
 
-const DataContext = createContext<DataContextType | undefined>(undefined);
+const DataSourceContext = createContext<DataSourceContextType | undefined>(undefined);
 
-export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const DataSourceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [dataSource, setDataSource] = useState<DataSourceSettings>({
     jobs: [
       {
@@ -73,11 +74,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   ]);
 
-  const [biDashboard, setBiDashboard] = useState<BiDashboardSettings>({
-    showDashboard: true,
-    items: [],
-  });
-
   useEffect(() => {
     const saved = localStorage.getItem('pipeline-simulator-settings');
     if (saved) {
@@ -89,11 +85,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         if (parsed.topics) setTopics(parsed.topics);
         if (parsed.tables) setTables(parsed.tables);
-
-        const migratedBI = migrateBiDashboardSettings(parsed);
-        if (migratedBI) setBiDashboard(migratedBI);
       } catch (e) {
-        console.error('Failed to load data settings', e);
+        console.error('Failed to load data source settings', e);
       }
     }
   }, []);
@@ -134,21 +127,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   return (
-    <DataContext.Provider value={{
+    <DataSourceContext.Provider value={{
       dataSource, setDataSource,
       topics, addTopic, removeTopic, updateTopic,
-      tables, addTable, removeTable, addColumn, removeColumn, setTables,
-      biDashboard, setBiDashboard
+      tables, addTable, removeTable, addColumn, removeColumn, setTables
     }}>
       {children}
-    </DataContext.Provider>
+    </DataSourceContext.Provider>
   );
 };
 
-export const useData = () => {
-  const context = useContext(DataContext);
+export const useDataSource = () => {
+  const context = useContext(DataSourceContext);
   if (context === undefined) {
-    throw new Error('useData must be used within a DataProvider');
+    throw new Error('useDataSource must be used within a DataSourceProvider');
   }
   return context;
 };

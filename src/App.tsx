@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FileSystemProvider, useFileSystem, type VFile } from './lib/VirtualFileSystem';
 import { VirtualDBProvider, useVirtualDB } from './lib/VirtualDB';
-import { SettingsProvider, useSettings } from './lib/SettingsContext';
+import { SettingsProvider } from './lib/SettingsProvider';
+import { useSettings } from './lib/SettingsContext';
 import { LanguageProvider } from './lib/i18n/LanguageContext';
 import { JobMonitorProvider, type JobType } from './lib/JobMonitorContext';
 import BiDashboard from './components/BiDashboard';
@@ -20,6 +21,7 @@ import { StorageView } from './components/views/StorageView';
 import { DatabaseView } from './components/views/DatabaseView';
 import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition } from './lib/types';
 import type { ValidationError } from './lib/validation';
+import { TIMEOUTS } from './lib/constants';
 
 // eslint-disable-next-line react-refresh/only-export-components
 const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type: JobType) => void) => void }> = ({ setRetryHandler }) => {
@@ -226,7 +228,7 @@ function App() {
     const res = saveSettings();
     setSaveResult(res);
     if (res.success) {
-      setTimeout(() => setSaveResult(null), 3000);
+      setTimeout(() => setSaveResult(null), TIMEOUTS.SAVE_RESULT);
     }
   }
 

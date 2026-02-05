@@ -70,3 +70,55 @@ export const LAYOUT = {
   /** ランク間の垂直方向の間隔 */
   RANK_SEP: 50,
 } as const;
+
+// システムテーブル名
+export const SYSTEM_TABLES = {
+  /** トピックサブスクリプション状態追跡テーブル */
+  SUBSCRIPTION_STATE: '_sys_subscription_state',
+} as const;
+
+// パスプレフィックス
+export const PATH_PREFIXES = {
+  /** トピックストレージのパスプレフィックス */
+  TOPICS: '/topics',
+} as const;
+
+// ジョブステップキープレフィックス
+export const STEP_KEYS = {
+  /** コレクションジョブのステップキープレフィックス */
+  COLLECTION_TRANSFER: 'transfer_1',
+  /** デリバリージョブのステップキープレフィックス */
+  DELIVERY_TRANSFER: 'transfer_2',
+  /** マッピングタスクのステップキープレフィックス */
+  MAPPING_TASK: 'mapping_task',
+  /** タスクフローのステップキープレフィックス */
+  TASK_FLOW: 'task_flow',
+} as const;
+
+// タイムアウト・遅延定数
+export const TIMEOUTS = {
+  /** 保存結果メッセージの表示時間（ミリ秒） */
+  SAVE_RESULT: 3000,
+  /** デフォルトのリトライ遅延（ミリ秒） */
+  RETRY_DELAY: 1000,
+  /** マッピング依存関係の実行遅延（ミリ秒） */
+  MAPPING_DEPENDENCY_DELAY: 500,
+  /** トピック保持期間チェック周期（ミリ秒） */
+  TOPIC_RETENTION_CHECK: 5000,
+  /** 経過時間表示の更新間隔（ミリ秒） */
+  ELAPSED_TIME_UPDATE: 1000,
+  /** ダッシュボード自動リフレッシュ間隔（ミリ秒） */
+  DASHBOARD_AUTO_REFRESH: 1000,
+} as const;
+
+// デフォルト実行パラメータ
+export const EXECUTION_DEFAULTS = {
+  /** デフォルトの実行間隔（ミリ秒） */
+  INTERVAL_MS: 1000,
+  /** マッピングタスクのデフォルト実行間隔（ミリ秒） */
+  MAPPING_INTERVAL_MS: 2000,
+  /** タスクフローのデフォルト実行間隔（ミリ秒） */
+  TASK_FLOW_INTERVAL_MS: 5000,
+  /** デフォルトの帯域幅（KB/秒） */
+  BANDWIDTH_KBPS: 100,
+} as const;

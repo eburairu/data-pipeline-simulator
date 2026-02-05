@@ -7,6 +7,7 @@ import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
 import { type SourceConfig, type TargetConfig } from '../lib/MappingTypes';
 import { usePipelineLayout } from '../lib/hooks/usePipelineLayout';
+import { STEP_KEYS } from '../lib/constants';
 import StorageNode from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
 
@@ -198,7 +199,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         calculatedNodes.push({
           id, type: 'process',
           position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
-          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_1_${job.id}`) }
+          data: { label: job.name, isProcessing: activeSteps.includes(`${STEP_KEYS.COLLECTION_TRANSFER}_${job.id}`) }
         });
         calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
         calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
@@ -226,7 +227,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         calculatedNodes.push({
           id, type: 'process',
           position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
-          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_2_${job.id}`) }
+          data: { label: job.name, isProcessing: activeSteps.includes(`${STEP_KEYS.DELIVERY_TRANSFER}_${job.id}`) }
         });
         calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
         calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
@@ -289,7 +290,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         id: taskId,
         type: 'process',
         position: { x: TASK_START_X + 200, y: avgY },
-        data: { label: task.name, isProcessing: activeSteps.includes(`mapping_task_${task.id}`) }
+        data: { label: task.name, isProcessing: activeSteps.includes(`${STEP_KEYS.MAPPING_TASK}_${task.id}`) }
       });
 
       // Edges
@@ -379,7 +380,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         position: { x: TASK_START_X + 500, y: 50 },
         data: {
             label: `Flow: ${flow.name}`,
-            isProcessing: activeSteps.includes(`task_flow_${flow.id}`),
+            isProcessing: activeSteps.includes(`${STEP_KEYS.TASK_FLOW}_${flow.id}`),
             icon: <GitBranch size={16} className="text-indigo-600" />
         }
       });

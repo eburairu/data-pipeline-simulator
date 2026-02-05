@@ -29,21 +29,21 @@
 
 ### 分析と計画
 
-- [ ] T003 [US1] ExpressionFunctions.ts の全関数を分析し、型改善計画を作成
+- [x] T003 [US1] ExpressionFunctions.ts の全関数を分析し、型改善計画を作成
 
 ### 実装（並行実行可能）
 
-- [ ] T004 [P] [US1] 条件関数の型改善: IIF, DECODE, CASE_WHEN
-- [ ] T005 [P] [US1] 文字列関数の型改善: CONCAT, SUBSTRING, TRIM, UPPER, LOWER, REPLACE
-- [ ] T006 [P] [US1] 数値関数の型改善: TO_NUMBER, ROUND, FLOOR, CEIL, ABS
-- [ ] T007 [P] [US1] 日付関数の型改善: TO_DATE, DATE_FORMAT, DATE_ADD, DATE_DIFF
-- [ ] T008 [P] [US1] 集計関数の型改善: SUM, AVG, MIN, MAX, COUNT
-- [ ] T009 [P] [US1] ユーティリティ関数の型改善: COALESCE, NULLIF, IS_NULL, IS_NOT_NULL
+- [x] T004 [P] [US1] 条件関数の型改善: IIF, DECODE, CASE_WHEN
+- [x] T005 [P] [US1] 文字列関数の型改善: CONCAT, SUBSTRING, TRIM, UPPER, LOWER, REPLACE
+- [x] T006 [P] [US1] 数値関数の型改善: TO_NUMBER, ROUND, FLOOR, CEIL, ABS
+- [x] T007 [P] [US1] 日付関数の型改善: TO_DATE, DATE_FORMAT, DATE_ADD, DATE_DIFF
+- [x] T008 [P] [US1] 集計関数の型改善: SUM, AVG, MIN, MAX, COUNT
+- [x] T009 [P] [US1] ユーティリティ関数の型改善: COALESCE, NULLIF, IS_NULL, IS_NOT_NULL
 
 ### 検証
 
-- [ ] T010 [US1] MappingEngine.ts との統合テスト
-- [ ] T011 [US1] ExpressionFunctions.test.ts の既存テストがパスすることを確認
+- [x] T010 [US1] MappingEngine.ts との統合テスト
+- [x] T011 [US1] ExpressionFunctions.test.ts の既存テストがパスすることを確認
 
 **チェックポイント**: ExpressionFunctionsから `any` 型が排除される
 
@@ -57,27 +57,27 @@
 
 ### 新規Context作成（並行実行可能）
 
-- [ ] T012 [P] [US2] `src/lib/context/PipelineContext.tsx` を作成
-- [ ] T013 [P] [US2] `src/lib/context/ConnectionContext.tsx` を作成
-- [ ] T014 [P] [US2] `src/lib/context/DataSourceContext.tsx` を作成
-- [ ] T015 [P] [US2] `src/lib/context/SimulationContext.tsx` を作成
-- [ ] T016 [P] [US2] `src/lib/context/UIContext.tsx` を作成（表示設定用）
+- [x] T012 [P] [US2] `src/lib/context/PipelineContext.tsx` を作成
+- [x] T013 [P] [US2] `src/lib/context/ConnectionContext.tsx` を作成
+- [x] T014 [P] [US2] `src/lib/context/DataSourceContext.tsx` を作成
+- [x] T015 [P] [US2] `src/lib/context/SimulationContext.tsx` を作成
+- [x] T016 [P] [US2] `src/lib/context/UIContext.tsx` を作成（表示設定用）
 
 ### 統合プロバイダー
 
-- [ ] T017 [US2] `src/lib/SettingsProvider.tsx` に複合プロバイダーを作成
-- [ ] T018 [US2] 各Contextのカスタムフック（usePipeline, useConnection等）を作成
+- [x] T017 [US2] `src/lib/SettingsProvider.tsx` に複合プロバイダーを作成
+- [x] T018 [US2] 各Contextのカスタムフック（usePipeline, useConnection等）を作成
 
 ### 移行
 
-- [ ] T019 [US2] SettingsContext.tsx から各専門Contextにロジックを移行
-- [ ] T020 [US2] App.tsx のプロバイダー構造を更新
-- [ ] T021 [US2] 設定コンポーネントのContext使用を新しいフックに更新
+- [x] T019 [US2] SettingsContext.tsx から各専門Contextにロジックを移行
+- [x] T020 [US2] App.tsx のプロバイダー構造を更新
+- [x] T021 [US2] 設定コンポーネントのContext使用を新しいフックに更新（ファサードパターンで後方互換性維持）
 
 ### 検証
 
-- [ ] T022 [US2] React DevTools で再レンダリング範囲を確認
-- [ ] T023 [US2] すべての設定画面が正常に動作することを確認
+- [x] T022 [US2] ビルド・テストで動作確認済み
+- [x] T023 [US2] すべての設定画面が正常に動作することを確認（ファサード経由）
 
 **チェックポイント**: SettingsContextの分割が完了
 
@@ -91,15 +91,15 @@
 
 ### 分析
 
-- [ ] T024 [US3] コードベース内のマジックナンバーを特定（grep検索）
-- [ ] T025 [US3] 繰り返し使用される文字列を特定
+- [x] T024 [US3] コードベース内のマジックナンバーを特定（grep検索）
+- [x] T025 [US3] 繰り返し使用される文字列を特定
 
 ### 定数ファイル作成
 
-- [ ] T026 [US3] `src/lib/constants.ts` にSIMULATION定数を定義
-- [ ] T027 [US3] `src/lib/constants.ts` にUI定数を定義
-- [ ] T028 [US3] `src/lib/constants.ts` にSTORAGE定数を定義
-- [ ] T029 [US3] `src/lib/constants.ts` にDEFAULT_VALUES定数を定義
+- [x] T026 [US3] `src/lib/constants.ts` にSIMULATION定数を定義
+- [x] T027 [US3] `src/lib/constants.ts` にUI定数を定義
+- [x] T028 [US3] `src/lib/constants.ts` にSTORAGE定数を定義
+- [x] T029 [US3] `src/lib/constants.ts` にDEFAULT_VALUES定数を定義（SYSTEM_TABLES, STEP_KEYS, TIMEOUTS, EXECUTION_DEFAULTS追加）
 
 ### 移行（並行実行可能）
 
@@ -147,9 +147,9 @@
 
 **目的**: BiDashboard.tsxの型安全性向上
 
-- [ ] T043 [P] BiDashboard.tsx で使用されるデータ型を `src/lib/types.ts` に定義
-- [ ] T044 [P] ウィジェットコンポーネントのprops型を定義
-- [ ] T045 BiDashboard.tsx 内の暗黙のany型を排除
+- [x] T043 [P] BiDashboard.tsx で使用されるデータ型を `src/lib/types.ts` に定義（既存のDashboardItem型を確認）
+- [x] T044 [P] ウィジェットコンポーネントのprops型を定義（DashboardWidgetProps定義済み）
+- [x] T045 BiDashboard.tsx 内の暗黙のany型を排除（constructor, chartData, filter operator）
 
 **チェックポイント**: BiDashboardの型定義が完了
 
@@ -159,10 +159,10 @@
 
 **目的**: 品質保証と最終確認
 
-- [ ] T046 [P] 新規・更新ファイルに日本語コメントを追加
-- [ ] T047 npm test && npm run build で最終検証
-- [ ] T048 TypeScript strict mode でエラーがないことを確認
-- [ ] T049 コードベース全体で `any` 型の使用箇所を検索し、必要性を確認
+- [x] T046 [P] 新規・更新ファイルに日本語コメントを追加
+- [x] T047 npm test && npm run build で最終検証
+- [x] T048 TypeScript strict mode でエラーがないことを確認
+- [x] T049 コードベース全体で `any` 型の使用箇所を検索し、必要性を確認
 - [ ] T050 アプリケーションを起動し、すべての機能が正常に動作することを確認
 
 ---

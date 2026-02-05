@@ -12,9 +12,11 @@ import {
 import { type Mapping, type MappingTask, type TaskFlow } from './MappingTypes';
 
 // Import new Context hooks and Providers
-import { InfrastructureProvider, useInfrastructure } from './context/InfrastructureContext';
-import { DataProvider, useData } from './context/DataContext';
-import { PipelineProvider, usePipeline } from './context/PipelineContext';
+import { useSimulation } from './context/SimulationContext';
+import { useDataSource } from './context/DataSourceContext';
+import { usePipeline } from './context/PipelineContext';
+import { useConnection } from './context/ConnectionContext';
+import { useUI } from './context/UIContext';
 
 interface SettingsContextType {
   dataSource: DataSourceSettings;
@@ -84,18 +86,24 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 // Internal component that has access to all sub-contexts
-const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) => {
   const {
-    hosts, addHost, removeHost, addDirectory, removeDirectory, setHosts,
+    hosts, addHost, removeHost, addDirectory, removeDirectory, setHosts
+  } = useSimulation();
+
+  const {
     connections, addConnection, removeConnection, updateConnection, setConnections
-  } = useInfrastructure();
+  } = useConnection();
 
   const {
     dataSource, setDataSource,
     topics, addTopic, removeTopic, updateTopic,
-    tables, addTable, removeTable, addColumn, removeColumn, setTables,
+    tables, addTable, removeTable, addColumn, removeColumn, setTables
+  } = useDataSource();
+
+  const {
     biDashboard, setBiDashboard
-  } = useData();
+  } = useUI();
 
   const {
     collection, setCollection,
@@ -191,7 +199,7 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     alert(`Template "${template.name}" applied successfully! Check the Simulation tab and relevant settings.`);
-  }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setTaskFlows, setHosts]); // Add deps
+  }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setTaskFlows, setHosts]);
 
   const cleanupTemplate = useCallback((templateId: string) => {
     const template = AVAILABLE_TEMPLATES.find(t => t.id === templateId);
@@ -208,7 +216,7 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     alert(`Resources for template "${template.name}" have been removed.`);
-  }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setTaskFlows, setHosts]); // Add deps
+  }, [setDataSource, setTables, setConnections, setMappings, setMappingTasks, setTaskFlows, setHosts]);
 
   return (
     <SettingsContext.Provider value={{
@@ -233,20 +241,6 @@ const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ children }) 
     }}>
       {children}
     </SettingsContext.Provider>
-  );
-};
-
-export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  return (
-    <InfrastructureProvider>
-      <DataProvider>
-        <PipelineProvider>
-          <SettingsContextFacade>
-            {children}
-          </SettingsContextFacade>
-        </PipelineProvider>
-      </DataProvider>
-    </InfrastructureProvider>
   );
 };
 

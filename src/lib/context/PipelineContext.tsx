@@ -1,3 +1,7 @@
+/**
+ * パイプラインコンテキスト
+ * コレクション・デリバリー・ETL設定、マッピング、タスクフローを管理する専門Context
+ */
 import React, { createContext, useContext, useState, type ReactNode, useCallback, useEffect } from 'react';
 import { type Mapping, type MappingTask, type TaskFlow } from '../MappingTypes';
 import { type CollectionSettings, type DeliverySettings, type EtlSettings } from '../types';

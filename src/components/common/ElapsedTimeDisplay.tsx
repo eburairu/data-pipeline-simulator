@@ -1,4 +1,5 @@
 import React, { useState, useEffect, memo } from 'react';
+import { TIMEOUTS } from '../../lib/constants';
 
 interface ElapsedTimeDisplayProps {
   /** 開始時刻（ミリ秒）*/
@@ -27,7 +28,7 @@ const ElapsedTimeDisplay: React.FC<ElapsedTimeDisplayProps> = memo(({
     if (endTime) return;
 
     // 実行中の場合のみ毎秒更新
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => setNow(Date.now()), TIMEOUTS.ELAPSED_TIME_UPDATE);
     return () => clearInterval(timer);
   }, [endTime]);
 
