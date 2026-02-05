@@ -588,16 +588,29 @@ const processUpdateStrategy = (node: UpdateStrategyTransformation, batch: DataRo
 };
 
 const processCleansing = (node: CleansingTransformation, batch: DataRow[]): DataRow[] => {
+    // Pre-compile regexes for 'replace' rules
+    const compiledRules = node.config.rules.map(rule => {
+        let regex: RegExp | undefined;
+        if (rule.operation === 'replace' && rule.replacePattern) {
+            try {
+                regex = new RegExp(rule.replacePattern, 'g');
+            } catch (e) {
+                console.warn(`[MappingEngine] Invalid regex in cleansing rule for field ${rule.field}: ${rule.replacePattern}`, e);
+            }
+        }
+        return { ...rule, regex };
+    });
+
     return batch.map(row => {
         const newRow = { ...row };
-        node.config.rules.forEach(rule => {
+        compiledRules.forEach(rule => {
             let val = newRow[rule.field];
             if (rule.operation === 'trim' && typeof val === 'string') val = val.trim();
             if (rule.operation === 'upper' && typeof val === 'string') val = val.toUpperCase();
             if (rule.operation === 'lower' && typeof val === 'string') val = val.toLowerCase();
             if (rule.operation === 'nullToDefault' && (val === null || val === undefined)) val = rule.defaultValue;
-            if (rule.operation === 'replace' && typeof val === 'string' && rule.replacePattern) {
-                val = val.replace(new RegExp(rule.replacePattern, 'g'), rule.replaceWith || '');
+            if (rule.operation === 'replace' && typeof val === 'string' && rule.regex) {
+                val = val.replace(rule.regex, rule.replaceWith || '');
             }
             newRow[rule.field] = val as DataValue;
         });
