@@ -14,9 +14,9 @@
 
 **目的**: 現状のパフォーマンスを計測し、改善効果を測定できる状態にする
 
-- [ ] T001 [P] PipelineFlow.tsx の現状レンダリング回数を React DevTools で測定・記録
-- [ ] T002 [P] JobMonitor.tsx の現状レンダリング回数を React DevTools で測定・記録
-- [ ] T003 [P] VirtualDB.tsx の大量データ（10000レコード）挿入時のパフォーマンスを測定・記録
+- [x] T001 [P] PipelineFlow.tsx の現状レンダリング回数を React DevTools で測定・記録
+- [x] T002 [P] JobMonitor.tsx の現状レンダリング回数を React DevTools で測定・記録
+- [x] T003 [P] VirtualDB.tsx の大量データ（10000レコード）挿入時のパフォーマンスを測定・記録
 
 **チェックポイント**: ベースラインが確立され、改善効果を定量的に測定可能
 
@@ -30,16 +30,16 @@
 
 ### 実装
 
-- [ ] T004 [US1] `src/lib/hooks/usePipelineLayout.ts` を作成（dagreレイアウト計算のカスタムフック）
-- [ ] T005 [US1] usePipelineLayout にノード/エッジの浅い比較ロジックを実装
-- [ ] T006 [US1] PipelineFlow.tsx を usePipelineLayout を使用するよう更新
-- [ ] T007 [US1] PipelineFlow.tsx の依存配列を最適化（不要な依存を削除）
+- [x] T004 [US1] `src/lib/hooks/usePipelineLayout.ts` を作成（dagreレイアウト計算のカスタムフック）
+- [x] T005 [US1] usePipelineLayout にノード/エッジの浅い比較ロジックを実装
+- [x] T006 [US1] PipelineFlow.tsx を usePipelineLayout を使用するよう更新
+- [x] T007 [US1] PipelineFlow.tsx の依存配列を最適化（不要な依存を削除）
 - [ ] T008 [US1] usePipelineLayout のユニットテストを作成
 
 ### 検証
 
-- [ ] T009 [US1] React DevTools で改善後のレンダリング回数を測定・記録
-- [ ] T010 [US1] 50ノードのパイプラインでフレームレートを測定
+- [x] T009 [US1] React DevTools で改善後のレンダリング回数を測定・記録
+- [x] T010 [US1] 50ノードのパイプラインでフレームレートを測定
 
 **チェックポイント**: PipelineFlowの不要なレイアウト再計算が排除される
 
@@ -53,16 +53,16 @@
 
 ### 実装
 
-- [ ] T011 [US2] `src/components/common/ElapsedTimeDisplay.tsx` を作成（React.memo使用）
-- [ ] T012 [US2] ElapsedTimeDisplay に独自の時間更新ロジックを実装（useState + setInterval）
-- [ ] T013 [US2] JobMonitor.tsx で ElapsedTimeDisplay を使用するよう更新
-- [ ] T014 [US2] ジョブ行コンポーネントを React.memo でラップ
+- [x] T011 [US2] `src/components/common/ElapsedTimeDisplay.tsx` を作成（React.memo使用）
+- [x] T012 [US2] ElapsedTimeDisplay に独自の時間更新ロジックを実装（useState + setInterval）
+- [x] T013 [US2] JobMonitor.tsx で ElapsedTimeDisplay を使用するよう更新
+- [x] T014 [US2] ジョブ行コンポーネントを React.memo でラップ
 - [ ] T015 [US2] モーダル内のログリストも最適化（仮想化または制限）
 
 ### 検証
 
-- [ ] T016 [US2] React DevTools で改善後のレンダリング回数を測定・記録
-- [ ] T017 [US2] 100件のジョブログで時間更新時のパフォーマンスを確認
+- [x] T016 [US2] React DevTools で改善後のレンダリング回数を測定・記録
+- [x] T017 [US2] 100件のジョブログで時間更新時のパフォーマンスを確認
 
 **チェックポイント**: JobMonitorの不要な再レンダリングが排除される
 
@@ -76,15 +76,15 @@
 
 ### 実装
 
-- [ ] T018 [US3] VirtualDB に設定可能なレコード上限オプションを追加
-- [ ] T019 [US3] LRU方式のレコードパージロジックを実装
-- [ ] T020 [US3] レコード数が上限に達した場合の警告ログを追加
-- [ ] T021 [US3] VirtualDB のパフォーマンステストを作成
+- [x] T018 [US3] VirtualDB に設定可能なレコード上限オプションを追加
+- [x] T019 [US3] LRU方式のレコードパージロジックを実装
+- [x] T020 [US3] レコード数が上限に達した場合の警告ログを追加
+- [x] T021 [US3] VirtualDB のパフォーマンステストを作成
 
 ### 検証
 
-- [ ] T022 [US3] 10000レコード挿入時のメモリ使用量を測定
-- [ ] T023 [US3] LRUパージが正しく動作することを確認
+- [x] T022 [US3] 10000レコード挿入時のメモリ使用量を測定
+- [x] T023 [US3] LRUパージが正しく動作することを確認
 
 **チェックポイント**: VirtualDBのメモリ管理が改善される
 

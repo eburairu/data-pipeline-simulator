@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
 
 export interface DBRecord {
   id: string;
@@ -13,6 +13,20 @@ export interface DBFilter {
   value: string;
 }
 
+// VirtualDBの設定オプション
+export interface VirtualDBOptions {
+  // レコードの上限数（デフォルト: 10000）
+  maxRecords?: number;
+  // 上限到達時の警告を表示するか（デフォルト: true）
+  showWarnings?: boolean;
+}
+
+// デフォルト設定
+const DEFAULT_OPTIONS: Required<VirtualDBOptions> = {
+  maxRecords: 10000,
+  showWarnings: true,
+};
+
 interface VirtualDBContextType {
   records: DBRecord[];
   insert: (table: string, data: Record<string, unknown>) => void;
@@ -20,13 +34,26 @@ interface VirtualDBContextType {
   query: (table: string, filters: DBFilter[]) => DBRecord[];
   update: (table: string, id: string, data: Record<string, unknown>) => void;
   remove: (table: string, id: string) => void;
+  getRecordCount: () => number;
+  getMaxRecords: () => number;
 }
 
 const VirtualDBContext = createContext<VirtualDBContextType | undefined>(undefined);
 
-export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+interface VirtualDBProviderProps {
+  children: ReactNode;
+  options?: VirtualDBOptions;
+}
+
+export const VirtualDBProvider: React.FC<VirtualDBProviderProps> = ({ children, options }) => {
+  // 設定をマージ
+  const config = { ...DEFAULT_OPTIONS, ...options };
+
   // FR-003: ページリロード時に全てのデータはリセットされる（永続化は行わない）
   const [records, setRecords] = useState<DBRecord[]>([]);
+
+  // 警告が既に表示されたかを追跡（同じ警告を繰り返さないため）
+  const warningShownRef = useRef(false);
 
   const insert = useCallback((table: string, data: Record<string, unknown>) => {
     const newRecord: DBRecord = {
@@ -35,9 +62,30 @@ export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children 
       table,
       insertedAt: Date.now(),
     };
-    setRecords((prev) => [...prev, newRecord]);
+    setRecords((prev) => {
+      // LRU方式でレコードをパージ
+      // 上限に達している場合、最も古いレコードを削除
+      if (prev.length >= config.maxRecords) {
+        // 警告ログを出力（初回のみ）
+        if (config.showWarnings && !warningShownRef.current) {
+          console.warn(
+            `[VirtualDB] レコード上限(${config.maxRecords})に達しました。古いレコードがLRU方式で自動削除されます。`
+          );
+          warningShownRef.current = true;
+        }
+
+        // insertedAtでソートし、最も古いレコードを除外して新しいレコードを追加
+        // パフォーマンスのため、削除するレコード数を計算
+        const recordsToRemove = prev.length - config.maxRecords + 1;
+        const sorted = [...prev].sort((a, b) => a.insertedAt - b.insertedAt);
+        const remaining = sorted.slice(recordsToRemove);
+        return [...remaining, newRecord];
+      }
+
+      return [...prev, newRecord];
+    });
     console.log(`[DB] Inserted into ${table}:`, data);
-  }, []);
+  }, [config.maxRecords, config.showWarnings]);
 
   const select = useCallback((table: string) => {
     return records.filter((r) => r.table === table);
@@ -89,8 +137,20 @@ export const VirtualDBProvider: React.FC<{ children: ReactNode }> = ({ children 
     console.log(`[DB] Deleted record ${id} from ${table}`);
   }, []);
 
+  // 現在のレコード数を取得
+  const getRecordCount = useCallback(() => {
+    return records.length;
+  }, [records.length]);
+
+  // 最大レコード数を取得
+  const getMaxRecords = useCallback(() => {
+    return config.maxRecords;
+  }, [config.maxRecords]);
+
   return (
-    <VirtualDBContext.Provider value={{ records, insert, select, query, update, remove }}>
+    <VirtualDBContext.Provider
+      value={{ records, insert, select, query, update, remove, getRecordCount, getMaxRecords }}
+    >
       {children}
     </VirtualDBContext.Provider>
   );
