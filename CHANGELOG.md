@@ -1,3 +1,16 @@
+# [1.6.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.5.0...v1.6.0) (2026-02-06)
+
+
+### Bug Fixes
+
+* resolve TypeScript compilation errors in TargetConfigPanel and MappingEngine tests ([793ac68](https://github.com/eburairu/data-pipeline-simulator/commit/793ac68be4b8b7f6e77f2ec1364ef216b74af36b))
+
+
+### Features
+
+* add accessibility improvements (T033-T042) ([c682199](https://github.com/eburairu/data-pipeline-simulator/commit/c6821990939ca2505a6fb924cb96ccfdef6691d7))
+* implement CIH topic schema enforcement ([5e2230f](https://github.com/eburairu/data-pipeline-simulator/commit/5e2230f1021e53b4b56302d9449cdbd8067bdb71))
+
 # [1.5.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.4.0...v1.5.0) (2026-02-06)
 
 
