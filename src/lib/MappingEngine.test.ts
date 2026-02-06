@@ -71,6 +71,7 @@ describe('MappingEngine Reject File', () => {
             mapping,
             [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
+            [],
             mockFs,
             mockDb,
             state
@@ -161,6 +162,7 @@ describe('MappingEngine Reject File', () => {
             mapping,
             [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
+            [],
             mockFs,
             mockDb,
             state
@@ -216,6 +218,7 @@ describe('MappingEngine Reject File', () => {
             task,
             mapping,
             [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
+            [],
             [],
             mockFs,
             mockDb,

@@ -61,7 +61,7 @@ describe('MappingEngine New Features', () => {
 
         const mockConn = { id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition;
 
-        const { stats } = await executeMappingTask(task, mapping, [mockConn], mockTables, mockFs, mockDb, {});
+        const { stats } = await executeMappingTask(task, mapping, [mockConn], mockTables, [], mockFs, mockDb, {});
 
         // WebService mock logic in Engine returns { id: 101, name: 'Simulated User', ... } for /users URL
         // We expect output to have userName='Simulated User'
@@ -106,7 +106,7 @@ describe('MappingEngine New Features', () => {
             { id: 'c2', name: 'Conn2', type: 'file', host: 'h1' } as ConnectionDefinition
         ];
 
-        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, mockFs, mockDb, {});
+        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, [], mockFs, mockDb, {});
 
         expect(stats.transformations['t_hp'].output).toBe(1);
 
@@ -149,7 +149,7 @@ describe('MappingEngine New Features', () => {
         const conns = [{ id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition];
 
         // Should throw
-        await expect(executeMappingTask(task, mapping, conns, mockTables, mockFs, mockDb, {})).rejects.toThrow(/Execution halted/);
+        await expect(executeMappingTask(task, mapping, conns, mockTables, [], mockFs, mockDb, {})).rejects.toThrow(/Execution halted/);
     });
 
     it('should load parameters from file', async () => {
@@ -188,7 +188,7 @@ describe('MappingEngine New Features', () => {
             { id: 'c2', name: 'Conn2', type: 'file', host: 'h1' } as ConnectionDefinition
         ];
 
-        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, mockFs, mockDb, {});
+        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, [], mockFs, mockDb, {});
         expect(stats.transformations['t_exp'].output).toBe(1);
 
         // Check output file content

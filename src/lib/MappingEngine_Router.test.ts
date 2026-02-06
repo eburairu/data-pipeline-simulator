@@ -117,6 +117,7 @@ describe('MappingEngine Router', () => {
             mapping,
             connections,
             [],
+            [],
             mockFs,
             mockDb,
             {}

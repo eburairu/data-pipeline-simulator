@@ -440,6 +440,7 @@ export const useSimulationEngine = (
                 mapping,
                 connections,
                 tables,
+                topics,
                 {
                     listFiles: (h, p) => listFiles(h, p),
                     readFile: (h, p, f) => listFiles(h, p).find(fi => fi.name === f)?.content || '',

@@ -62,6 +62,7 @@ describe('MappingEngine CSV Parsing Error', () => {
             mapping,
             [{ id: 'conn1', name: 'FileConn', type: 'file', host: 'local' }],
             [],
+            [],
             mockFs,
             mockDb,
             state
