@@ -27,7 +27,7 @@ import {
 } from './MappingTypes';
 import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition, type TopicDefinition } from './types';
 import { ExpressionFunctions } from './ExpressionFunctions';
-import { decompressRecursive, applyCompressionActions } from './ArchiveEngine';
+import { decompressRecursive, applyCompressionActions, isCompressed } from './ArchiveEngine';
 
 export interface DbRecord {
     id: string;
@@ -385,11 +385,27 @@ const processTarget = async (
                 let recordToDb = rowToProcess;
                 if (tableDef) {
                     const filtered: DataRow = {};
+                    let hasMatch = false;
                     tableDef.columns.forEach(col => {
                         if (Object.prototype.hasOwnProperty.call(rowToProcess, col.name)) {
                             filtered[col.name] = rowToProcess[col.name];
+                            hasMatch = true;
                         }
                     });
+
+                    if (!hasMatch && Object.keys(rowToProcess).length > 0) {
+                        stats.transformations[node.id].errors++;
+                        if (!stats.rejectRows) stats.rejectRows = [];
+                        if (stats.rejectRows.length < 100) {
+                            stats.rejectRows.push({
+                                row: row,
+                                error: `No columns match target table '${tableName}'`,
+                                transformationName: node.name
+                            });
+                        }
+                        checkStopOnErrors(stats, task);
+                        continue;
+                    }
                     recordToDb = filtered;
                 }
 
@@ -1103,6 +1119,17 @@ export const executeMappingTaskRecursive = async (
                 const rawContent = fs.readFile(conn.host, path, file.name);
                 let filesToProcess = [{ name: file.name, content: rawContent }];
 
+                // Check for unhandled compression
+                if (!config.decompression && isCompressed(rawContent)) {
+                    stats.transformations[sourceNode.id].errors++;
+                    if (!stats.rejectRows) stats.rejectRows = [];
+                    stats.rejectRows.push({
+                        row: { file: file.name },
+                        error: `Compressed file detected but decompression is disabled.`,
+                        transformationName: sourceNode.name
+                    });
+                }
+
                 if (config.decompression) {
                     const decompressed = decompressRecursive(rawContent, file.name);
                     // Use decompressed files if any, otherwise keep original (though decompressRecursive returns original if no prefix)
@@ -1139,9 +1166,20 @@ export const executeMappingTaskRecursive = async (
                         try {
                             const parsed = JSON.parse(processingFile.content);
                             fileRecords = Array.isArray(parsed) ? parsed : [parsed];
-                        } catch {
-                            // If it's not JSON, maybe treat as raw text line-by-line or single record?
-                            // Existing logic fell back to single record with content
+                        } catch (e) {
+                            // If it's not JSON, only treat as raw if it's not clearly a failed decompression attempt
+                            if (!config.decompression && isCompressed(processingFile.content)) {
+                                // Already handled above or newly detected
+                            } else {
+                                stats.transformations[sourceNode.id].errors++;
+                                if (!stats.rejectRows) stats.rejectRows = [];
+                                stats.rejectRows.push({
+                                    row: { file: processingFile.name },
+                                    error: `Failed to parse JSON: ${e instanceof Error ? e.message : String(e)}`,
+                                    transformationName: sourceNode.name
+                                });
+                            }
+                            // Fallback to raw for backward compatibility if needed, but it will be marked as error
                             fileRecords = [{ file: processingFile.name, content: processingFile.content }];
                         }
                     }
