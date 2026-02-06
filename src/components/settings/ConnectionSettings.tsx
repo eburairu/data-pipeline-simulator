@@ -27,7 +27,7 @@ const ConnectionSettings: React.FC = () => {
   return (
     <div className="space-y-4 p-4 border rounded bg-white shadow-sm">
       <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
-        <Server className="w-5 h-5" /> Connections
+        <Server className="w-5 h-5" aria-hidden="true" /> Connections
       </h3>
       <p className="text-xs text-gray-500">Define host connections. Specific paths/tables are configured in each job.</p>
 
@@ -35,16 +35,17 @@ const ConnectionSettings: React.FC = () => {
         {connections.map((conn) => (
           <div key={conn.id} className="border p-4 rounded-md bg-gray-50 relative">
              <div className="absolute top-2 right-2">
-                <button onClick={() => removeConnection(conn.id)} className="text-red-500 hover:text-red-700" title="Delete Connection">
-                  <Trash2 size={18} />
+                <button onClick={() => removeConnection(conn.id)} className="text-red-500 hover:text-red-700" title="Delete Connection" aria-label={`接続 ${conn.name} を削除`}>
+                  <Trash2 size={18} aria-hidden="true" />
                 </button>
              </div>
 
              <div className="grid gap-3">
                 <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Connection Name</label>
+                     <label htmlFor={`conn-name-${conn.id}`} className="block text-xs font-medium text-gray-500">Connection Name</label>
                      <input
+                        id={`conn-name-${conn.id}`}
                         type="text"
                         value={conn.name}
                         onChange={(e) => handleChange(conn.id, { name: e.target.value })}
@@ -57,14 +58,16 @@ const ConnectionSettings: React.FC = () => {
                         <button
                             onClick={() => handleTypeChange(conn.id, 'file')}
                             className={`flex items-center gap-1 px-3 py-1 rounded text-xs border ${conn.type === 'file' ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white text-gray-600'}`}
+                            aria-pressed={conn.type === 'file'}
                         >
-                            <FileText size={14} /> File
+                            <FileText size={14} aria-hidden="true" /> File
                         </button>
                         <button
                              onClick={() => handleTypeChange(conn.id, 'database')}
                              className={`flex items-center gap-1 px-3 py-1 rounded text-xs border ${conn.type === 'database' ? 'bg-purple-100 border-purple-300 text-purple-700' : 'bg-white text-gray-600'}`}
+                             aria-pressed={conn.type === 'database'}
                         >
-                            <Database size={14} /> Database
+                            <Database size={14} aria-hidden="true" /> Database
                         </button>
                      </div>
                    </div>
@@ -72,8 +75,9 @@ const ConnectionSettings: React.FC = () => {
 
                 <div className={`grid grid-cols-1 gap-3 p-2 rounded border ${conn.type === 'file' ? 'bg-blue-50 border-blue-100' : 'bg-purple-50 border-purple-100'}`}>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500">Host</label>
+                    <label htmlFor={`conn-host-${conn.id}`} className="block text-xs font-medium text-gray-500">Host</label>
                     <select
+                      id={`conn-host-${conn.id}`}
                       value={conn.host || ''}
                       onChange={(e) => handleChange(conn.id, { host: e.target.value })}
                       className="w-full border rounded p-1 text-sm bg-white"

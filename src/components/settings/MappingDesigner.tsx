@@ -465,19 +465,20 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                     {node.type.toUpperCase()} Properties
                     <div className="flex items-center gap-2">
                         {!readOnly && (
-                            <button onClick={() => removeTransformation(node.id)} className="text-red-500 hover:text-red-700">
-                                <Trash2 size={16} />
+                            <button onClick={() => removeTransformation(node.id)} className="text-red-500 hover:text-red-700" aria-label="変換を削除">
+                                <Trash2 size={16} aria-hidden="true" />
                             </button>
                         )}
-                        <button onClick={() => setSelectedNodeId(null)} className="md:hidden text-gray-500 hover:text-gray-700">
-                            <X size={16} />
+                        <button onClick={() => setSelectedNodeId(null)} className="md:hidden text-gray-500 hover:text-gray-700" aria-label="パネルを閉じる">
+                            <X size={16} aria-hidden="true" />
                         </button>
                     </div>
                 </div>
 
                 <div>
-                    <label className="block text-xs text-gray-500">Name</label>
+                    <label htmlFor={`trans-name-${node.id}`} className="block text-xs text-gray-500">Name</label>
                     <input
+                        id={`trans-name-${node.id}`}
                         disabled={readOnly}
                         className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
                         value={node.name}
@@ -529,15 +530,16 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                         className="font-bold bg-transparent border-none focus:ring-0 text-sm min-w-0 flex-grow disabled:text-gray-600"
                         value={editingMapping.name}
                         onChange={e => setEditingMapping({ ...editingMapping, name: e.target.value })}
+                        aria-label="マッピング名"
                     />
                     <div className="flex gap-2 shrink-0">
                         {!readOnly && (
-                            <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-                                <Save size={14} /> <span className="hidden sm:inline">Save</span>
+                            <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700" aria-label="マッピングを保存">
+                                <Save size={14} aria-hidden="true" /> <span className="hidden sm:inline">Save</span>
                             </button>
                         )}
-                        <button onClick={() => setEditingMapping(null)} className="flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300">
-                            <X size={14} /> <span className="hidden sm:inline">{readOnly ? 'Close' : 'Cancel'}</span>
+                        <button onClick={() => setEditingMapping(null)} className="flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" aria-label={readOnly ? 'マッピングを閉じる' : 'キャンセル'}>
+                            <X size={14} aria-hidden="true" /> <span className="hidden sm:inline">{readOnly ? 'Close' : 'Cancel'}</span>
                         </button>
                     </div>
                 </div>
@@ -550,6 +552,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                                 <button
                                     key={t.type}
                                     title={`Add ${t.label}`}
+                                    aria-label={`${t.label} を追加`}
                                     onClick={() => addTransformation(t.type as TransformationType)}
                                     className="flex items-center gap-2 p-1 rounded hover:bg-gray-200 group transition-colors"
                                 >

@@ -92,8 +92,9 @@ const DatabaseSettings: React.FC = () => {
                 className="p-1 rounded text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
                 title="Delete Table"
                 type="button"
+                aria-label={`テーブル ${table.name} を削除`}
               >
-                <Trash2 size={18} />
+                <Trash2 size={18} aria-hidden="true" />
               </button>
             </div>
 
@@ -121,8 +122,9 @@ const DatabaseSettings: React.FC = () => {
                       className="p-1 rounded text-gray-400 hover:text-red-600 transition-colors"
                       title="Delete Column"
                       type="button"
+                      aria-label={`列 ${col.name} を削除`}
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={16} aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -135,6 +137,7 @@ const DatabaseSettings: React.FC = () => {
                   value={newColumnInputs[table.id]?.name || ''}
                   onChange={(e) => handleColumnInputChange(table.id, 'name', e.target.value)}
                   placeholder="Column name"
+                  aria-label="列名"
                   className="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
                   onKeyDown={(e) => e.key === 'Enter' && handleAddColumn(table.id)}
                 />
@@ -142,6 +145,7 @@ const DatabaseSettings: React.FC = () => {
                   value={newColumnInputs[table.id]?.type || 'string'}
                   onChange={(e) => handleColumnInputChange(table.id, 'type', e.target.value)}
                   className="border rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400 bg-white"
+                  aria-label="列の型"
                 >
                   <option value="string">String</option>
                   <option value="number">Number</option>
@@ -164,9 +168,10 @@ const DatabaseSettings: React.FC = () => {
 
       {/* Add Table Section */}
       <div className="pt-4 border-t">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Create New Table</label>
+        <label htmlFor="new-table-name" className="block text-sm font-medium text-gray-700 mb-2">Create New Table</label>
         <div className="flex gap-2">
           <input
+            id="new-table-name"
             type="text"
             value={newTableName}
             onChange={(e) => setNewTableName(e.target.value)}
@@ -186,13 +191,20 @@ const DatabaseSettings: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          onClick={cancelDelete}
+          onKeyDown={(e) => e.key === 'Escape' && cancelDelete()}
+        >
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-full">
-                <AlertTriangle className="text-red-600" size={24} />
+                <AlertTriangle className="text-red-600" size={24} aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
+              <h3 id="delete-confirm-title" className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
             </div>
 
             <p className="text-gray-600 mb-6">
