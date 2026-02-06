@@ -27,6 +27,7 @@ import {
 } from './MappingTypes';
 import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition, type TopicDefinition } from './types';
 import { ExpressionFunctions } from './ExpressionFunctions';
+import { decompressRecursive, applyCompressionActions } from './ArchiveEngine';
 
 export interface DbRecord {
     id: string;
@@ -454,13 +455,20 @@ const processTarget = async (
         } else if (targetConn.type === 'file') {
             const path = node.config.path || '/';
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `output_${timestamp}.json`;
+            let filename = `output_${timestamp}.json`;
             const cleanBatch = batch.map(r => {
                 const c = { ...r };
                 delete c['_strategy'];
                 return c;
             });
-            const content = JSON.stringify(cleanBatch, null, 2);
+            let content = JSON.stringify(cleanBatch, null, 2);
+
+            if (node.config.compressionActions && node.config.compressionActions.length > 0) {
+                const res = applyCompressionActions(content, node.config.compressionActions, filename);
+                content = res.content;
+                filename = res.finalFilename;
+            }
+
             fs.writeFile(targetConn.host, path, filename, content);
             processedBatch.push(...cleanBatch);
         }
@@ -1092,43 +1100,60 @@ export const executeMappingTaskRecursive = async (
             const file = files.find(f => !processedSet.has(`${task.id}:${f.name}`));
 
             if (file) {
-                const content = fs.readFile(conn.host, path, file.name);
-                if (file.name.endsWith('.csv')) {
-                    try {
-                        const lines = content.split(/\r?\n/);
-                        if (lines.length > 0) {
-                            const headers = lines[0].split(',');
-                            records = lines.slice(1).filter(l => l.trim()).map(line => {
-                                const vals = line.split(',');
-                                const rec: DataRow = {};
-                                headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
-                                return rec;
-                            });
-                        }
-                    } catch (e) {
-                        console.error(`[MappingEngine] Failed to parse CSV file: ${file.name}`, e);
-                        stats.transformations[sourceNode.id].errors++;
-                        if (!stats.rejectRows) stats.rejectRows = [];
-                        stats.rejectRows.push({
-                            row: { file: file.name },
-                            error: `Failed to parse CSV: ${e instanceof Error ? e.message : String(e)}`,
-                            transformationName: sourceNode.name
-                        });
-                    }
-                } else {
-                    try {
-                        const parsed = JSON.parse(content);
-                        records = Array.isArray(parsed) ? parsed : [parsed];
-                    } catch {
-                        records = [{ file: file.name, content: content }];
+                const rawContent = fs.readFile(conn.host, path, file.name);
+                let filesToProcess = [{ name: file.name, content: rawContent }];
+
+                if (config.decompression) {
+                    const decompressed = decompressRecursive(rawContent, file.name);
+                    // Use decompressed files if any, otherwise keep original (though decompressRecursive returns original if no prefix)
+                    if (decompressed.files.length > 0) {
+                        filesToProcess = decompressed.files.map(f => ({ name: f.filename, content: f.content }));
                     }
                 }
 
-                if (config.filenameColumn && config.filenameColumn.trim()) {
-                    records = records.map(rec => ({
-                        ...rec,
-                        [config.filenameColumn!]: file.name
-                    }));
+                for (const processingFile of filesToProcess) {
+                    let fileRecords: DataRow[] = [];
+                    if (processingFile.name.endsWith('.csv')) {
+                        try {
+                            const lines = processingFile.content.split(/\r?\n/);
+                            if (lines.length > 0) {
+                                const headers = lines[0].split(',');
+                                fileRecords = lines.slice(1).filter(l => l.trim()).map(line => {
+                                    const vals = line.split(',');
+                                    const rec: DataRow = {};
+                                    headers.forEach((h, i) => rec[h.trim()] = vals[i]?.trim());
+                                    return rec;
+                                });
+                            }
+                        } catch (e) {
+                            console.error(`[MappingEngine] Failed to parse CSV file: ${processingFile.name}`, e);
+                            stats.transformations[sourceNode.id].errors++;
+                            if (!stats.rejectRows) stats.rejectRows = [];
+                            stats.rejectRows.push({
+                                row: { file: processingFile.name },
+                                error: `Failed to parse CSV: ${e instanceof Error ? e.message : String(e)}`,
+                                transformationName: sourceNode.name
+                            });
+                        }
+                    } else {
+                        try {
+                            const parsed = JSON.parse(processingFile.content);
+                            fileRecords = Array.isArray(parsed) ? parsed : [parsed];
+                        } catch {
+                            // If it's not JSON, maybe treat as raw text line-by-line or single record?
+                            // Existing logic fell back to single record with content
+                            fileRecords = [{ file: processingFile.name, content: processingFile.content }];
+                        }
+                    }
+
+                    if (config.filenameColumn && config.filenameColumn.trim()) {
+                        fileRecords = fileRecords.map(rec => ({
+                            ...rec,
+                            [config.filenameColumn!]: processingFile.name
+                        }));
+                    }
+                    
+                    records.push(...fileRecords);
                 }
 
                 if (!newState.processedFiles) newState.processedFiles = new Set(processedSet);

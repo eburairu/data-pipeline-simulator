@@ -1,9 +1,39 @@
 import React from 'react';
-import { useSettings, type GenerationJob, type ColumnSchema, type GeneratorType } from '../../lib/SettingsContext';
+import { useSettings, type GenerationJob, type ColumnSchema, type GeneratorType, type CompressionFormat } from '../../lib/SettingsContext';
 import { validateGenerationJob, type ValidationError } from '../../lib/validation';
-import { Trash2, Plus, FileText, AlignJustify, List } from 'lucide-react';
+import { Trash2, Plus, FileText, AlignJustify, List, Archive } from 'lucide-react';
 
 const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list', 'timestamp'];
+
+const CompressionActionsEditor: React.FC<{ actions: CompressionFormat[], onChange: (actions: CompressionFormat[]) => void }> = ({ actions, onChange }) => {
+    const addAction = (format: CompressionFormat) => onChange([...actions, format]);
+    const removeAction = (index: number) => onChange(actions.filter((_, i) => i !== index));
+
+    return (
+        <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap gap-2 items-center min-h-[24px]">
+                {actions.length === 0 && <span className="text-gray-400 text-xs italic">No compression</span>}
+                {actions.map((action, i) => (
+                    <div key={i} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs flex items-center gap-1 border border-blue-200">
+                        {action}
+                        <button onClick={() => removeAction(i)} className="text-blue-500 hover:text-red-500 font-bold px-1">×</button>
+                    </div>
+                ))}
+            </div>
+            <div className="flex gap-2 mt-1">
+                {(['gz', 'tar', 'zip'] as CompressionFormat[]).map(fmt => (
+                    <button 
+                        key={fmt} 
+                        onClick={() => addAction(fmt)} 
+                        className="px-2 py-0.5 text-xs border rounded hover:bg-gray-50 text-gray-600 flex items-center gap-1"
+                    >
+                        <Plus size={10} /> {fmt}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 const ParamInput = ({ label, id, ...props }: any) => {
     const inputId = id || `param-${label?.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -296,6 +326,16 @@ const DataSourceSettings: React.FC = () => {
                         title={getErrorMsg('executionInterval')}
                      />
                    </div>
+                </div>
+
+                <div className="border-t pt-3 mt-1">
+                    <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                        <Archive size={14} /> Compression Actions (Applied sequentially)
+                    </label>
+                    <CompressionActionsEditor 
+                        actions={job.compressionActions || []} 
+                        onChange={(newActions) => handleJobChange(job.id, 'compressionActions', newActions)} 
+                    />
                 </div>
 
                 {/* Mode Selector */}

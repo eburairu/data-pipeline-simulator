@@ -4,6 +4,7 @@ import { useFileSystem } from '../VirtualFileSystem';
 import { generateDataFromSchema } from '../DataGenerator';
 import { processTemplate } from '../templateUtils';
 import { TIMEOUTS } from '../constants';
+import { applyCompressionActions } from '../ArchiveEngine';
 
 export const useSimulationTimers = (
     isRunning: { generator: boolean; transfer: boolean; mapping: boolean },
@@ -46,7 +47,17 @@ export const useSimulationTimers = (
                 } else {
                     content = processTemplate(job.fileContent, ctx);
                 }
-                writeFile(conn.host, job.path, processTemplate(job.fileNamePattern, ctx), content);
+
+                let finalContent = content;
+                let finalFileName = processTemplate(job.fileNamePattern, ctx);
+
+                if (job.compressionActions && job.compressionActions.length > 0) {
+                    const result = applyCompressionActions(finalContent, job.compressionActions, finalFileName);
+                    finalContent = result.content;
+                    finalFileName = result.finalFilename;
+                }
+
+                writeFile(conn.host, job.path, finalFileName, finalContent);
             }, job.executionInterval);
         }).filter(Boolean) as ReturnType<typeof setInterval>[];
         return () => timers.forEach(clearInterval);

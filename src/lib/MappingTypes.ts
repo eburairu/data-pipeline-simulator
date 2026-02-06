@@ -1,3 +1,5 @@
+import { type CompressionFormat } from './types';
+
 export type TransformationType = 
   | 'source' | 'target' | 'filter' | 'expression' | 'aggregator' 
   | 'validator' | 'joiner' | 'lookup' | 'router' | 'sorter' 
@@ -17,6 +19,7 @@ export interface SourceConfig {
   tableName?: string;
   deleteAfterRead?: boolean;
   filenameColumn?: string;
+  decompression?: boolean;
 }
 
 export interface TargetConfig {
@@ -29,6 +32,7 @@ export interface TargetConfig {
   updateColumns?: string[];
   deduplicationKeys?: string[];
   duplicateBehavior?: 'error' | 'ignore' | 'update';
+  compressionActions?: CompressionFormat[];
 }
 
 export interface FilterConfig {

@@ -24,6 +24,8 @@ export interface ColumnSchema {
   params: Record<string, string | number | boolean | string[] | number[]>;
 }
 
+export type CompressionFormat = 'none' | 'gz' | 'tar' | 'zip';
+
 export interface GenerationJob {
   id: string;
   name: string;
@@ -36,6 +38,7 @@ export interface GenerationJob {
   schema?: ColumnSchema[];
   executionInterval: number;
   enabled: boolean;
+  compressionActions?: CompressionFormat[];
 }
 
 export interface DataSourceSettings {

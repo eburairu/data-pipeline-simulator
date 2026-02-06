@@ -45,21 +45,41 @@ const SourceConfigPanel: React.FC<TransformationConfigProps> = ({
 
       {/* ファイルまたはテーブルの選択 */}
       {connInfo?.type === 'file' && (
-        <div>
-          <label className="block text-xs text-gray-500">パス</label>
-          <select
-            disabled={readOnly}
-            className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
-            value={sourceConfig.path || ''}
-            onChange={(e) => onChange({ ...config, path: e.target.value })}
-          >
-            <option value="">パスを選択</option>
-            {connInfo.directories?.map((dir) => (
-              <option key={dir} value={dir}>
-                {dir}
-              </option>
-            ))}
-          </select>
+        <div className="space-y-3">
+            <div>
+            <label className="block text-xs text-gray-500">パス</label>
+            <select
+                disabled={readOnly}
+                className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
+                value={sourceConfig.path || ''}
+                onChange={(e) => onChange({ ...config, path: e.target.value })}
+            >
+                <option value="">パスを選択</option>
+                {connInfo.directories?.map((dir) => (
+                <option key={dir} value={dir}>
+                    {dir}
+                </option>
+                ))}
+            </select>
+            </div>
+
+            <div className="pt-1 border-t border-gray-100">
+            <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                type="checkbox"
+                disabled={readOnly}
+                checked={sourceConfig.decompression || false}
+                onChange={(e) =>
+                    onChange({ ...config, decompression: e.target.checked })
+                }
+                className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+                />
+                <div className="flex flex-col">
+                    <span className="text-xs text-gray-700 font-medium">自動展開（Decompress Recursively）</span>
+                    <span className="text-[10px] text-gray-500">gz, tar, zipなどを再帰的に展開して処理します。tarの場合は含まれる全ファイルを処理します。</span>
+                </div>
+            </label>
+            </div>
         </div>
       )}
 
