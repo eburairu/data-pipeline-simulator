@@ -3,6 +3,7 @@ import { useSettings } from '../SettingsContext';
 import { useFileSystem } from '../VirtualFileSystem';
 import { generateDataFromSchema } from '../DataGenerator';
 import { processTemplate } from '../templateUtils';
+import { TIMEOUTS } from '../constants';
 
 export const useSimulationTimers = (
     isRunning: { generator: boolean; transfer: boolean; mapping: boolean },
@@ -99,7 +100,7 @@ export const useSimulationTimers = (
         // Run retention check every 5 seconds
         const timer = setInterval(() => {
             enginesRef.current.checkTopicRetention();
-        }, 5000);
+        }, TIMEOUTS.TOPIC_RETENTION_CHECK);
         return () => clearInterval(timer);
     }, []);
 };

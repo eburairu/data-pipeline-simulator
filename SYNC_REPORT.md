@@ -1,22 +1,21 @@
-## ドキュメント同期レポート - 2026-02-02
+## ドキュメント同期レポート - 2026-02-05
 
 ### 検出された変更
-- **Data Generator機能拡張**: `sin`, `cos` (周期的変動), `sequence` (連番), `uuid` (一意識別子) などの新しいジェネレータタイプの実装を確認しました。
-- **BI Dashboard機能強化**: 1秒ごとの自動更新機能 (Auto Run) と、エラー発生時のクラッシュを防ぐ Error Boundary の実装を確認しました。
-- **ETL機能の実装完了**: `LPAD`, `SYSDATE` などのExpression関数や、ETLエンジンの拡張機能が実装されていることを確認しました。
-- **システムリファクタリングの完了**: `useSimulationEngine` フックによるロジックの分離と最適化が完了していることを確認しました。
+- **UIコンポーネント分割 (012)**: 16種類の変換タイプ用ConfigPanelコンポーネントが新規作成され、`src/components/settings/mapping/` に配置されました。`JobDetailModal` も `JobMonitor` から分離されました。
+- **型安全性向上 (013)**: `src/lib/constants.ts` が導入され、マジックナンバーの定数化が進行中です。`src/lib/context/` 配下に新しいコンテキストファイルが作成されています。
+- **仕様書の追加**: `006` から `013` までの新しい仕様書とタスク定義が追加されています。
 
 ### 更新したドキュメント
 - **README.md**:
-    - `Data Generation` セクションに、サポートされるジェネレータタイプの一覧を追記しました。
-    - `Visualization` セクションに、BI Dashboard の Auto Run と Error Boundary 機能について追記しました。
-- **.specify/specs/004-etl-enhancements/spec.md**:
-    - 実装確認に基づき、Status を `Draft` から `Implemented` に更新しました。
-- **.specify/specs/005-system-refactoring/spec.md**:
-    - 実装確認に基づき、Status を `In Progress` から `Completed` に更新しました。
+    - 「詳細仕様」セクションに、`006` から `013` までの仕様書リンクを追加しました。
+- **.specify/specs/012-ui-component-decomposition/spec.md**:
+    - 実装状況に基づき、Status を `Draft` から `In Progress` に更新しました。
+- **.specify/specs/013-type-safety-improvements/spec.md**:
+    - 実装状況に基づき、Status を `Draft` から `In Progress` に更新しました。
 
 ### 注意が必要な項目
-- 特になし。実装とドキュメントの同期は良好です。
+- **MappingDesignerの統合**: ConfigPanelコンポーネントは作成されましたが、`MappingDesigner.tsx` はまだこれらのコンポーネントを使用するようにリファクタリングされていません（タスク T029）。
+- **ステータスの不一致**: 一部のタスクは実装済みですが、仕様書のステータスは `Draft` のままでした。これを `In Progress` に更新しました。
 
 ### 推奨事項
-- 今後、新しいExpression関数を追加する際は、`ExpressionFunctions.ts` だけでなく、`README.md` または `spec.md` の関数リストも同時に更新することを推奨します。
+- `MappingDesigner.tsx` のリファクタリングタスク (T029) を優先的に完了させることを推奨します。これにより、コードの保守性が大幅に向上します。

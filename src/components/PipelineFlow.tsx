@@ -1,12 +1,13 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
-import dagre from 'dagre';
-import { LayoutGrid, GitBranch, Workflow } from 'lucide-react';
+import { LayoutGrid, GitBranch, Workflow, BarChart3 } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
 import { type SourceConfig, type TargetConfig } from '../lib/MappingTypes';
+import { usePipelineLayout } from '../lib/hooks/usePipelineLayout';
+import { STEP_KEYS } from '../lib/constants';
 import StorageNode from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
 
@@ -22,11 +23,14 @@ interface PipelineFlowProps {
 const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const { listFiles } = useFileSystem();
   const { select } = useVirtualDB();
-  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections } = useSettings();
+  const { dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, biDashboard, tables } = useSettings();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+
+  // dagreレイアウト計算のカスタムフック（メモ化済み）
+  const { calculateLayout } = usePipelineLayout();
 
   const getCount = useCallback((conn: ConnectionDefinition, path?: string, tableName?: string) => {
     try {
@@ -195,7 +199,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         calculatedNodes.push({
           id, type: 'process',
           position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
-          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_1_${job.id}`) }
+          data: { label: job.name, isProcessing: activeSteps.includes(`${STEP_KEYS.COLLECTION_TRANSFER}_${job.id}`) }
         });
         calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
         calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
@@ -223,7 +227,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         calculatedNodes.push({
           id, type: 'process',
           position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
-          data: { label: job.name, isProcessing: activeSteps.includes(`transfer_2_${job.id}`) }
+          data: { label: job.name, isProcessing: activeSteps.includes(`${STEP_KEYS.DELIVERY_TRANSFER}_${job.id}`) }
         });
         calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
         calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
@@ -286,7 +290,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         id: taskId,
         type: 'process',
         position: { x: TASK_START_X + 200, y: avgY },
-        data: { label: task.name, isProcessing: activeSteps.includes(`mapping_task_${task.id}`) }
+        data: { label: task.name, isProcessing: activeSteps.includes(`${STEP_KEYS.MAPPING_TASK}_${task.id}`) }
       });
 
       // Edges
@@ -376,7 +380,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         position: { x: TASK_START_X + 500, y: 50 },
         data: {
             label: `Flow: ${flow.name}`,
-            isProcessing: activeSteps.includes(`task_flow_${flow.id}`),
+            isProcessing: activeSteps.includes(`${STEP_KEYS.TASK_FLOW}_${flow.id}`),
             icon: <GitBranch size={16} className="text-indigo-600" />
         }
       });
@@ -458,6 +462,62 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     });
 
 
+    // --- 5. Render BI Dashboard ---
+
+    biDashboard.items.forEach((item, index) => {
+      const dashboardId = `process-bi-${item.id}`;
+
+      // ダッシュボードノードを追加
+      calculatedNodes.push({
+        id: dashboardId,
+        type: 'process',
+        position: { x: TASK_START_X + 700, y: 50 + index * 150 },
+        data: {
+          label: `BI: ${item.title || 'Dashboard'}`,
+          isProcessing: false,
+          icon: <BarChart3 size={16} className="text-emerald-600" />
+        }
+      });
+
+      // テーブルへの接続（データソース）
+      const tableDef = tables.find(t => t.id === item.tableId);
+      if (tableDef) {
+        // テーブルノードを追加（存在しない場合のみ）
+        const tableKey = `db:${tableDef.name}`;
+        if (!keyNodeMap.has(tableKey)) {
+          const tableNodeId = `storage-${tableKey.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+          const tableNode: Node = {
+            id: tableNodeId,
+            type: 'storage',
+            position: { x: TASK_START_X + 500, y: 50 + index * 150 },
+            data: {
+              label: `DB: ${tableDef.name}`,
+              type: 'db',
+              count: select(tableDef.name).length
+            },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+          };
+          calculatedNodes.push(tableNode);
+          keyNodeMap.set(tableKey, tableNode);
+        }
+
+        // テーブルからダッシュボードへのエッジ
+        const tableNode = keyNodeMap.get(tableKey);
+        if (tableNode) {
+          calculatedEdges.push({
+            id: `e-bi-${item.id}-${tableNode.id}`,
+            source: tableNode.id,
+            target: dashboardId,
+            animated: false,
+            style: { stroke: '#10b981', strokeWidth: 1.5 },
+            label: 'visualizes'
+          });
+        }
+      }
+    });
+
+
     // --- Legacy ETL (Disabled visual) ---
     // (Old ETL visualization code removed)
 
@@ -483,104 +543,24 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     setEdges(calculatedEdges);
 
-  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
+  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, biDashboard, tables, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
 
   // Auto-align nodes when the flow is initialized
   const [hasAutoAligned, setHasAutoAligned] = useState(false);
   useEffect(() => {
     if (rfInstance && nodes.length > 0 && edges.length > 0 && !hasAutoAligned) {
       setHasAutoAligned(true);
-      // Delay to ensure nodes are rendered
+      // ノードが描画されるのを待ってからレイアウト計算
       window.requestAnimationFrame(() => {
-        const dagreGraph = new dagre.graphlib.Graph();
-        dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-        const isMobile = window.innerWidth < 768;
-        const rankdir = 'LR'; // Force Left-to-Right layout even on mobile
-        dagreGraph.setGraph({ rankdir });
-
-        const getWidth = (node: Node) => {
-            const baseWidth = node.type === 'storage' ? 220 : 180;
-            return isMobile ? baseWidth * 0.8 : baseWidth;
-        };
-        const getHeight = (node: Node) => {
-            const baseHeight = node.type === 'storage' ? 120 : 80;
-            return isMobile ? baseHeight * 0.8 : baseHeight;
-        };
-
-        nodes.forEach((node) => {
-          dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
-        });
-        edges.forEach((edge) => {
-          dagreGraph.setEdge(edge.source, edge.target);
-        });
-
-        dagre.layout(dagreGraph);
-
-        const layoutedNodes = nodes.map((node) => {
-          const nodeWithPosition = dagreGraph.node(node.id);
-          return {
-            ...node,
-            targetPosition: Position.Left,
-            sourcePosition: Position.Right,
-            width: getWidth(node),
-            height: getHeight(node),
-            position: {
-              x: nodeWithPosition.x - getWidth(node) / 2,
-              y: nodeWithPosition.y - getHeight(node) / 2,
-            },
-          };
-        });
-
+        const layoutedNodes = calculateLayout(nodes, edges);
         setNodes(layoutedNodes);
         rfInstance.fitView({ padding: 0.2, duration: 800 });
       });
     }
-  }, [rfInstance, nodes, edges, hasAutoAligned, setNodes]);
+  }, [rfInstance, nodes, edges, hasAutoAligned, setNodes, calculateLayout]);
 
   const onLayout = useCallback(() => {
-    const dagreGraph = new dagre.graphlib.Graph();
-    dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-    const isMobile = window.innerWidth < 768;
-    const rankdir = 'LR'; // Force Left-to-Right layout even on mobile
-
-    const getWidth = (node: Node) => {
-        const baseWidth = node.type === 'storage' ? 220 : 180;
-        return isMobile ? baseWidth * 0.8 : baseWidth;
-    };
-    const getHeight = (node: Node) => {
-        const baseHeight = node.type === 'storage' ? 120 : 80;
-        return isMobile ? baseHeight * 0.8 : baseHeight;
-    };
-
-    dagreGraph.setGraph({ rankdir });
-
-    nodes.forEach((node) => {
-      dagreGraph.setNode(node.id, { width: getWidth(node), height: getHeight(node) });
-    });
-
-    edges.forEach((edge) => {
-      dagreGraph.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(dagreGraph);
-
-    const layoutedNodes = nodes.map((node) => {
-      const nodeWithPosition = dagreGraph.node(node.id);
-      return {
-        ...node,
-        targetPosition: Position.Left,
-        sourcePosition: Position.Right,
-        width: getWidth(node),
-        height: getHeight(node),
-        position: {
-          x: nodeWithPosition.x - getWidth(node) / 2,
-          y: nodeWithPosition.y - getHeight(node) / 2,
-        },
-      };
-    });
-
+    const layoutedNodes = calculateLayout(nodes, edges);
     setNodes(layoutedNodes);
 
     if (rfInstance) {
@@ -588,7 +568,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         rfInstance.fitView({ padding: 0.2, duration: 800 });
       });
     }
-  }, [nodes, edges, setNodes, rfInstance]);
+  }, [nodes, edges, setNodes, rfInstance, calculateLayout]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>

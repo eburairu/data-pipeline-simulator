@@ -6,6 +6,7 @@ import { useJobMonitor } from '../JobMonitorContext';
 import { processTemplate } from '../templateUtils';
 import { executeMappingTaskRecursive, type ExecutionState, type ExecutionStats, type DbRecord } from '../MappingEngine';
 import type { DataRow } from '../types';
+import { SYSTEM_TABLES, STEP_KEYS, TIMEOUTS } from '../constants';
 
 export const useSimulationEngine = (
     toggleStep: (step: string, active: boolean) => void,
@@ -105,10 +106,10 @@ export const useSimulationEngine = (
             // 増分処理: 処理済みファイルをフィルタリング
             const loadMode = job.loadMode || 'full';
             if (loadMode === 'incremental' || loadMode === 'initial_and_incremental') {
-                const processedRecords = select('_sys_subscription_state');
+                const processedRecords = select(SYSTEM_TABLES.SUBSCRIPTION_STATE);
                 const processedFiles = processedRecords
-                    .filter((r) => (r as any).data?.jobId === job.id && (r as any).data?.jobType === 'collection')
-                    .map((r) => (r as any).data?.fileName)
+                    .filter((r) => r.data.jobId === job.id && r.data.jobType === 'collection')
+                    .map((r) => r.data.fileName as string)
                     .filter(Boolean);
 
                 const processedSet = new Set(processedFiles);
@@ -127,7 +128,7 @@ export const useSimulationEngine = (
 
             collectionLocks.current[job.id] = true;
             lockFile(sourceHost, sourcePath, file.name);
-            toggleStep(`transfer_1_${job.id}`, true);
+            toggleStep(`${STEP_KEYS.COLLECTION_TRANSFER}_${job.id}`, true);
             const startTime = Date.now();
 
             const logId = addLog({
@@ -143,7 +144,7 @@ export const useSimulationEngine = (
 
             // リトライ機構
             const maxRetries = job.retryConfig?.maxRetries || 0;
-            const retryDelayMs = job.retryConfig?.retryDelayMs || 1000;
+            const retryDelayMs = job.retryConfig?.retryDelayMs || TIMEOUTS.RETRY_DELAY;
             const backoffMultiplier = job.retryConfig?.backoffMultiplier || 2;
             const continueOnError = job.retryConfig?.continueOnError || false;
             let retryCount = 0;
@@ -191,7 +192,7 @@ export const useSimulationEngine = (
                     // 増分処理: 処理済みファイルを記録
                     const loadMode = job.loadMode || 'full';
                     if (loadMode === 'incremental' || loadMode === 'initial_and_incremental') {
-                        insert('_sys_subscription_state', {
+                        insert(SYSTEM_TABLES.SUBSCRIPTION_STATE, {
                             jobId: job.id,
                             jobType: 'collection',
                             fileName: file.name,
@@ -246,7 +247,7 @@ export const useSimulationEngine = (
 
             // クリーンアップ
             unlockFile(sourceHost, sourcePath, file.name);
-            toggleStep(`transfer_1_${job.id}`, false);
+            toggleStep(`${STEP_KEYS.COLLECTION_TRANSFER}_${job.id}`, false);
             collectionLocks.current[job.id] = false;
         } catch {
             collectionLocks.current[job.id] = false;
@@ -295,12 +296,12 @@ export const useSimulationEngine = (
             if (currentFiles.length === 0) return;
 
             if (job.sourceType === 'topic') {
-                const processedRecords = select('_sys_subscription_state');
+                const processedRecords = select(SYSTEM_TABLES.SUBSCRIPTION_STATE);
                 // jobId でフィルタリングして、このジョブが処理済みのファイルのみをスキップ
                 const processedSet = new Set(
                     processedRecords
-                        .filter((r) => (r as any).data?.jobId === job.id)
-                        .map((r) => (r as any).data?.fileName)
+                        .filter((r) => r.data.jobId === job.id)
+                        .map((r) => r.data.fileName as string)
                         .filter(Boolean)
                 );
                 currentFiles = currentFiles.filter(f => !processedSet.has(f.name));
@@ -320,7 +321,7 @@ export const useSimulationEngine = (
 
             deliveryLocks.current[job.id] = true;
             lockFile(sourceHost, sourcePath, file.name);
-            toggleStep(`transfer_2_${job.id}`, true);
+            toggleStep(`${STEP_KEYS.DELIVERY_TRANSFER}_${job.id}`, true);
             const startTime = Date.now();
 
             const logId = addLog({
@@ -341,7 +342,7 @@ export const useSimulationEngine = (
                 if (job.sourceType === 'topic') {
                     // Topic source always copies (subscription model)
                     writeFile(targetHost, targetPath, file.name, file.content);
-                    insert('_sys_subscription_state', { jobId: job.id, fileName: file.name, timestamp: Date.now() });
+                    insert(SYSTEM_TABLES.SUBSCRIPTION_STATE, { jobId: job.id, fileName: file.name, timestamp: Date.now() });
                 } else {
                     // Host source: check if source file should be deleted after transfer (default: true = move)
                     const shouldDeleteSource = job.deleteSourceAfterTransfer !== false;
@@ -380,7 +381,7 @@ export const useSimulationEngine = (
                 });
             } finally {
                 unlockFile(sourceHost, sourcePath, file.name);
-                toggleStep(`transfer_2_${job.id}`, false);
+                toggleStep(`${STEP_KEYS.DELIVERY_TRANSFER}_${job.id}`, false);
                 deliveryLocks.current[job.id] = false;
             }
         } catch {
@@ -403,7 +404,7 @@ export const useSimulationEngine = (
         if (sources.length === 0) return null;
 
         mappingLocks.current[task.id] = true;
-        toggleStep(`mapping_task_${task.id}`, true);
+        toggleStep(`${STEP_KEYS.MAPPING_TASK}_${task.id}`, true);
         const startTime = Date.now();
 
         const logId = addLog({
@@ -479,7 +480,7 @@ export const useSimulationEngine = (
                 setErrors(prev => prev.filter(e => !e.includes(`Task ${task.name}`)));
                 const downstreamTasks = mappingTasks.filter(t => t.dependencies?.includes(taskId));
                 downstreamTasks.forEach(t => {
-                    setTimeout(() => executeMappingJob(t.id), 500);
+                    setTimeout(() => executeMappingJob(t.id), TIMEOUTS.MAPPING_DEPENDENCY_DELAY);
                 });
             }
             return resultCounts;
@@ -494,7 +495,7 @@ export const useSimulationEngine = (
             return null;
         } finally {
             await delay(500);
-            toggleStep(`mapping_task_${task.id}`, false);
+            toggleStep(`${STEP_KEYS.MAPPING_TASK}_${task.id}`, false);
             mappingLocks.current[task.id] = false;
         }
     }, [mappingTasks, mappings, connections, tables, listFiles, deleteFile, writeFile, select, insert, update, remove, addLog, toggleStep, updateLog, setErrors]);
@@ -503,7 +504,7 @@ export const useSimulationEngine = (
         const flow = taskFlows.find(f => f.id === flowId);
         if (!flow || !flow.enabled) return;
 
-        toggleStep(`task_flow_${flow.id}`, true);
+        toggleStep(`${STEP_KEYS.TASK_FLOW}_${flow.id}`, true);
         const startTime = Date.now();
         const logId = addLog({
             jobId: flow.id,
@@ -557,7 +558,7 @@ export const useSimulationEngine = (
                 errorMessage: e instanceof Error ? e.message : 'Unknown error during flow execution'
             });
         } finally {
-            toggleStep(`task_flow_${flow.id}`, false);
+            toggleStep(`${STEP_KEYS.TASK_FLOW}_${flow.id}`, false);
         }
     }, [taskFlows, toggleStep, addLog, executeMappingJob, updateLog]);
 

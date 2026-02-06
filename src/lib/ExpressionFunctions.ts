@@ -4,7 +4,7 @@
 export const ExpressionFunctions = {
     // Logic
     IIF: <T>(condition: boolean, trueVal: T, falseVal: T): T => (condition ? trueVal : falseVal),
-    DECODE: <T>(value: any, ...args: any[]): T | null => {
+    DECODE: <T>(value: unknown, ...args: unknown[]): T | null => {
         // decode(val, search1, result1, search2, result2, ..., default)
         for (let i = 0; i < args.length - 1; i += 2) {
             if (String(value) === String(args[i])) return args[i + 1] as T;
@@ -13,8 +13,8 @@ export const ExpressionFunctions = {
     },
 
     // Null handling
-    ISNULL: (val: any): boolean => val === null || val === undefined || val === '',
-    NVL: <T>(val: T | null | undefined | string, defaultVal: T): T => (val === null || val === undefined || val === '') ? defaultVal : (val as T),
+    ISNULL: (val: unknown): boolean => val === null || val === undefined || val === '',
+    NVL: <T>(val: T | null | undefined, defaultVal: T): T => (val === null || val === undefined || val === '') ? defaultVal : (val as T),
 
     // String
     SUBSTR: (str: string, start: number, length?: number): string | null => {
@@ -32,7 +32,7 @@ export const ExpressionFunctions = {
     LENGTH: (str: string): number => (typeof str === 'string' ? str.length : 0),
     UPPER: (str: string): string => (typeof str === 'string' ? str.toUpperCase() : str),
     LOWER: (str: string): string => (typeof str === 'string' ? str.toLowerCase() : str),
-    CONCAT: (...args: string[]): string => args.join(''),
+    CONCAT: (...args: unknown[]): string => args.map(String).join(''),
     TRIM: (str: string): string => (typeof str === 'string' ? str.trim() : str),
 
     // String Enhancements
@@ -57,11 +57,11 @@ export const ExpressionFunctions = {
         // Global replace
         return str.split(search).join(replace);
     },
-    IS_NUMBER: (val: any): boolean => {
+    IS_NUMBER: (val: unknown): boolean => {
         if (val === null || val === undefined || val === '') return false;
         return !isNaN(Number(val));
     },
-    IS_SPACES: (val: any): boolean => {
+    IS_SPACES: (val: unknown): boolean => {
         if (typeof val !== 'string') return false;
         return val.trim().length === 0;
     },
@@ -116,7 +116,7 @@ export const ExpressionFunctions = {
     },
 
     // JSON Handling
-    JSON_VALUE: <T = any>(json: string, path: string): T | null => {
+    JSON_VALUE: <T = unknown>(json: string, path: string): T | null => {
         if (!json) return null;
         try {
             const obj = JSON.parse(json);
@@ -154,18 +154,18 @@ export const ExpressionFunctions = {
     },
 
     // Number Enhancements
-    ABS: (val: any): number => Math.abs(Number(val)),
-    CEIL: (val: any): number => Math.ceil(Number(val)),
-    FLOOR: (val: any): number => Math.floor(Number(val)),
-    ROUND: (val: any, decimals: number = 0): number => {
+    ABS: (val: unknown): number => Math.abs(Number(val)),
+    CEIL: (val: unknown): number => Math.ceil(Number(val)),
+    FLOOR: (val: unknown): number => Math.floor(Number(val)),
+    ROUND: (val: unknown, decimals: number = 0): number => {
         const factor = Math.pow(10, decimals);
         return Math.round(Number(val) * factor) / factor;
     },
-    TRUNC: (val: any, decimals: number = 0): number => {
+    TRUNC: (val: unknown, decimals: number = 0): number => {
         const factor = Math.pow(10, decimals);
         return Math.trunc(Number(val) * factor) / factor;
     },
-    MOD: (dividend: any, divisor: any): number => Number(dividend) % Number(divisor),
+    MOD: (dividend: unknown, divisor: unknown): number => Number(dividend) % Number(divisor),
 
     // Date
     GET_DATE: (): Date => new Date(), // Returns Date object
@@ -173,7 +173,7 @@ export const ExpressionFunctions = {
         // Very basic parsing, ignoring format for now as JS Date handles ISO well
         return new Date(str);
     },
-    TO_CHAR: (val: any, _format?: string): string => {
+    TO_CHAR: (val: unknown, _format?: string): string => {
         if (val instanceof Date) return val.toISOString();
         return String(val);
     },
@@ -217,19 +217,19 @@ export const ExpressionFunctions = {
         else if (part === 'YYYY') { d.setMonth(0, 1); d.setHours(0, 0, 0, 0); }
         return d;
     },
-    IS_DATE: (val: any, _format?: string): boolean => {
+    IS_DATE: (val: unknown, _format?: string): boolean => {
         if (!val) return false;
-        const d = new Date(val);
+        const d = new Date(val as string | number | Date);
         return !isNaN(d.getTime());
     },
 
     // Conversion
-    TO_INTEGER: (val: any): number => parseInt(String(val), 10),
-    TO_DECIMAL: (val: any, scale: number = 0): number | null => {
+    TO_INTEGER: (val: unknown): number => parseInt(String(val), 10),
+    TO_DECIMAL: (val: unknown, scale: number = 0): number | null => {
         const num = parseFloat(String(val));
         return isNaN(num) ? null : Number(num.toFixed(scale));
     },
-    TO_FLOAT: (val: any): number => parseFloat(String(val)),
+    TO_FLOAT: (val: unknown): number => parseFloat(String(val)),
 };
 
 // Helper to expose these to the execution context

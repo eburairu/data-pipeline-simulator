@@ -3,9 +3,10 @@ import { useVirtualDB, type DBFilter, type DBRecord } from '../lib/VirtualDB';
 import { useSettings, type DashboardItem } from '../lib/SettingsContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Play, Plus, Trash2, Filter, Table as TableIcon, Activity, AlertTriangle } from 'lucide-react';
+import { TIMEOUTS } from '../lib/constants';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
-  constructor(props: any) {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null };
   }
@@ -92,7 +93,7 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
   // Auto-refresh logic (Manual Toggle 1s)
   useEffect(() => {
     if (autoRefresh && selectedTableId) {
-        const interval = setInterval(() => handleRunQueryRef.current(), 1000);
+        const interval = setInterval(() => handleRunQueryRef.current(), TIMEOUTS.DASHBOARD_AUTO_REFRESH);
         return () => clearInterval(interval);
     }
   }, [autoRefresh, selectedTableId]);
@@ -142,7 +143,7 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
   const chartData = useMemo(() => {
     if (viewType !== 'chart') return [];
     return results.map(r => {
-      const d: any = { ...r.data };
+      const d: Record<string, unknown> = { ...r.data };
       if (yAxis) {
         const val = Number(d[yAxis]);
         d[yAxis] = isNaN(val) ? null : val;
@@ -234,7 +235,7 @@ const DashboardWidget: React.FC<DashboardWidgetProps> = ({ item }) => {
                                 </select>
                                 <select
                                     value={f.operator}
-                                    onChange={(e) => updateFilter(i, 'operator', e.target.value as any)}
+                                    onChange={(e) => updateFilter(i, 'operator', e.target.value)}
                                     className="border rounded p-1 text-[10px] bg-white w-[40px]"
                                 >
                                     <option value="=">=</option>
