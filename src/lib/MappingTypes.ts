@@ -20,7 +20,9 @@ export interface SourceConfig {
 }
 
 export interface TargetConfig {
-  connectionId: string;
+  connectionId?: string;
+  targetType?: 'connection' | 'topic';
+  topicId?: string;
   path?: string;
   tableName?: string;
   truncate?: boolean;

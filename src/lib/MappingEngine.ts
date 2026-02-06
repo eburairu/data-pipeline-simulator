@@ -25,7 +25,7 @@ import {
     type HierarchyParserTransformation,
     type SourceConfig // Used in executeMappingTaskRecursive
 } from './MappingTypes';
-import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition } from './types';
+import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition, type TopicDefinition } from './types';
 import { ExpressionFunctions } from './ExpressionFunctions';
 
 export interface DbRecord {
@@ -248,13 +248,118 @@ const processTarget = async (
     batch: DataRow[],
     connections: ConnectionDefinition[],
     tables: TableDefinition[],
+    topics: TopicDefinition[],
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats,
     task: MappingTask
 ): Promise<DataRow[]> => {
-    const targetConn = connections.find(c => c.id === node.config.connectionId);
     const processedBatch: DataRow[] = [];
+
+    // Topic Target Processing
+    if (node.config.targetType === 'topic' && node.config.topicId) {
+        const topic = topics.find(t => t.id === node.config.topicId);
+        if (!topic) {
+            stats.transformations[node.id].errors += batch.length;
+             if (!stats.rejectRows) stats.rejectRows = [];
+             stats.rejectRows.push({
+                row: batch.length > 0 ? batch[0] : {},
+                error: `Topic not found: ${node.config.topicId}`,
+                transformationName: node.name
+             });
+            return [];
+        }
+
+        const validBatch: DataRow[] = [];
+        for (const row of batch) {
+            let isValid = true;
+            const cleanRow: DataRow = {};
+
+            // Remove internal flags
+            const rawRow = { ...row };
+            delete rawRow['_strategy'];
+
+            if (topic.schema && topic.schema.length > 0) {
+                // Schema Enforcement
+                for (const field of topic.schema) {
+                    let val = rawRow[field.name];
+
+                    // Check existence
+                    if (val === undefined || val === null) {
+                         if (topic.schemaEnforcement === 'strict') {
+                             isValid = false; break;
+                         } else {
+                             val = null; // Lenient: Treat as null
+                         }
+                    }
+
+                    // Check Type (Simplified)
+                    if (val !== null) {
+                        if (field.type === 'number') {
+                            if (typeof val === 'number') {
+                                // OK
+                            } else {
+                                if (topic.schemaEnforcement === 'strict') {
+                                    isValid = false; break;
+                                } else {
+                                    const num = Number(val);
+                                    if (isNaN(num)) {
+                                        val = null;
+                                    } else {
+                                        val = num; // Auto-cast
+                                    }
+                                }
+                            }
+                        }
+                        // Add other type checks as needed
+                    }
+                    cleanRow[field.name] = val;
+                }
+
+                // Check for unknown fields in Strict mode
+                if (isValid && topic.schemaEnforcement === 'strict') {
+                    for (const key of Object.keys(rawRow)) {
+                        if (!topic.schema.some(f => f.name === key)) {
+                            isValid = false; break;
+                        }
+                    }
+                }
+            } else {
+                // No schema defined, pass through
+                Object.assign(cleanRow, rawRow);
+            }
+
+            if (isValid) {
+                validBatch.push(cleanRow);
+            } else {
+                stats.transformations[node.id].rejects++;
+                if (!stats.rejectRows) stats.rejectRows = [];
+                // Sample reject (don't fill memory with all rejects)
+                if (stats.rejectRows.length < 100) {
+                    stats.rejectRows.push({
+                        row: row,
+                        error: 'Schema Validation Failed',
+                        transformationName: node.name
+                    });
+                }
+            }
+        }
+
+        if (validBatch.length > 0) {
+            // Write to Topic Directory: /topics/<topicId>/<timestamp>_<batchId>.json
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `data_${timestamp}_${Math.random().toString(36).substr(2, 5)}.json`;
+            const content = JSON.stringify(validBatch, null, 2);
+            // Assuming 'localhost' for internal storage
+            fs.writeFile('localhost', `/topics/${topic.id}/`, filename, content);
+            processedBatch.push(...validBatch);
+        }
+
+        return processedBatch;
+    }
+
+    // Connection Target Processing
+    const targetConn = connections.find(c => c.id === node.config.connectionId);
 
     if (targetConn) {
         if (targetConn.type === 'database') {
@@ -717,6 +822,7 @@ const traverseAsync = async (
     mapping: Mapping,
     connections: ConnectionDefinition[],
     tables: TableDefinition[],
+    topics: TopicDefinition[],
     fs: FileSystemOps,
     db: DbOps,
     stats: ExecutionStats,
@@ -784,7 +890,7 @@ const traverseAsync = async (
                     break;
                 }
                 case 'target': {
-                    processedBatch = await processTarget(nextNode, batch, connections, tables, fs, db, stats, _task);
+                    processedBatch = await processTarget(nextNode, batch, connections, tables, topics, fs, db, stats, _task);
                     break;
                 }
                 case 'joiner': {
@@ -891,7 +997,7 @@ const traverseAsync = async (
         if (observer) observer({ ...stats });
 
         if (outputCount > 0) {
-            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, fs, db, stats, state, parameters, _task, observer);
+            await traverseAsync(nextNode, processedBatch, mapping, connections, tables, topics, fs, db, stats, state, parameters, _task, observer);
         }
     }
 };
@@ -901,6 +1007,7 @@ export const executeMappingTaskRecursive = async (
     mapping: Mapping,
     connections: ConnectionDefinition[],
     tables: TableDefinition[],
+    topics: TopicDefinition[],
     fs: FileSystemOps,
     db: DbOps,
     state: ExecutionState,
@@ -1055,7 +1162,7 @@ export const executeMappingTaskRecursive = async (
         if (observer) observer({ ...stats });
 
         if (records.length > 0) {
-            await traverseAsync(sourceNode, records, mapping, connections, tables, fs, db, stats, newState, parameters, task, observer);
+            await traverseAsync(sourceNode, records, mapping, connections, tables, topics, fs, db, stats, newState, parameters, task, observer);
         }
     }
 

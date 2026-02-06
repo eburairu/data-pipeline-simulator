@@ -55,7 +55,7 @@ describe('MappingEngine Advanced Features', () => {
         (mockFs.readFile as any).mockReturnValue('col1\nA\nB'); // 2 rows
 
         // First Execution
-        const res1 = await executeMappingTaskRecursive(task, mapping, connections as any, [], mockFs, mockDb, state);
+        const res1 = await executeMappingTaskRecursive(task, mapping, connections as any, [], [], mockFs, mockDb, state);
 
         // Expect sequence to start at 100
         // Row 1: 100
@@ -68,7 +68,7 @@ describe('MappingEngine Advanced Features', () => {
         (mockFs.readFile as any).mockReturnValue('col1\nC'); // 1 row
 
         // Pass newState from first execution
-        const res2 = await executeMappingTaskRecursive(task, mapping, connections as any, [], mockFs, mockDb, res1.newState);
+        const res2 = await executeMappingTaskRecursive(task, mapping, connections as any, [], [], mockFs, mockDb, res1.newState);
 
         // Expect sequence to continue from 120
         // Row 1: 120
@@ -121,7 +121,7 @@ describe('MappingEngine Advanced Features', () => {
         mapping.links.push({ id: 'l2', sourceId: exprId, targetId: targetId });
         connections.push({ id: 'conn_out', name: 'OutConn', type: 'file', host: 'local' } as any);
 
-        await executeMappingTaskRecursive(task, mapping, connections as any, [], mockFs, mockDb, state);
+        await executeMappingTaskRecursive(task, mapping, connections as any, [], [], mockFs, mockDb, state);
 
         const writeCall = (mockFs.writeFile as any).mock.calls.find((c: any) => c[1] === '/out');
         const content = JSON.parse(writeCall[3]);
@@ -179,7 +179,7 @@ describe('MappingEngine Advanced Features', () => {
             { id: 'u2', data: { user_id: '102', email: 'bob@example.com' } }
         ]);
 
-        await executeMappingTaskRecursive(task, mapping, connections as any, [], mockFs, mockDb, state);
+        await executeMappingTaskRecursive(task, mapping, connections as any, [], [], mockFs, mockDb, state);
 
         // Verify select was called (to build cache)
         expect(mockDb.select).toHaveBeenCalledWith('users');
