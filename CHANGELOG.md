@@ -1,3 +1,22 @@
+# [1.5.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.4.0...v1.5.0) (2026-02-06)
+
+
+### Features
+
+* add BI Dashboard nodes to pipeline visualization ([1c98780](https://github.com/eburairu/data-pipeline-simulator/commit/1c98780916f31dbeee94829254ecfbd208df175c))
+* add gemini-speckit skill for SDD specification generation ([46f69a8](https://github.com/eburairu/data-pipeline-simulator/commit/46f69a8fdf4be1e2e4e60a25fd56893d2b3cdb5f))
+* add UI component decomposition infrastructure and ConfigPanels ([9e3fd55](https://github.com/eburairu/data-pipeline-simulator/commit/9e3fd55012b3b5cbb06c99c85672b53dec1e7c9e))
+* complete all transformation ConfigPanels and use constants ([99c2de3](https://github.com/eburairu/data-pipeline-simulator/commit/99c2de3296d30edb313caddc83c667f7726f2579))
+* implement type safety improvements and SettingsContext split ([1ec9955](https://github.com/eburairu/data-pipeline-simulator/commit/1ec9955fa703476f7f2ffce4b5a478b39282e377))
+
+
+### Performance Improvements
+
+* add LRU-based memory management to VirtualDB ([87def73](https://github.com/eburairu/data-pipeline-simulator/commit/87def736528b9731904cd7cf5f10afa0d1810746))
+* **mapping:** optimize validator regex compilation ([51b263a](https://github.com/eburairu/data-pipeline-simulator/commit/51b263ab77d7fa26391740c996eafdb4808e9cf0))
+* optimize JobMonitor and PipelineFlow rendering performance ([0351428](https://github.com/eburairu/data-pipeline-simulator/commit/0351428345c5c66fe7f05529f353894ef3eaf6d5))
+* optimize VirtualDB select performance with map-based storage ([044db8c](https://github.com/eburairu/data-pipeline-simulator/commit/044db8c345379afaa72a25023dded777a3d20fd1))
+
 # [1.4.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.3.0...v1.4.0) (2026-02-04)
 
 
