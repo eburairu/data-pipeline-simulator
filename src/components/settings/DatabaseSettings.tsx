@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useSettings } from '../../lib/SettingsContext';
-import { Database, Trash2, Plus, Columns, AlertTriangle, X } from 'lucide-react';
+import { Database, Trash2, Plus, AlertTriangle, X } from 'lucide-react';
+import TableEditor from '../common/TableEditor';
 
 interface DeleteConfirmation {
   type: 'table' | 'column';
@@ -44,7 +45,7 @@ const DatabaseSettings: React.FC = () => {
       addColumn(tableId, input.name.trim(), input.type || 'string');
       setNewColumnInputs(prev => ({
         ...prev,
-        [tableId]: { name: '', type: 'string' } // Reset only name, keep type default
+        [tableId]: { name: '', type: 'string' }
       }));
     }
   };
@@ -79,94 +80,24 @@ const DatabaseSettings: React.FC = () => {
 
       <div className="space-y-6">
         {tables.map((table) => (
-          <div key={table.id} className="border rounded-md bg-gray-50 overflow-hidden">
-            {/* Table Header */}
-            <div className="flex items-center justify-between p-3 bg-gray-100 border-b">
-              <div className="flex items-center gap-2 font-medium text-gray-700">
-                <Database size={18} />
-                <span>{table.name}</span>
-                <span className="text-xs text-gray-400 font-normal">({table.id})</span>
-              </div>
-              <button
-                onClick={(e) => handleRemoveTable(e, table.id, table.name)}
-                className="p-1 rounded text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
-                title="Delete Table"
-                type="button"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-
-            {/* Columns List */}
-            <div className="p-3 space-y-2">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Columns size={12} /> Columns
-              </div>
-
-              {table.columns.length === 0 && (
-                <div className="text-sm text-gray-400 italic pl-2">No columns defined</div>
-              )}
-
-              <div className="space-y-2">
-                {table.columns.map((col) => (
-                  <div key={col.name} className="flex items-center justify-between bg-white p-2 rounded border text-sm">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium text-gray-700">{col.name}</span>
-                      <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border">
-                        {col.type}
-                      </span>
-                    </div>
-                    <button
-                      onClick={(e) => handleRemoveColumn(e, table.id, col.name)}
-                      className="p-1 rounded text-gray-400 hover:text-red-600 transition-colors"
-                      title="Delete Column"
-                      type="button"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Add Column Input */}
-              <div className="mt-3 flex gap-2 items-center bg-white p-2 rounded border border-dashed border-gray-300">
-                <input
-                  type="text"
-                  value={newColumnInputs[table.id]?.name || ''}
-                  onChange={(e) => handleColumnInputChange(table.id, 'name', e.target.value)}
-                  placeholder="Column name"
-                  className="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddColumn(table.id)}
-                />
-                <select
-                  value={newColumnInputs[table.id]?.type || 'string'}
-                  onChange={(e) => handleColumnInputChange(table.id, 'type', e.target.value)}
-                  className="border rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400 bg-white"
-                >
-                  <option value="string">String</option>
-                  <option value="number">Number</option>
-                  <option value="boolean">Boolean</option>
-                  <option value="date">Date</option>
-                  <option value="json">JSON</option>
-                </select>
-                <button
-                  onClick={() => handleAddColumn(table.id)}
-                  disabled={!newColumnInputs[table.id]?.name}
-                  className="px-3 py-1 bg-purple-50 border border-purple-200 text-purple-700 rounded text-sm hover:bg-purple-100 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus size={16} /> Add
-                </button>
-              </div>
-            </div>
-          </div>
+          <TableEditor
+            key={table.id}
+            table={table}
+            onAddColumn={handleAddColumn}
+            onRemoveColumn={handleRemoveColumn}
+            onRemoveTable={handleRemoveTable}
+            columnInput={newColumnInputs[table.id] || { name: '', type: 'string' }}
+            onColumnInputChange={handleColumnInputChange}
+          />
         ))}
       </div>
 
-      {/* Add Table Section */}
+      {/* テーブル追加セクション */}
       <div className="pt-4 border-t">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Create New Table</label>
+        <label htmlFor="new-table-name" className="block text-sm font-medium text-gray-700 mb-2">Create New Table</label>
         <div className="flex gap-2">
           <input
+            id="new-table-name"
             type="text"
             value={newTableName}
             onChange={(e) => setNewTableName(e.target.value)}
@@ -184,15 +115,22 @@ const DatabaseSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* 削除確認モーダル */}
       {deleteConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          onClick={cancelDelete}
+          onKeyDown={(e) => e.key === 'Escape' && cancelDelete()}
+        >
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-full">
-                <AlertTriangle className="text-red-600" size={24} />
+                <AlertTriangle className="text-red-600" size={24} aria-hidden="true" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
+              <h3 id="delete-confirm-title" className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
             </div>
 
             <p className="text-gray-600 mb-6">

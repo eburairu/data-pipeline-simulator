@@ -5,12 +5,15 @@ import { Trash2, Plus, FileText, AlignJustify, List } from 'lucide-react';
 
 const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list', 'timestamp'];
 
-const ParamInput = ({ label, ...props }: any) => (
-    <div className="flex flex-col">
-        <label className="text-[10px] text-gray-500 font-medium ml-1 mb-0.5">{label}</label>
-        <input className="border rounded p-1 text-sm w-full" {...props} />
-    </div>
-);
+const ParamInput = ({ label, id, ...props }: any) => {
+    const inputId = id || `param-${label?.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`;
+    return (
+        <div className="flex flex-col">
+            <label htmlFor={inputId} className="text-[10px] text-gray-500 font-medium ml-1 mb-0.5">{label}</label>
+            <input id={inputId} className="border rounded p-1 text-sm w-full" {...props} />
+        </div>
+    );
+};
 
 const SchemaEditor: React.FC<{
     schema: ColumnSchema[];
@@ -60,6 +63,7 @@ const SchemaEditor: React.FC<{
                             onChange={(e) => updateColumn(col.id, { name: e.target.value })}
                             className="w-full border rounded p-1 text-sm"
                             placeholder="Name"
+                            aria-label="列名"
                         />
                     </div>
                     <div className="col-span-3">
@@ -67,6 +71,7 @@ const SchemaEditor: React.FC<{
                             value={col.type}
                             onChange={(e) => updateColumn(col.id, { type: e.target.value as GeneratorType, params: {} })}
                             className="w-full border rounded p-1 text-sm bg-white"
+                            aria-label="列の型"
                         >
                             {GENERATOR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
@@ -123,8 +128,8 @@ const SchemaEditor: React.FC<{
                         </div>
                     </div>
                     <div className="col-span-1 flex justify-end">
-                        <button onClick={() => removeColumn(col.id)} className="text-gray-400 hover:text-red-500">
-                            <Trash2 size={16} />
+                        <button onClick={() => removeColumn(col.id)} className="text-gray-400 hover:text-red-500" aria-label={`列 ${col.name} を削除`}>
+                            <Trash2 size={16} aria-hidden="true" />
                         </button>
                     </div>
                 </div>
@@ -204,14 +209,15 @@ const DataSourceSettings: React.FC = () => {
           return (
           <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
              <div className="absolute top-2 right-2">
-                <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job">
-                  <Trash2 size={18} />
+                <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job" aria-label={`ジョブ ${job.name} を削除`}>
+                  <Trash2 size={18} aria-hidden="true" />
                 </button>
              </div>
              <div className="grid gap-3">
                <div>
-                 <label className="block text-xs font-medium text-gray-500">Job Name</label>
+                 <label htmlFor={`job-name-${job.id}`} className="block text-xs font-medium text-gray-500">Job Name</label>
                  <input
+                    id={`job-name-${job.id}`}
                     type="text"
                     value={job.name}
                     onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
@@ -221,8 +227,9 @@ const DataSourceSettings: React.FC = () => {
                </div>
                <div className="grid grid-cols-2 gap-3">
                    <div>
-                        <label className="block text-xs font-medium text-gray-500">Target Connection (File)</label>
+                        <label htmlFor={`job-conn-${job.id}`} className="block text-xs font-medium text-gray-500">Target Connection (File)</label>
                         <select
+                            id={`job-conn-${job.id}`}
                             value={job.connectionId}
                             onChange={(e) => {
                                 const newConnId = e.target.value;
@@ -249,8 +256,9 @@ const DataSourceSettings: React.FC = () => {
                         </select>
                    </div>
                    <div>
-                        <label className="block text-xs font-medium text-gray-500">Target Path</label>
+                        <label htmlFor={`job-path-${job.id}`} className="block text-xs font-medium text-gray-500">Target Path</label>
                         <select
+                            id={`job-path-${job.id}`}
                             value={job.path}
                             onChange={(e) => handleJobChange(job.id, 'path', e.target.value)}
                             className={`w-full border rounded p-1 text-sm bg-white ${hasError('path') ? 'border-red-500 bg-red-50' : ''}`}
@@ -266,8 +274,9 @@ const DataSourceSettings: React.FC = () => {
                 </div>
                  <div className="grid grid-cols-2 gap-3">
                    <div>
-                     <label className="block text-xs font-medium text-gray-500">File Name Pattern</label>
+                     <label htmlFor={`job-pattern-${job.id}`} className="block text-xs font-medium text-gray-500">File Name Pattern</label>
                      <input
+                        id={`job-pattern-${job.id}`}
                         type="text"
                         value={job.fileNamePattern}
                         onChange={(e) => handleJobChange(job.id, 'fileNamePattern', e.target.value)}
@@ -277,8 +286,9 @@ const DataSourceSettings: React.FC = () => {
                      />
                    </div>
                    <div>
-                     <label className="block text-xs font-medium text-gray-500">Interval (ms)</label>
+                     <label htmlFor={`job-interval-${job.id}`} className="block text-xs font-medium text-gray-500">Interval (ms)</label>
                      <input
+                        id={`job-interval-${job.id}`}
                         type="number"
                         value={job.executionInterval}
                         onChange={(e) => handleJobChange(job.id, 'executionInterval', parseInt(e.target.value) || 0)}
@@ -309,8 +319,9 @@ const DataSourceSettings: React.FC = () => {
 
                 {currentMode === 'template' ? (
                      <div>
-                         <label className="block text-xs font-medium text-gray-500">File Content Template</label>
+                         <label htmlFor={`job-content-${job.id}`} className="block text-xs font-medium text-gray-500">File Content Template</label>
                          <textarea
+                            id={`job-content-${job.id}`}
                             value={job.fileContent}
                             onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
                             className="w-full border rounded p-1 text-sm font-mono h-32"
@@ -320,8 +331,9 @@ const DataSourceSettings: React.FC = () => {
                 ) : (
                     <div>
                          <div className="mb-2">
-                             <label className="block text-xs font-medium text-gray-500 mb-1">Rows per Execution</label>
+                             <label htmlFor={`job-rows-${job.id}`} className="block text-xs font-medium text-gray-500 mb-1">Rows per Execution</label>
                              <input
+                                id={`job-rows-${job.id}`}
                                 type="number"
                                 value={job.rowCount || 1}
                                 onChange={(e) => handleJobChange(job.id, 'rowCount', parseInt(e.target.value) || 1)}

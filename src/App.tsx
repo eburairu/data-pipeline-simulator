@@ -96,8 +96,8 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
               <Activity className="w-5 h-5" /> {t('app.control.title')}
             </h2>
             {errors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-xs sm:text-sm flex flex-col gap-1">
-                <div className="font-bold flex items-center gap-1"><AlertTriangle size={14} /> Errors Detected:</div>
+              <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-xs sm:text-sm flex flex-col gap-1" role="alert" aria-live="assertive">
+                <div className="font-bold flex items-center gap-1"><AlertTriangle size={14} aria-hidden="true" /> Errors Detected:</div>
                 <ul className="list-disc list-inside">
                   {errors.map((e, i) => <li key={i}>{e}</li>)}
                 </ul>
@@ -246,18 +246,19 @@ function App() {
               onClick={toggleLanguage}
               className="flex items-center gap-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded"
               title="Toggle Language"
+              aria-label="言語を切り替え"
             >
-              <Globe size={14} /> {language.toUpperCase()}
+              <Globe size={14} aria-hidden="true" /> {language.toUpperCase()}
             </button>
           </div>
 
-          <div className="flex bg-white rounded-lg shadow p-1 w-full sm:w-auto overflow-x-auto">
-            <button onClick={() => setActiveTab('simulation')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'simulation' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Activity size={16} /> <span className="hidden xs:inline">{t('app.tabs.simulation')}</span></button>
-            <button onClick={() => setActiveTab('dashboard')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Grid3X3 size={16} /> <span className="hidden xs:inline">{t('app.tabs.dashboard')}</span></button>
-            <button onClick={() => setActiveTab('monitor')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'monitor' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><MonitorPlay size={16} /> <span className="hidden xs:inline">{t('app.tabs.monitor')}</span></button>
-            <button onClick={() => setActiveTab('settings')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Settings size={16} /> <span className="hidden xs:inline">{t('app.tabs.settings')}</span></button>
-            <button onClick={() => setActiveTab('documentation')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'documentation' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`}><Book size={16} /> <span className="hidden xs:inline">{t('app.tabs.docs')}</span></button>
-          </div>
+          <nav className="flex bg-white rounded-lg shadow p-1 w-full sm:w-auto overflow-x-auto" aria-label="メインナビゲーション" role="tablist">
+            <button onClick={() => setActiveTab('simulation')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'simulation' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} aria-current={activeTab === 'simulation' ? 'page' : undefined}><Activity size={16} aria-hidden="true" /> <span className="hidden xs:inline">{t('app.tabs.simulation')}</span></button>
+            <button onClick={() => setActiveTab('dashboard')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} aria-current={activeTab === 'dashboard' ? 'page' : undefined}><Grid3X3 size={16} aria-hidden="true" /> <span className="hidden xs:inline">{t('app.tabs.dashboard')}</span></button>
+            <button onClick={() => setActiveTab('monitor')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'monitor' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} aria-current={activeTab === 'monitor' ? 'page' : undefined}><MonitorPlay size={16} aria-hidden="true" /> <span className="hidden xs:inline">{t('app.tabs.monitor')}</span></button>
+            <button onClick={() => setActiveTab('settings')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} aria-current={activeTab === 'settings' ? 'page' : undefined}><Settings size={16} aria-hidden="true" /> <span className="hidden xs:inline">{t('app.tabs.settings')}</span></button>
+            <button onClick={() => setActiveTab('documentation')} className={`px-3 sm:px-4 py-2 rounded-md flex gap-2 items-center text-sm sm:text-base whitespace-nowrap ${activeTab === 'documentation' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} aria-current={activeTab === 'documentation' ? 'page' : undefined}><Book size={16} aria-hidden="true" /> <span className="hidden xs:inline">{t('app.tabs.docs')}</span></button>
+          </nav>
         </div>
 
         <div className={activeTab === 'simulation' ? '' : 'hidden'}>
@@ -279,7 +280,7 @@ function App() {
               <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base">Save Settings</button>
             </div>
             {saveResult && (
-              <div className={`mb-4 p-3 rounded ${saveResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              <div className={`mb-4 p-3 rounded ${saveResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`} role="status" aria-live="polite">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <p className="font-medium">{saveResult.success ? '設定を保存しました' : '保存に失敗しました'}</p>

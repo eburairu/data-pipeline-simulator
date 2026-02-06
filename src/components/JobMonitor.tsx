@@ -149,15 +149,16 @@ const JobMonitor: React.FC = () => {
               onClick={() => setShowVisualizer(!showVisualizer)}
               className={`flex items-center gap-2 px-3 py-1 rounded border text-xs font-medium transition-colors ${showVisualizer ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
               title={showVisualizer ? "Hide Visualizer" : "Show Visualizer"}
+              aria-pressed={showVisualizer}
             >
-              {showVisualizer ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {showVisualizer ? <Minimize2 size={14} aria-hidden="true" /> : <Maximize2 size={14} aria-hidden="true" />}
               Visualizer
             </button>
             <button
               onClick={clearLogs}
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 px-3 py-1 rounded border border-gray-300 hover:border-red-300 transition-colors"
             >
-              <Trash2 size={14} />
+              <Trash2 size={14} aria-hidden="true" />
               Clear Log
             </button>
           </div>
@@ -186,14 +187,18 @@ const JobMonitor: React.FC = () => {
                 <div
                   key={log.id}
                   onClick={() => setSelectedLog(log)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedLog(log); } }}
+                  role="button"
+                  tabIndex={0}
                   className={`bg-white p-3 rounded shadow-sm border border-gray-200 space-y-2 active:bg-blue-50 transition-colors ${isChild ? 'ml-4 bg-gray-50/50' : ''}`}
+                  aria-label={`${log.jobName} - ${log.status}`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2 overflow-hidden">
                       {isChild && <CornerDownRight size={14} className="text-gray-400 shrink-0" />}
                       {log.jobType === 'taskflow' && (
-                        <button onClick={(e) => toggleFlow(log.id, e)} className="p-1">
-                          <ChevronRight size={14} className={`transition-transform ${expandedFlows.has(log.id) ? 'rotate-90' : ''}`} />
+                        <button onClick={(e) => toggleFlow(log.id, e)} className="p-1" aria-label={expandedFlows.has(log.id) ? 'タスクフローを折りたたむ' : 'タスクフローを展開'} aria-expanded={expandedFlows.has(log.id)}>
+                          <ChevronRight size={14} className={`transition-transform ${expandedFlows.has(log.id) ? 'rotate-90' : ''}`} aria-hidden="true" />
                         </button>
                       )}
                       {getTypeIcon(log.jobType)}
@@ -285,7 +290,10 @@ const JobMonitor: React.FC = () => {
                   <tr
                     key={log.id}
                     onClick={() => setSelectedLog(log)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedLog(log); } }}
+                    tabIndex={0}
                     className={`hover:bg-blue-50 transition-colors cursor-pointer group ${isChild ? 'bg-gray-50/50' : ''}`}
+                    aria-label={`${log.jobName} - ${log.status}`}
                   >
                     <td className="p-3 text-gray-500 whitespace-nowrap font-mono text-xs">
                       {formatTime(log.startTime)}
@@ -303,10 +311,13 @@ const JobMonitor: React.FC = () => {
                           <button
                             onClick={(e) => toggleFlow(log.id, e)}
                             className="p-0.5 hover:bg-gray-200 rounded transition-colors text-gray-500"
+                            aria-label={expandedFlows.has(log.id) ? 'タスクフローを折りたたむ' : 'タスクフローを展開'}
+                            aria-expanded={expandedFlows.has(log.id)}
                           >
                             <ChevronRight
                               size={14}
                               className={`transition-transform ${expandedFlows.has(log.id) ? 'rotate-90' : ''}`}
+                              aria-hidden="true"
                             />
                           </button>
                         )}
@@ -362,8 +373,9 @@ const JobMonitor: React.FC = () => {
                         onClick={() => retryJob(log.jobId, log.jobType)}
                         className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-blue-100"
                         title="Retry Job"
+                        aria-label={`${log.jobName} を再実行`}
                       >
-                        <RotateCw size={16} />
+                        <RotateCw size={16} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

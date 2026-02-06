@@ -2,7 +2,7 @@
  * ジョブ詳細モーダルコンポーネント
  * ジョブの実行結果、統計情報、エラー詳細を表示
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../../lib/JobMonitorContext';
 import { useSettings } from '../../lib/SettingsContext';
 import MappingDesigner from '../settings/MappingDesigner';
@@ -53,8 +53,42 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ log, onClose }) => {
   const [showAllTransformations, setShowAllTransformations] = useState(false);
   const { mappingTasks } = useSettings();
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
   const mappingDetails = isMapping ? (log.extendedDetails as MappingExecutionDetails) : null;
   const transferDetails = isTransfer ? (log.extendedDetails as TransferExecutionDetails) : null;
+
+  // フォーカストラップとEscキー対応
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+      return;
+    }
+    if (e.key === 'Tab' && modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+  }, [onClose]);
+
+  // モーダル表示時にフォーカスを移動、閉じる時に復元
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    const firstButton = modalRef.current?.querySelector<HTMLElement>('button');
+    firstButton?.focus();
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, []);
 
   // マッピングジョブの場合、マッピングIDを解決
   const mappingId = useMemo(() => {
@@ -64,14 +98,22 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ log, onClose }) => {
   }, [isMapping, log.jobId, mappingTasks]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="job-detail-title"
+      onKeyDown={handleKeyDown}
+      ref={modalRef}
+    >
       <div className={`bg-white rounded-lg shadow-xl w-full ${showVisual ? 'max-w-6xl h-[85vh]' : 'max-w-4xl max-h-[90vh]'} flex flex-col animate-in fade-in zoom-in duration-200 transition-all`} onClick={e => e.stopPropagation()}>
         {/* ヘッダー */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 rounded-t-lg shrink-0">
           <div className="flex items-center gap-3">
             {getTypeIcon(log.jobType)}
             <div>
-              <h3 className="font-bold text-lg text-gray-800 leading-tight">{log.jobName}</h3>
+              <h3 id="job-detail-title" className="font-bold text-lg text-gray-800 leading-tight">{log.jobName}</h3>
               <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{log.jobType} Job</p>
             </div>
           </div>
@@ -85,7 +127,7 @@ const JobDetailModal: React.FC<JobDetailModalProps> = ({ log, onClose }) => {
                 {showVisual ? 'Show Log Details' : 'Visualize Flow'}
               </button>
             )}
-            <button onClick={onClose} className="p-2 rounded hover:bg-gray-200 text-gray-500 transition-colors"><X size={20} /></button>
+            <button onClick={onClose} className="p-2 rounded hover:bg-gray-200 text-gray-500 transition-colors" aria-label="モーダルを閉じる"><X size={20} aria-hidden="true" /></button>
           </div>
         </div>
 

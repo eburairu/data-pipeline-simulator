@@ -17,8 +17,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ tables, select }) =>
       <div className="flex justify-between items-center mb-2 border-b pb-1">
         <h3 className="font-bold text-gray-700 flex items-center gap-2 text-xs sm:text-sm"><span className="w-2 h-2 rounded-full bg-gray-600"></span> {t('app.storage.database')}</h3>
         <div className="flex bg-white rounded border p-0.5">
-          <button onClick={() => setDbViewMode('text')} className={`p-1 rounded ${dbViewMode === 'text' ? 'bg-gray-200' : 'text-gray-400'}`}><List size={12} /></button>
-          <button onClick={() => setDbViewMode('table')} className={`p-1 rounded ${dbViewMode === 'table' ? 'bg-gray-200' : 'text-gray-400'}`}><Grid3X3 size={12} /></button>
+          <button onClick={() => setDbViewMode('text')} className={`p-1 rounded ${dbViewMode === 'text' ? 'bg-gray-200' : 'text-gray-400'}`} aria-label="リスト表示" aria-pressed={dbViewMode === 'text'}><List size={12} aria-hidden="true" /></button>
+          <button onClick={() => setDbViewMode('table')} className={`p-1 rounded ${dbViewMode === 'table' ? 'bg-gray-200' : 'text-gray-400'}`} aria-label="テーブル表示" aria-pressed={dbViewMode === 'table'}><Grid3X3 size={12} aria-hidden="true" /></button>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

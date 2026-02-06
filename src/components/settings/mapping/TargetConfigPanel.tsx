@@ -14,7 +14,7 @@ const TargetConfigPanel: React.FC<TransformationConfigProps> = ({
   getConnectionInfo,
 }) => {
   const targetConfig = config as unknown as TargetConfig;
-  const connInfo = getConnectionInfo?.(targetConfig.connectionId);
+  const connInfo = targetConfig.connectionId ? getConnectionInfo?.(targetConfig.connectionId) : undefined;
 
   return (
     <div className="space-y-3">

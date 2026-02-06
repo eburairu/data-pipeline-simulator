@@ -1,122 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import ReactFlow, {
-    Background,
-    Controls,
-    Panel,
-    type Node,
-    type Edge,
-    type Connection,
-    Handle,
-    Position,
-    MarkerType,
-    type ReactFlowInstance,
-    useNodesState,
-    useEdgesState,
-    type NodeChange,
-    type EdgeChange
-} from 'reactflow';
+import ReactFlow, { Background, Controls, Panel, type Node, type Edge, type Connection, MarkerType, type ReactFlowInstance, useNodesState, useEdgesState, type NodeChange, type EdgeChange } from 'reactflow';
 import 'reactflow/dist/style.css';
-import dagre from 'dagre';
 import { useSettings } from '../../lib/SettingsContext';
 import {
     type Mapping,
-    type Transformation,
     type TransformationType,
 } from '../../lib/MappingTypes';
 import { type ExecutionStats } from '../../lib/MappingEngine';
-import MetricEdge from '../MetricEdge';
-import { Trash2, Plus, Save, X, Edit3, LayoutGrid, Search, GitFork, ArrowUpDown, Merge, Repeat, Award, Hash, Flag, Sparkles, Copy, Table, Columns, Database, Globe, FileJson, CheckSquare } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit3, LayoutGrid } from 'lucide-react';
 import { getConfigPanel, registerDefaultConfigPanels } from './mapping';
-
-// --- Constants ---
-const TRANSFORMATION_TYPES = [
-    { type: 'source', label: 'Source', short: 'SRC', bg: 'bg-green-100', border: 'border-green-500', icon: null },
-    { type: 'target', label: 'Target', short: 'TGT', bg: 'bg-red-100', border: 'border-red-500', icon: null },
-    { type: 'filter', label: 'Filter', short: 'FLT', bg: 'bg-yellow-100', border: 'border-yellow-500', icon: null },
-    { type: 'expression', label: 'Expression', short: 'EXP', bg: 'bg-purple-100', border: 'border-purple-500', icon: null },
-    { type: 'aggregator', label: 'Aggregator', short: 'AGG', bg: 'bg-orange-100', border: 'border-orange-500', icon: null },
-    { type: 'lookup', label: 'Lookup', short: null, bg: 'bg-cyan-100', border: 'border-cyan-500', icon: Search },
-    { type: 'joiner', label: 'Joiner', short: 'JOIN', bg: 'bg-blue-100', border: 'border-blue-500', icon: null },
-    { type: 'union', label: 'Union', short: null, bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Merge },
-    { type: 'router', label: 'Router', short: null, bg: 'bg-lime-100', border: 'border-lime-500', icon: GitFork },
-    { type: 'sorter', label: 'Sorter', short: null, bg: 'bg-amber-100', border: 'border-amber-500', icon: ArrowUpDown },
-    { type: 'normalizer', label: 'Normalizer', short: null, bg: 'bg-violet-100', border: 'border-violet-500', icon: Repeat },
-    { type: 'rank', label: 'Rank', short: null, bg: 'bg-rose-100', border: 'border-rose-500', icon: Award },
-    { type: 'sequence', label: 'Sequence', short: null, bg: 'bg-sky-100', border: 'border-sky-500', icon: Hash },
-    { type: 'updateStrategy', label: 'Update Strategy', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Flag },
-    { type: 'validator', label: 'Validator', short: null, bg: 'bg-pink-100', border: 'border-pink-500', icon: CheckSquare },
-    { type: 'cleansing', label: 'Cleansing', short: null, bg: 'bg-teal-100', border: 'border-teal-500', icon: Sparkles },
-    { type: 'deduplicator', label: 'Deduplicator', short: null, bg: 'bg-orange-100', border: 'border-orange-500', icon: Copy },
-    { type: 'pivot', label: 'Pivot', short: null, bg: 'bg-purple-100', border: 'border-purple-500', icon: Table },
-    { type: 'unpivot', label: 'Unpivot', short: null, bg: 'bg-fuchsia-100', border: 'border-fuchsia-500', icon: Columns },
-    { type: 'webService', label: 'Web Service', short: 'WS', bg: 'bg-indigo-100', border: 'border-indigo-500', icon: Globe },
-    { type: 'hierarchyParser', label: 'Hierarchy Parser', short: 'HP', bg: 'bg-green-100', border: 'border-green-500', icon: FileJson },
-    { type: 'sql', label: 'SQL', short: null, bg: 'bg-slate-100', border: 'border-slate-500', icon: Database },
-];
-
-// --- Custom Nodes for Designer ---
-const DesignerNode = ({ data }: { data: { label: string, type: string, isSelected: boolean, stats?: { input: number, output: number, errors: number, rejects: number } } }) => {
-    const style = data.isSelected ? { border: '2px solid #2563eb' } : {};
-    return (
-        <div className={`px-4 py-2 shadow-md rounded-md bg-white border border-gray-200 text-xs w-32 flex flex-col items-center justify-center relative`} style={style}>
-            <Handle type="target" position={Position.Left} className="w-2 h-2" />
-            <div className="font-bold text-center truncate w-full">{data.label}</div>
-            <div className="text-[10px] text-gray-500 uppercase">{data.type}</div>
-
-            {/* Stats Overlay */}
-            {data.stats && (data.stats.input > 0 || data.stats.output > 0 || data.stats.errors > 0) && (
-                <div className="absolute -top-3 -right-3 bg-white border border-gray-200 shadow-sm rounded-lg p-1 flex flex-col items-center text-[8px] z-10 min-w-[40px]">
-                    {data.stats.errors > 0 && <span className="text-red-600 font-bold">Err: {data.stats.errors}</span>}
-                    <span className="text-green-600">In: {data.stats.input}</span>
-                    <span className="text-blue-600">Out: {data.stats.output}</span>
-                </div>
-            )}
-
-            <Handle type="source" position={Position.Right} className="w-2 h-2" />
-        </div>
-    );
-};
-
-const nodeTypes = {
-    designer: DesignerNode
-};
-
-const edgeTypes = {
-    metric: MetricEdge
-};
-
-// --- Layout Helper ---
-const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-    const dagreGraph = new dagre.graphlib.Graph();
-    dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-    const nodeWidth = 150;
-    const nodeHeight = 50;
-
-    dagreGraph.setGraph({ rankdir: 'LR' });
-
-    nodes.forEach((node) => {
-        dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-    });
-
-    edges.forEach((edge) => {
-        dagreGraph.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(dagreGraph);
-
-    nodes.forEach((node) => {
-        const nodeWithPosition = dagreGraph.node(node.id);
-        node.targetPosition = Position.Left;
-        node.sourcePosition = Position.Right;
-        node.position = {
-            x: nodeWithPosition.x - nodeWidth / 2,
-            y: nodeWithPosition.y - nodeHeight / 2,
-        };
-    });
-
-    return { nodes, edges };
-};
+import { TRANSFORMATION_TYPES, createDefaultTransformation } from './mapping/constants';
+import { nodeTypes, edgeTypes } from './mapping/DesignerNode';
+import { getLayoutedElements, applyDagreLayout } from './mapping/layoutHelper';
 
 interface MappingDesignerProps {
     executionStats?: ExecutionStats;
@@ -193,40 +88,8 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
         if (readOnly || !editingMapping) return;
 
         const id = `t_${crypto.randomUUID().substring(0, 8)}`;
-        let newTrans: Transformation;
-
-        const base = {
-            id,
-            type,
-            name: `${type}_${editingMapping.transformations.length + 1}`,
-            position: { x: 0, y: 0 }
-        };
-
-        switch (type) {
-            case 'source': newTrans = { ...base, type: 'source', config: { connectionId: '' } }; break;
-            case 'target': newTrans = { ...base, type: 'target', config: { connectionId: '' } }; break;
-            case 'filter': newTrans = { ...base, type: 'filter', config: { condition: 'true' } }; break;
-            case 'expression': newTrans = { ...base, type: 'expression', config: { fields: [] } }; break;
-            case 'aggregator': newTrans = { ...base, type: 'aggregator', config: { groupBy: [], aggregates: [] } }; break;
-            case 'validator': newTrans = { ...base, type: 'validator', config: { rules: [], errorBehavior: 'skip' } }; break;
-            case 'joiner': newTrans = { ...base, type: 'joiner', config: { joinType: 'inner', masterKeys: [], detailKeys: [] } }; break;
-            case 'lookup': newTrans = { ...base, type: 'lookup', config: { connectionId: '', lookupKeys: [], referenceKeys: [], returnFields: [], defaultValue: '' } }; break;
-            case 'router': newTrans = { ...base, type: 'router', config: { routes: [], defaultGroup: 'default' } }; break;
-            case 'sorter': newTrans = { ...base, type: 'sorter', config: { sortFields: [] } }; break;
-            case 'union': newTrans = { ...base, type: 'union', config: {} }; break;
-            case 'normalizer': newTrans = { ...base, type: 'normalizer', config: { arrayField: '', outputFields: [], keepOriginalFields: true } }; break;
-            case 'rank': newTrans = { ...base, type: 'rank', config: { partitionBy: [], orderBy: [], rankField: 'rank', rankType: 'rowNumber' } }; break;
-            case 'sequence': newTrans = { ...base, type: 'sequence', config: { sequenceField: 'seq', startValue: 1, incrementBy: 1 } }; break;
-            case 'updateStrategy': newTrans = { ...base, type: 'updateStrategy', config: { strategyField: '_strategy', defaultStrategy: 'insert', conditions: [] } }; break;
-            case 'cleansing': newTrans = { ...base, type: 'cleansing', config: { rules: [] } }; break;
-            case 'deduplicator': newTrans = { ...base, type: 'deduplicator', config: { keys: [], caseInsensitive: false } }; break;
-            case 'pivot': newTrans = { ...base, type: 'pivot', config: { groupByFields: [], pivotField: '', valueField: '' } }; break;
-            case 'unpivot': newTrans = { ...base, type: 'unpivot', config: { fieldsToUnpivot: [], newHeaderFieldName: 'Metric', newValueFieldName: 'Value' } }; break;
-            case 'sql': newTrans = { ...base, type: 'sql', config: { sqlQuery: '', mode: 'query' } }; break;
-            case 'webService': newTrans = { ...base, type: 'webService', config: { url: 'http://api.example.com/data', method: 'GET', headers: [], responseMap: [] } }; break;
-            case 'hierarchyParser': newTrans = { ...base, type: 'hierarchyParser', config: { inputField: '', outputFields: [] } }; break;
-            default: return;
-        }
+        const newTrans = createDefaultTransformation(type, id, editingMapping.transformations.length + 1);
+        if (!newTrans) return;
 
         const newLinks = [...editingMapping.links];
         if (selectedNodeId) {
@@ -416,34 +279,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
     const onLayout = useCallback(() => {
         if (!editingMapping || nodes.length === 0) return;
 
-        const dagreGraph = new dagre.graphlib.Graph();
-        dagreGraph.setDefaultEdgeLabel(() => ({}));
-        dagreGraph.setGraph({ rankdir: 'LR' });
-
-        const nodeWidth = 150;
-        const nodeHeight = 50;
-
-        nodes.forEach((node) => {
-            dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-        });
-
-        edges.forEach((edge) => {
-            dagreGraph.setEdge(edge.source, edge.target);
-        });
-
-        dagre.layout(dagreGraph);
-
-        const layoutedNodes = nodes.map((node) => {
-            const nodeWithPosition = dagreGraph.node(node.id);
-            return {
-                ...node,
-                position: {
-                    x: nodeWithPosition.x - nodeWidth / 2,
-                    y: nodeWithPosition.y - nodeHeight / 2,
-                },
-            };
-        });
-
+        const layoutedNodes = applyDagreLayout(nodes, edges);
         setNodes(layoutedNodes);
 
         if (rfInstance) {
@@ -465,19 +301,20 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                     {node.type.toUpperCase()} Properties
                     <div className="flex items-center gap-2">
                         {!readOnly && (
-                            <button onClick={() => removeTransformation(node.id)} className="text-red-500 hover:text-red-700">
-                                <Trash2 size={16} />
+                            <button onClick={() => removeTransformation(node.id)} className="text-red-500 hover:text-red-700" aria-label="変換を削除">
+                                <Trash2 size={16} aria-hidden="true" />
                             </button>
                         )}
-                        <button onClick={() => setSelectedNodeId(null)} className="md:hidden text-gray-500 hover:text-gray-700">
-                            <X size={16} />
+                        <button onClick={() => setSelectedNodeId(null)} className="md:hidden text-gray-500 hover:text-gray-700" aria-label="パネルを閉じる">
+                            <X size={16} aria-hidden="true" />
                         </button>
                     </div>
                 </div>
 
                 <div>
-                    <label className="block text-xs text-gray-500">Name</label>
+                    <label htmlFor={`trans-name-${node.id}`} className="block text-xs text-gray-500">Name</label>
                     <input
+                        id={`trans-name-${node.id}`}
                         disabled={readOnly}
                         className="w-full border rounded p-1 text-sm disabled:bg-gray-100"
                         value={node.name}
@@ -529,27 +366,29 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                         className="font-bold bg-transparent border-none focus:ring-0 text-sm min-w-0 flex-grow disabled:text-gray-600"
                         value={editingMapping.name}
                         onChange={e => setEditingMapping({ ...editingMapping, name: e.target.value })}
+                        aria-label="マッピング名"
                     />
                     <div className="flex gap-2 shrink-0">
                         {!readOnly && (
-                            <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">
-                                <Save size={14} /> <span className="hidden sm:inline">Save</span>
+                            <button onClick={handleSave} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700" aria-label="マッピングを保存">
+                                <Save size={14} aria-hidden="true" /> <span className="hidden sm:inline">Save</span>
                             </button>
                         )}
-                        <button onClick={() => setEditingMapping(null)} className="flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300">
-                            <X size={14} /> <span className="hidden sm:inline">{readOnly ? 'Close' : 'Cancel'}</span>
+                        <button onClick={() => setEditingMapping(null)} className="flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300" aria-label={readOnly ? 'マッピングを閉じる' : 'キャンセル'}>
+                            <X size={14} aria-hidden="true" /> <span className="hidden sm:inline">{readOnly ? 'Close' : 'Cancel'}</span>
                         </button>
                     </div>
                 </div>
 
                 <div className="flex-grow flex flex-col md:flex-row overflow-hidden relative">
-                    {/* Toolbar */}
+                    {/* ツールバー */}
                     {!readOnly && (
                         <div className="w-full md:w-48 h-auto md:h-full bg-gray-100 border-t md:border-t-0 md:border-r flex flex-row md:flex-col items-center md:items-stretch justify-start py-2 gap-2 overflow-x-auto md:overflow-y-auto order-last md:order-first shrink-0 px-2">
                             {TRANSFORMATION_TYPES.map((t) => (
                                 <button
                                     key={t.type}
                                     title={`Add ${t.label}`}
+                                    aria-label={`${t.label} を追加`}
                                     onClick={() => addTransformation(t.type as TransformationType)}
                                     className="flex items-center gap-2 p-1 rounded hover:bg-gray-200 group transition-colors"
                                 >
@@ -562,7 +401,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                         </div>
                     )}
 
-                    {/* Canvas */}
+                    {/* キャンバス */}
                     <div className="flex-grow relative bg-gray-50">
                         <ReactFlow
                             nodes={nodes}
@@ -605,7 +444,7 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
                         </ReactFlow>
                     </div>
 
-                    {/* Properties */}
+                    {/* プロパティパネル */}
                     <div className={`bg-white overflow-y-auto absolute inset-0 z-20 md:static md:w-64 md:border-l ${selectedNodeId ? 'block' : 'hidden md:block'}`}>
                         {renderConfigPanel()}
                     </div>
