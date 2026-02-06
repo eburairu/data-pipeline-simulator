@@ -181,9 +181,22 @@ const processValidator = (
     const rules = node.config.rules || [];
     const validRows: DataRow[] = [];
 
+    // Optimization: Pre-compile regexes
+    const compiledRules = rules.map(rule => {
+        let regex: RegExp | undefined;
+        if (rule.regex) {
+            try {
+                regex = new RegExp(rule.regex);
+            } catch (e) {
+                console.warn(`[MappingEngine] Invalid regex in validator: ${rule.regex}`, e);
+            }
+        }
+        return { ...rule, compiledRegex: regex };
+    });
+
     for (const row of batch) {
         let isValid = true;
-        for (const rule of rules) {
+        for (const rule of compiledRules) {
             const val = row[rule.field];
 
             // Required check
@@ -203,16 +216,11 @@ const processValidator = (
                     }
                 }
 
-                // Regex check
-                if (rule.regex) {
-                    try {
-                        const re = new RegExp(rule.regex);
-                        if (!re.test(String(val))) {
-                            isValid = false; break;
-                        }
-                    } catch {
-                        console.warn(`[MappingEngine] Invalid regex in validator: ${rule.regex}`);
-                    }
+                // Regex check (Optimized)
+                if (rule.compiledRegex) {
+                     if (!rule.compiledRegex.test(String(val))) {
+                        isValid = false; break;
+                     }
                 }
             }
         }
