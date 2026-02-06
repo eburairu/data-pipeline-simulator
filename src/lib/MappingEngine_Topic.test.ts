@@ -1,6 +1,6 @@
 
 import { executeMappingTaskRecursive, type FileSystemOps, type DbOps, type ExecutionState } from './MappingEngine';
-import type { Mapping, MappingTask } from './MappingTypes';
+import type { Mapping, MappingTask, TargetTransformation } from './MappingTypes';
 import type { TopicDefinition } from './types';
 import { describe, test, expect, vi } from 'vitest';
 
@@ -154,8 +154,10 @@ describe('MappingEngine Topic Target', () => {
         invalidMapping.transformations = [...mapping.transformations];
         invalidMapping.transformations[1] = {
             ...mapping.transformations[1],
+            type: 'target',
             config: { targetType: 'topic', topicId: 'unknown_topic' }
-        };
+        } as TargetTransformation;
+
 
         (mockFs.listFiles as any).mockReturnValue([{ name: 'data.json' }]);
         (mockFs.readFile as any).mockReturnValue(JSON.stringify([{ id: 1 }]));
