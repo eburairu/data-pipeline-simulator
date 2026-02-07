@@ -33,7 +33,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
 
   const { listFiles, writeFile } = useFileSystem();
   const { select } = useVirtualDB();
-  const { dataSource, collection, delivery, topics, connections, tables, biDashboard } = useSettings();
+  const { dataSource, collection, delivery, topics, connections, tables } = useSettings();
   const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
   // Dummy toggleStep as visualizer is removed from Simulation tab
@@ -88,58 +88,45 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   }, [listFiles]);
 
   return (
-    <>
-      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8`}>
-        <div className="flex flex-col gap-4">
-          <div className="p-3 sm:p-4 bg-white rounded shadow space-y-4">
-            <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-              <Activity className="w-5 h-5" /> {t('app.control.title')}
-            </h2>
-            {errors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-xs sm:text-sm flex flex-col gap-1" role="alert" aria-live="assertive">
-                <div className="font-bold flex items-center gap-1"><AlertTriangle size={14} aria-hidden="true" /> Errors Detected:</div>
-                <ul className="list-disc list-inside">
-                  {errors.map((e, i) => <li key={i}>{e}</li>)}
-                </ul>
-                <button onClick={() => setErrors([])} className="text-xs text-red-500 hover:underline self-end">Clear</button>
-              </div>
-            )}
-
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => {
-                  const all = isGeneratorRunning && isTransferRunning && isMappingRunning;
-                  setIsGeneratorRunning(!all); setIsTransferRunning(!all); setIsMappingRunning(!all);
-                }}
-                className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning && isTransferRunning && isMappingRunning ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
-              >
-                {isGeneratorRunning && isTransferRunning && isMappingRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />} {t('app.control.all')}
-              </button>
-              <button onClick={() => setIsGeneratorRunning(!isGeneratorRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{isGeneratorRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.gen')}</button>
-              <button onClick={() => setIsTransferRunning(!isTransferRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isTransferRunning ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{isTransferRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.trans')}</button>
-              <button onClick={() => setIsMappingRunning(!isMappingRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isMappingRunning ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isMappingRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.map')}</button>
-              <button
-                onClick={handleCreateSourceFile}
-                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm"
-              >
-                <FilePlus className="w-4 h-4" /> <span className="hidden xs:inline">{t('app.control.createFile')}</span><span className="xs:hidden">File+</span>
-              </button>
-            </div>
-
-            <StorageViews dataSource={dataSource} collection={collection} delivery={delivery} topics={topics} listFiles={safeListFiles} connections={connections} />
-
-            <DatabaseView tables={tables} select={select} />
-          </div>
+    <div className="p-3 sm:p-4 bg-white rounded shadow space-y-4">
+      <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+        <Activity className="w-5 h-5" /> {t('app.control.title')}
+      </h2>
+      {errors.length > 0 && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded text-xs sm:text-sm flex flex-col gap-1" role="alert" aria-live="assertive">
+          <div className="font-bold flex items-center gap-1"><AlertTriangle size={14} aria-hidden="true" /> Errors Detected:</div>
+          <ul className="list-disc list-inside">
+            {errors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+          <button onClick={() => setErrors([])} className="text-xs text-red-500 hover:underline self-end">Clear</button>
         </div>
-        <div className="flex flex-col gap-4">
-          {biDashboard.showDashboard && (
-            <div className="h-[700px] sm:h-[800px]">
-              <BiDashboard />
-            </div>
-          )}
-        </div>
+      )}
+
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => {
+            const all = isGeneratorRunning && isTransferRunning && isMappingRunning;
+            setIsGeneratorRunning(!all); setIsTransferRunning(!all); setIsMappingRunning(!all);
+          }}
+          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning && isTransferRunning && isMappingRunning ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+        >
+          {isGeneratorRunning && isTransferRunning && isMappingRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />} {t('app.control.all')}
+        </button>
+        <button onClick={() => setIsGeneratorRunning(!isGeneratorRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{isGeneratorRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.gen')}</button>
+        <button onClick={() => setIsTransferRunning(!isTransferRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isTransferRunning ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{isTransferRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.trans')}</button>
+        <button onClick={() => setIsMappingRunning(!isMappingRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isMappingRunning ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isMappingRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.map')}</button>
+        <button
+          onClick={handleCreateSourceFile}
+          className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+        >
+          <FilePlus className="w-4 h-4" /> <span className="hidden xs:inline">{t('app.control.createFile')}</span><span className="xs:hidden">File+</span>
+        </button>
       </div>
-    </>
+
+      <StorageViews dataSource={dataSource} collection={collection} delivery={delivery} topics={topics} listFiles={safeListFiles} connections={connections} />
+
+      <DatabaseView tables={tables} select={select} />
+    </div>
   );
 };
 
