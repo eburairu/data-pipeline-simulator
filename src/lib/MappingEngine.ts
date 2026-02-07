@@ -44,7 +44,7 @@ const extractData = (record: unknown): DataRow => {
 
 // Interfaces for dependencies to decouple from Hooks
 export interface FileSystemOps {
-    listFiles: (host: string, path: string) => { name: string, content: string }[];
+    listFiles: (host: string, path: string) => { name: string, content: string; createdAt?: number }[];
     readFile: (host: string, path: string, filename: string) => string;
     deleteFile: (host: string, filename: string, path: string) => void;
     writeFile: (host: string, path: string, filename: string, content: string) => void;
@@ -553,13 +553,48 @@ const processLookup = (
     node: LookupTransformation,
     batch: DataRow[],
     connections: ConnectionDefinition[],
-    db: DbOps
+    db: DbOps,
+    fs: FileSystemOps
 ): DataRow[] => {
     const conn = connections.find(c => c.id === node.config.connectionId);
     if (!conn || conn.type !== 'database') return batch;
 
     const tableName = node.config.tableName || 'lookup_table';
-    const allLookupRecords = db.select(tableName);
+    let allLookupRecords: (DbRecord | DataRow)[] = [];
+
+    // Persistent Cache Logic
+    if (node.config.cacheType === 'persistent') {
+        const cacheFileName = node.config.persistentCacheFileName || `lookup_cache_${node.id}.json`;
+        const cachePath = '/cache/';
+        const host = 'localhost'; // Cache location
+
+        try {
+            // Check if cache exists
+            const cachedContent = fs.readFile(host, cachePath, cacheFileName);
+            if (cachedContent && cachedContent.length > 0) {
+                allLookupRecords = JSON.parse(cachedContent);
+                // console.log(`[Lookup] Used persistent cache: ${cacheFileName}`);
+            }
+        } catch (e) {
+            // console.warn(`[Lookup] Failed to read cache: ${e}`);
+        }
+
+        // If not loaded from cache, load from DB and save
+        if (allLookupRecords.length === 0) {
+            allLookupRecords = db.select(tableName);
+            try {
+                const content = JSON.stringify(allLookupRecords);
+                fs.writeFile(host, cachePath, cacheFileName, content);
+                // console.log(`[Lookup] Created persistent cache: ${cacheFileName}`);
+            } catch (e) {
+                console.warn(`[Lookup] Failed to write cache: ${e}`);
+            }
+        }
+    } else {
+        // Static Cache (Full reload every batch in current sim, or simulated via db.select which is fast in-memory)
+        allLookupRecords = db.select(tableName);
+    }
+
     return batch.map(row => {
         const match = allLookupRecords.find(r => {
             const d = extractData(r);
@@ -927,7 +962,7 @@ const traverseAsync = async (
                     break;
                 }
                 case 'lookup': {
-                    processedBatch = processLookup(nextNode, batch, connections, db);
+                    processedBatch = processLookup(nextNode, batch, connections, db, fs);
                     break;
                 }
                 case 'router': {

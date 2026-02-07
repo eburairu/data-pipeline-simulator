@@ -305,6 +305,16 @@ export const useSimulationEngine = (
                         .filter(Boolean)
                 );
                 currentFiles = currentFiles.filter(f => !processedSet.has(f.name));
+
+                // CIH Delayed Subscription: Check retention/delay
+                if (job.delayMs && job.delayMs > 0) {
+                    const now = Date.now();
+                    currentFiles = currentFiles.filter(f => {
+                        // VFile has createdAt
+                        const createdAt = (f as any).createdAt || 0;
+                        return (now - createdAt) >= job.delayMs!;
+                    });
+                }
             }
             if (currentFiles.length === 0) return;
 

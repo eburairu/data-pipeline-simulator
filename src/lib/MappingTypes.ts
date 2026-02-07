@@ -85,6 +85,8 @@ export interface LookupConfig {
   referenceKeys: string[];
   returnFields: string[];
   defaultValue?: string;
+    cacheType?: 'static' | 'persistent';
+    persistentCacheFileName?: string;
 }
 
 export interface RouterRoute {
