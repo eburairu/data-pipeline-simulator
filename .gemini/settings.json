@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "name": "npm-strict-check",
+            "type": "command",
+            "command": "node .gemini/hooks/run-npm-before-push.cjs",
+            "description": "Runs type checks and build before git push"
+          }
+        ]
+      }
+    ]
+  },
+  "hooksConfig": {
+    "disabled": []
+  }
+}
