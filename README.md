@@ -28,6 +28,7 @@
 ### 3. データ生成と仮想インフラ
 *   **データ生成 (Data Generation)**: カスタマイズ可能なスキーマやテンプレートを使用して、テスト用のCSVデータを自動生成します。
     *   サポートされるジェネレータ: `Static`, `Random Int/Float`, `Sequence`, `UUID`, `List`, `Timestamp`, `Sin/Cos` (周期的変動)
+*   **アーカイブ・圧縮サポート (Archive Support)**: Gzip, Tar, Tar.Gzip 形式の自動展開および生成時の圧縮をサポート。
 *   **仮想ファイルシステム**: ブラウザメモリ上で動作するファイルシステムにより、物理的なファイル操作なしにETLフローを再現します。
 *   **仮想データベース**: SQLライクなクエリをサポートするインメモリデータベースで、処理結果を検証できます。
 
@@ -71,7 +72,7 @@ npm run dev
 
 ## 使い方
 
-1.  **シミュレーション (Simulation) タブ**: データパイプライン全体のフローを可視化し、リアルタイムで監視・制御します。
+1.  **シミュレーション (Simulation) タブ**: データパイプライン全体のフローを制御し、ストレージやデータベースの状態をリアルタイムで監視します。
 2.  **設定 (Settings) タブ**:
     *   **Data Hub**: トピック、アプリケーション、Pub/Subの設定を行います。
     *   **Data Integration**: コネクション、マッピング、マッピングタスク、タスクフローの定義を行います。
@@ -97,6 +98,9 @@ npm run dev
 *   [パフォーマンス最適化仕様](.specify/specs/011-performance-optimization/spec.md)
 *   [UIコンポーネント分割仕様](.specify/specs/012-ui-component-decomposition/spec.md)
 *   [型安全性改善仕様](.specify/specs/013-type-safety-improvements/spec.md)
+*   [CIH Topicスキーマ強制仕様](.specify/specs/014-cih-topic-schema-enforcement.md)
+*   [アーカイブ圧縮サポート仕様](.specify/specs/015-archive-compression-support/spec.md)
+*   [シミュレーションタブ統合仕様](.specify/specs/016-simulation-tab-integration/spec.md)
 
 ## 技術スタック
 
