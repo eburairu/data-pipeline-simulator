@@ -1,21 +1,22 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { executeMappingTaskRecursive, type FileSystemOps, type DbOps, type ExecutionState } from './MappingEngine';
 import { type Mapping, type MappingTask } from './MappingTypes';
 import { compress, bundleTar } from './ArchiveEngine';
 
 describe('MappingEngine Compression Integration', () => {
-    const mockFs: FileSystemOps = {
+    const mockFs = {
         listFiles: vi.fn(),
         readFile: vi.fn(),
         deleteFile: vi.fn(),
         writeFile: vi.fn(),
-    };
-    const mockDb: DbOps = {
+    } as unknown as { [K in keyof FileSystemOps]: Mock & FileSystemOps[K] };
+
+    const mockDb = {
         select: vi.fn(),
         insert: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
-    };
+    } as unknown as { [K in keyof DbOps]: Mock & DbOps[K] };
 
     beforeEach(() => {
         vi.clearAllMocks();

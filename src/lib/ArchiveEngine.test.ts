@@ -120,7 +120,7 @@ describe('ArchiveEngine', () => {
     describe('Edge Cases and Error Handling', () => {
         it('should handle malformed TAR header gracefully', () => {
             const malformed = '[TAR:file1.txtfile2.txt]--FILE:file1.txt--\ncontent';
-            const result = decompressRecursive(malformed, 'bad.tar');
+            decompressRecursive(malformed, 'bad.tar');
             // Depending on implementation, it might fail to find files or return raw.
             // Current implementation returns raw if TAR_HEADER_END is not found.
             // If header is found but contents are weird:
