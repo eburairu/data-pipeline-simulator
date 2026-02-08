@@ -57,6 +57,7 @@ const BiDashboard: React.FC = () => {
             <div className={item.type === 'query' ? 'col-span-1 md:col-span-2 h-[500px]' : 'h-auto'}>
               {WidgetComponent ? (
                 <WidgetComponent 
+                  item={item}
                   {...(item as any)} 
                   title={item.title || item.name} 
                 />
