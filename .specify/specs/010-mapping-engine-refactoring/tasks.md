@@ -14,9 +14,9 @@
 
 **目的**: 新しいファイル構造の準備
 
-- [ ] T001 `src/lib/transformations/` ディレクトリを作成
-- [ ] T002 TransformationStrategy インターフェースを `src/lib/transformations/types.ts` に定義
-- [ ] T003 TransformationContext 型を `src/lib/transformations/types.ts` に定義
+- [x] T001 `src/lib/transformations/` ディレクトリを作成
+- [x] T002 TransformationStrategy インターフェースを `src/lib/transformations/types.ts` に定義
+- [x] T003 TransformationContext 型を `src/lib/transformations/types.ts` に定義
 
 ---
 
@@ -24,9 +24,9 @@
 
 **目的**: セキュアな式評価とStrategy登録の基盤
 
-- [ ] T004 [US2] `src/lib/SafeExpressionEvaluator.ts` を作成（許可リスト方式の式評価）
-- [ ] T005 [P] [US2] SafeExpressionEvaluator のユニットテストを `src/lib/SafeExpressionEvaluator.test.ts` に作成
-- [ ] T006 [US1] `src/lib/transformations/index.ts` にStrategy登録・取得メカニズムを実装
+- [x] T004 [US2] `src/lib/SafeExpressionEvaluator.ts` を作成（許可リスト方式の式評価）
+- [x] T005 [P] [US2] SafeExpressionEvaluator のユニットテストを `src/lib/SafeExpressionEvaluator.test.ts` に作成
+- [x] T006 [US1] `src/lib/transformations/index.ts` にStrategy登録・取得メカニズムを実装
 - [ ] T007 [P] [US1] Strategy登録のユニットテストを作成
 
 **チェックポイント**: 基盤準備完了 - 個別Strategy実装を開始可能
@@ -41,39 +41,39 @@
 
 ### 基本変換Strategy（並行実行可能）
 
-- [ ] T008 [P] [US1] `src/lib/transformations/SourceStrategy.ts` を実装
-- [ ] T009 [P] [US1] `src/lib/transformations/TargetStrategy.ts` を実装
-- [ ] T010 [P] [US1] `src/lib/transformations/FilterStrategy.ts` を実装
-- [ ] T011 [P] [US1] `src/lib/transformations/ExpressionStrategy.ts` を実装（SafeExpressionEvaluator使用）
+- [x] T008 [P] [US1] `src/lib/transformations/SourceStrategy.ts` を実装
+- [x] T009 [P] [US1] `src/lib/transformations/TargetStrategy.ts` を実装
+- [x] T010 [P] [US1] `src/lib/transformations/FilterStrategy.ts` を実装
+- [x] T011 [P] [US1] `src/lib/transformations/ExpressionStrategy.ts` を実装（SafeExpressionEvaluator使用）
 
 ### 集計変換Strategy（並行実行可能）
 
-- [ ] T012 [P] [US1] `src/lib/transformations/AggregatorStrategy.ts` を実装
-- [ ] T013 [P] [US1] `src/lib/transformations/SorterStrategy.ts` を実装
+- [x] T012 [P] [US1] `src/lib/transformations/AggregatorStrategy.ts` を実装
+- [x] T013 [P] [US1] `src/lib/transformations/SorterStrategy.ts` を実装
 - [ ] T014 [P] [US1] `src/lib/transformations/RankStrategy.ts` を実装
 - [ ] T015 [P] [US1] `src/lib/transformations/SequenceStrategy.ts` を実装
 
 ### 結合変換Strategy（並行実行可能）
 
-- [ ] T016 [P] [US1] `src/lib/transformations/JoinerStrategy.ts` を実装
-- [ ] T017 [P] [US1] `src/lib/transformations/LookupStrategy.ts` を実装（キャッシュ機能含む）
-- [ ] T018 [P] [US1] `src/lib/transformations/UnionStrategy.ts` を実装
+- [x] T016 [P] [US1] `src/lib/transformations/JoinerStrategy.ts` を実装
+- [x] T017 [P] [US1] `src/lib/transformations/LookupStrategy.ts` を実装（キャッシュ機能含む）
+- [x] T018 [P] [US1] `src/lib/transformations/UnionStrategy.ts` を実装
 
 ### データ処理変換Strategy（並行実行可能）
 
-- [ ] T019 [P] [US1] `src/lib/transformations/RouterStrategy.ts` を実装
-- [ ] T020 [P] [US1] `src/lib/transformations/NormalizerStrategy.ts` を実装
-- [ ] T021 [P] [US1] `src/lib/transformations/DeduplicatorStrategy.ts` を実装
-- [ ] T022 [P] [US1] `src/lib/transformations/PivotStrategy.ts` を実装
-- [ ] T023 [P] [US1] `src/lib/transformations/UnpivotStrategy.ts` を実装
+- [x] T019 [P] [US1] `src/lib/transformations/RouterStrategy.ts` を実装
+- [x] T020 [P] [US1] `src/lib/transformations/NormalizerStrategy.ts` を実装
+- [x] T021 [P] [US1] `src/lib/transformations/DeduplicatorStrategy.ts` を実装
+- [x] T022 [P] [US1] `src/lib/transformations/PivotStrategy.ts` を実装
+- [x] T023 [P] [US1] `src/lib/transformations/UnpivotStrategy.ts` を実装
 
 ### 高度な変換Strategy（並行実行可能）
 
-- [ ] T024 [P] [US1] `src/lib/transformations/SQLStrategy.ts` を実装
-- [ ] T025 [P] [US1] `src/lib/transformations/WebServiceStrategy.ts` を実装
-- [ ] T026 [P] [US1] `src/lib/transformations/HierarchyParserStrategy.ts` を実装
-- [ ] T027 [P] [US1] `src/lib/transformations/CleansingStrategy.ts` を実装
-- [ ] T028 [P] [US1] `src/lib/transformations/UpdateStrategyStrategy.ts` を実装
+- [x] T024 [P] [US1] `src/lib/transformations/SQLStrategy.ts` を実装
+- [x] T025 [P] [US1] `src/lib/transformations/WebServiceStrategy.ts` を実装
+- [x] T026 [P] [US1] `src/lib/transformations/HierarchyParserStrategy.ts` を実装
+- [x] T027 [P] [US1] `src/lib/transformations/CleansingStrategy.ts` を実装
+- [x] T028 [P] [US1] `src/lib/transformations/UpdateStrategyStrategy.ts` を実装
 
 **チェックポイント**: すべてのStrategyクラスが実装完了
 
