@@ -26,8 +26,8 @@ import {
     type SourceConfig // Used in executeMappingTaskRecursive
 } from './MappingTypes';
 import { type DataRow, type DataValue, type ConnectionDefinition, type TableDefinition, type TopicDefinition } from './types';
-import { ExpressionFunctions } from './ExpressionFunctions';
 import { decompressRecursive, applyCompressionActions, isCompressed } from './ArchiveEngine';
+import { safeEvaluateExpression } from './SafeExpressionEvaluator';
 
 export interface DbRecord {
     id: string;
@@ -73,26 +73,13 @@ export interface ExecutionState {
 
 export type ExecutionObserver = (stats: ExecutionStats) => void;
 
-// Helper to evaluate conditions/expressions safely-ish
+/**
+ * 式を安全に評価します（SafeExpressionEvaluatorを使用）
+ * 
+ * @deprecated 直接 safeEvaluateExpression を使用してください
+ */
 const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): DataValue => {
-    try {
-        const recordKeys = Object.keys(record);
-        const recordValues = Object.values(record);
-
-        const paramKeys = Object.keys(parameters);
-        const paramValues = Object.values(parameters);
-
-        const funcKeys = Object.keys(ExpressionFunctions);
-        const funcValues = Object.values(ExpressionFunctions);
-
-        // Create a function with keys as arguments
-        // Order: Record Fields, Parameters, Functions
-        const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
-        return func(...recordValues, ...paramValues, ...funcValues) as DataValue;
-    } catch {
-        // console.warn(`Expression evaluation failed: ${expression}`, e);
-        return null;
-    }
+    return safeEvaluateExpression(record, expression, parameters);
 };
 
 // Helper to substitute parameters in string config values
@@ -174,9 +161,9 @@ const processAggregator = (node: AggregatorTransformation, batch: DataRow[]): Da
 };
 
 const processValidator = (
-    node: ValidatorTransformation, 
-    batch: DataRow[], 
-    stats: ExecutionStats, 
+    node: ValidatorTransformation,
+    batch: DataRow[],
+    stats: ExecutionStats,
     _task: MappingTask
 ): DataRow[] => {
     const rules = node.config.rules || [];
@@ -219,9 +206,9 @@ const processValidator = (
 
                 // Regex check (Optimized)
                 if (rule.compiledRegex) {
-                     if (!rule.compiledRegex.test(String(val))) {
+                    if (!rule.compiledRegex.test(String(val))) {
                         isValid = false; break;
-                     }
+                    }
                 }
             }
         }
@@ -262,12 +249,12 @@ const processTarget = async (
         const topic = topics.find(t => t.id === node.config.topicId);
         if (!topic) {
             stats.transformations[node.id].errors += batch.length;
-             if (!stats.rejectRows) stats.rejectRows = [];
-             stats.rejectRows.push({
+            if (!stats.rejectRows) stats.rejectRows = [];
+            stats.rejectRows.push({
                 row: batch.length > 0 ? batch[0] : {},
                 error: `Topic not found: ${node.config.topicId}`,
                 transformationName: node.name
-             });
+            });
             return [];
         }
 
@@ -287,11 +274,11 @@ const processTarget = async (
 
                     // Check existence
                     if (val === undefined || val === null) {
-                         if (topic.schemaEnforcement === 'strict') {
-                             isValid = false; break;
-                         } else {
-                             val = null; // Lenient: Treat as null
-                         }
+                        if (topic.schemaEnforcement === 'strict') {
+                            isValid = false; break;
+                        } else {
+                            val = null; // Lenient: Treat as null
+                        }
                     }
 
                     // Check Type (Simplified)
@@ -427,12 +414,12 @@ const processTarget = async (
                         if (match) {
                             shouldInsert = false;
                             matchId = match.id;
-                                                                        if (dupBehavior === 'error') {
-                                                                            stats.transformations[node.id].errors++;
-                                                                            checkStopOnErrors(stats, task);
-                                                                            continue;
-                                                                        } else if (dupBehavior === 'ignore') {
-                            
+                            if (dupBehavior === 'error') {
+                                stats.transformations[node.id].errors++;
+                                checkStopOnErrors(stats, task);
+                                continue;
+                            } else if (dupBehavior === 'ignore') {
+
                                 processedBatch.push(row); // Treat as success
                                 continue;
                             } else if (dupBehavior === 'update') {
@@ -520,7 +507,7 @@ const processJoiner = (
             masterBatch.forEach(mRow => {
                 let hasMatch = false;
                 detailBatch.forEach((dRow, dIdx) => {
-                    const match = node.config.masterKeys.every((mKey, i) => 
+                    const match = node.config.masterKeys.every((mKey, i) =>
                         String(mRow[mKey]) === String(dRow[node.config.detailKeys[i]])
                     );
                     if (match) {
@@ -529,7 +516,7 @@ const processJoiner = (
                         joinedRows.push({ ...mRow, ...dRow });
                     }
                 });
-                
+
                 if (!hasMatch && (node.config.joinType === 'left' || node.config.joinType === 'full')) {
                     joinedRows.push({ ...mRow });
                 }
@@ -804,7 +791,7 @@ const processSql = async (node: SqlTransformation, batch: DataRow[], _db: DbOps,
     const sqlQuery = substituteParams(node.config.sqlQuery, parameters);
     // Simulated SQL execution with parameter substitution logic preserved for future extension
     if (sqlQuery) { /* use sqlQuery */ }
-    
+
     await delay(30);
     return batch; // Current implementation is a pass-through
 };
@@ -813,7 +800,7 @@ const processWebService = async (node: WebServiceTransformation, batch: DataRow[
     const url = substituteParams(node.config.url, parameters);
     // Simulate network delay
     await delay(50);
-    
+
     // Simple mock logic using url
     if (url) { /* use url */ }
 
@@ -857,20 +844,20 @@ const traverseAsync = async (
 ) => {
     // Find next nodes
     const outgoingLinks = mapping.links.filter(l => l.sourceId === currentNode.id);
-    
+
     // Group links by targetId to handle multiple links to same target (unlikely but possible)
     for (const link of outgoingLinks) {
         // Resolve input batch for this link
         let batch: DataRow[] = [];
         if (currentNode.type === 'router' && !Array.isArray(batchOrRouterResult)) {
-             let defaultGroup = 'default';
-             if ('defaultGroup' in currentNode.config) {
-                 defaultGroup = (currentNode.config as any).defaultGroup;
-             }
-             const groupName = link.routerGroup || defaultGroup;
-             batch = (batchOrRouterResult as Record<string, DataRow[]>)[groupName] || [];
+            let defaultGroup = 'default';
+            if ('defaultGroup' in currentNode.config) {
+                defaultGroup = (currentNode.config as any).defaultGroup;
+            }
+            const groupName = link.routerGroup || defaultGroup;
+            batch = (batchOrRouterResult as Record<string, DataRow[]>)[groupName] || [];
         } else {
-             batch = batchOrRouterResult as DataRow[];
+            batch = batchOrRouterResult as DataRow[];
         }
 
         const nextNode = mapping.transformations.find(t => t.id === link.targetId);
@@ -886,7 +873,7 @@ const traverseAsync = async (
             stats.transformations[nextNode.id] = { name: nextNode.name, input: 0, output: 0, errors: 0, rejects: 0 };
         }
         stats.transformations[nextNode.id].input += batch.length;
-        
+
         // Update Link Stats
         if (!stats.links) stats.links = {};
         if (!stats.links[link.id]) stats.links[link.id] = 0;
@@ -1057,27 +1044,27 @@ export const executeMappingTaskRecursive = async (
             const dir = pathParts.join('/');
 
             if (filename) {
-               const content = fs.readFile(host, dir || '/', filename);
-               if (content) {
-                   content.split(/\r?\n/).forEach(line => {
-                       const idx = line.indexOf('=');
-                       if (idx > 0) {
-                           const key = line.substring(0, idx).trim();
-                           const val = line.substring(idx+1).trim();
-                           if (key && !key.startsWith('#')) {
-                               fileParameters[key] = val;
-                           }
-                       }
-                   });
-               }
+                const content = fs.readFile(host, dir || '/', filename);
+                if (content) {
+                    content.split(/\r?\n/).forEach(line => {
+                        const idx = line.indexOf('=');
+                        if (idx > 0) {
+                            const key = line.substring(0, idx).trim();
+                            const val = line.substring(idx + 1).trim();
+                            if (key && !key.startsWith('#')) {
+                                fileParameters[key] = val;
+                            }
+                        }
+                    });
+                }
             }
         } catch (e) {
-             if (!stats.rejectRows) stats.rejectRows = [];
-             stats.rejectRows.push({
+            if (!stats.rejectRows) stats.rejectRows = [];
+            stats.rejectRows.push({
                 row: { file: task.parameterFileName },
                 error: `Failed to load parameter file: ${e instanceof Error ? e.message : String(e)}`,
                 transformationName: 'ParameterInit'
-             });
+            });
         }
     }
 
@@ -1190,7 +1177,7 @@ export const executeMappingTaskRecursive = async (
                             [config.filenameColumn!]: processingFile.name
                         }));
                     }
-                    
+
                     records.push(...fileRecords);
                 }
 
@@ -1205,11 +1192,11 @@ export const executeMappingTaskRecursive = async (
             const tableName = config.tableName || 'default_table';
             const raw = db.select(tableName);
             const lastTs = newState.lastProcessedTimestamp as number | undefined || 0;
-            
+
             // Database records might have insertedAt
-            records = raw.filter((r: any) => (r.insertedAt || 0) > lastTs).map(r => ({ 
-                ...extractData(r), 
-                insertedAt: (r as any).insertedAt 
+            records = raw.filter((r: any) => (r.insertedAt || 0) > lastTs).map(r => ({
+                ...extractData(r),
+                insertedAt: (r as any).insertedAt
             }));
 
             if (records.length > 0) {
