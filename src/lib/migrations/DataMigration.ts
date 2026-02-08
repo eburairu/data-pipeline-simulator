@@ -57,5 +57,15 @@ export const migrateBiDashboardSettings = (parsed: any): BiDashboardSettings | n
             }] : []
         };
     }
-    return parsed.biDashboard as BiDashboardSettings;
+
+    // Ensure all items have a 'type' property (for settings that have items but no type yet)
+    const settings = parsed.biDashboard as BiDashboardSettings;
+    if (settings.items && Array.isArray(settings.items)) {
+        settings.items = settings.items.map((item: any) => ({
+            ...item,
+            type: item.type || 'query'
+        }));
+    }
+
+    return settings;
 }
