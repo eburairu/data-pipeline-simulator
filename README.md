@@ -29,10 +29,14 @@
 *   **データ生成 (Data Generation)**: カスタマイズ可能なスキーマやテンプレートを使用して、テスト用のCSVデータを自動生成します。
     *   サポートされるジェネレータ: `Static`, `Random Int/Float`, `Sequence`, `UUID`, `List`, `Timestamp`, `Sin/Cos` (周期的変動)
 *   **アーカイブ・圧縮サポート (Archive Support)**: Gzip, Tar, Tar.Gzip 形式の自動展開および生成時の圧縮をサポート。
+    *   **エラーハンドリング**: 圧縮ファイルを展開せずに読み込んだ場合の検知と警告機能により、設定ミスを防止します。
 *   **仮想ファイルシステム**: ブラウザメモリ上で動作するファイルシステムにより、物理的なファイル操作なしにETLフローを再現します。
 *   **仮想データベース**: SQLライクなクエリをサポートするインメモリデータベースで、処理結果を検証できます。
 
 ### 4. 可視化とモニタリング
+*   **パイプラインアーキテクチャビジュアライザー (Pipeline Visualizer)**: React Flowを使用したインタラクティブなダイアグラムにより、エンドツーエンドのデータフロー（ソース、処理、ターゲット）を可視化します。
+    *   **フローティングエッジ**: データの流れをアニメーション付きのエッジで表現し、処理状態を直感的に把握できます。
+    *   **自動レイアウト**: dagreアルゴリズムを使用した自動整列機能により、複雑なパイプラインも整理して表示されます。
 *   **BIダッシュボード**: 処理結果をグラフ（折れ線、棒グラフ）や表で可視化し、データの傾向を分析できます。
     *   **Auto Run**: 1秒ごとの自動データ更新をサポートし、リアルタイムのモニタリングが可能です。
     *   **堅牢性**: エラー発生時もダッシュボード全体がクラッシュしないよう、ウィジェット単位のエラー境界 (Error Boundary) を備えています。
@@ -91,16 +95,17 @@ npm run dev
 *   [ETL拡張仕様](.specify/specs/004-etl-enhancements/spec.md)
 *   [システムリファクタリング仕様](.specify/specs/005-system-refactoring/spec.md)
 *   [コードベース改善仕様](.specify/specs/006-codebase-improvements/spec.md)
-*   [CDI Router修正仕様](.specify/specs/007-cdi-router-fix/spec.md)
+*   [Data Integration Router修正仕様](.specify/specs/007-cdi-router-fix/spec.md)
 *   [データソース簡素化仕様](.specify/specs/008-datasource-simplification/spec.md)
 *   [データソース更新バグ修正仕様](.specify/specs/009-bugfix-datasource-update/spec.md)
 *   [マッピングエンジンリファクタリング仕様](.specify/specs/010-mapping-engine-refactoring/spec.md)
 *   [パフォーマンス最適化仕様](.specify/specs/011-performance-optimization/spec.md)
 *   [UIコンポーネント分割仕様](.specify/specs/012-ui-component-decomposition/spec.md)
 *   [型安全性改善仕様](.specify/specs/013-type-safety-improvements/spec.md)
-*   [CIH Topicスキーマ強制仕様](.specify/specs/014-cih-topic-schema-enforcement.md)
+*   [Data Hub Topicスキーマ強制仕様](.specify/specs/014-cih-topic-schema-enforcement/spec.md)
 *   [アーカイブ圧縮サポート仕様](.specify/specs/015-archive-compression-support/spec.md)
 *   [シミュレーションタブ統合仕様](.specify/specs/016-simulation-tab-integration/spec.md)
+*   [エラーハンドリング強化仕様](.specify/specs/017-error-handling-enhancement/spec.md)
 
 ## 技術スタック
 
