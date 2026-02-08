@@ -79,8 +79,8 @@
 
 ### MappingDesigner更新
 
-- [ ] T029 [US1] MappingDesigner.tsx から設定パネルロジックを削除し、動的インポートに置き換え
-- [ ] T030 [US1] MappingDesigner.tsx のコード行数が500行以下になったことを確認
+- [x] T029 [US1] MappingDesigner.tsx から設定パネルロジックを削除し、動的インポートに置き換え
+- [x] T030 [US1] MappingDesigner.tsx のコード行数が500行以下になったことを確認
 
 **チェックポイント**: MappingDesignerの分割が完了
 
@@ -110,17 +110,17 @@
 
 ### ウィジェットコンポーネント（並行実行可能）
 
-- [ ] T036 [P] [US3] `src/components/widgets/RecordCountWidget.tsx` を作成
-- [ ] T037 [P] [US3] `src/components/widgets/ThroughputWidget.tsx` を作成
-- [ ] T038 [P] [US3] `src/components/widgets/ErrorRateWidget.tsx` を作成
-- [ ] T039 [P] [US3] `src/components/widgets/ProcessingTimeWidget.tsx` を作成
-- [ ] T040 [P] [US3] その他のウィジェットを特定し分割（BiDashboard.tsx分析に基づく）
+- [x] T036 [P] [US3] `src/components/widgets/RecordCountWidget.tsx` を作成
+- [x] T037 [P] [US3] `src/components/widgets/ThroughputWidget.tsx` を作成
+- [x] T038 [P] [US3] `src/components/widgets/ErrorRateWidget.tsx` を作成
+- [x] T039 [P] [US3] `src/components/widgets/ProcessingTimeWidget.tsx` を作成
+- [x] T040 [P] [US3] その他のウィジェットを特定し分割（BiDashboard.tsx分析に基づく）
 
 ### BiDashboard更新
 
-- [ ] T041 [US3] BiDashboard.tsx からウィジェットロジックを削除し、新しいコンポーネントを使用
+- [x] T041 [US3] BiDashboard.tsx からウィジェットロジックを削除し、新しいコンポーネントを使用
 
-**チェックポイント**: BiDashboardの分割が完了
+**チェックポイント**: BiDashboard of the 分割が完了
 
 ---
 
@@ -130,13 +130,13 @@
 
 **独立テスト**: TableEditorが独立して動作し、DatabaseSettingsから正しく呼び出される
 
-- [ ] T042 [US4] `src/components/common/TableEditor.tsx` を作成
-- [ ] T043 [US4] TableEditor にカラム定義・編集機能を実装
-- [ ] T044 [US4] TableEditor にスキーマプレビュー機能を実装
-- [ ] T045 [US4] DatabaseSettings.tsx から TableEditor を使用するよう更新
-- [ ] T046 [US4] DatabaseSettings.tsx からテーブルエディタ関連コードを削除
+- [x] T042 [US4] `src/components/common/TableEditor.tsx` を作成
+- [x] T043 [US4] TableEditor にカラム定義・編集機能を実装
+- [x] T044 [US4] TableEditor にスキーマプレビュー機能を実装
+- [x] T045 [US4] DatabaseSettings.tsx から TableEditor を使用するよう更新
+- [x] T046 [US4] DatabaseSettings.tsx からテーブルエディタ関連コードを削除
 
-**チェックポイント**: DatabaseSettingsの分割が完了
+**チェックポイント**: DatabaseSettings of the 分割が完了
 
 ---
 
@@ -144,11 +144,11 @@
 
 **目的**: 品質保証とコード整理
 
-- [ ] T047 [P] 各新規コンポーネントに日本語コメントを追加
-- [ ] T048 [P] 分割されたコンポーネントの型エラーをすべて解消
-- [ ] T049 npm test && npm run build で最終検証
-- [ ] T050 アプリケーションを起動し、すべての設定画面が正常に動作することを確認
-- [ ] T051 各コンポーネントのコード行数が300行以下であることを確認
+- [x] T047 [P] 各新規コンポーネントに日本語コメントを追加
+- [x] T048 [P] 分割されたコンポーネントの型エラーをすべて解消
+- [x] T049 npm test && npm run build で最終検証
+- [x] T050 アプリケーションを起動し、すべての設定画面が正常に動作することを確認
+- [x] T051 各コンポーネントのコード行数が300行以下であることを確認
 
 ---
 

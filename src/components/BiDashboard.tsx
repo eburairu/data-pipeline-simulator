@@ -1,10 +1,11 @@
 /**
  * BIダッシュボード - ウィジェットグリッド表示
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSettings } from '../lib/SettingsContext';
 import { Activity, AlertTriangle } from 'lucide-react';
-import QueryWidget from './widgets/QueryWidget';
+import { getWidget, registerDefaultWidgets } from './widgets';
+import type { DashboardItem } from '../lib/types';
 
 /** ウィジェット描画エラーを局所化するErrorBoundary */
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -22,7 +23,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
       return (
         <div className="p-4 border border-red-500 bg-red-50 text-red-700 rounded h-full overflow-auto flex flex-col items-start">
           <h3 className="font-bold flex items-center gap-2"><AlertTriangle size={16} /> Visualization Error</h3>
-          <p className="text-sm mt-2">An error occurred while rendering the dashboard.</p>
+          <p className="text-sm mt-2">An error occurred while rendering the widget.</p>
           <div className="text-xs mt-2 bg-white p-2 border rounded overflow-x-auto w-full text-left">
             <p className="font-semibold">{this.state.error?.message}</p>
           </div>
@@ -36,6 +37,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 const BiDashboard: React.FC = () => {
   const { biDashboard } = useSettings();
 
+  // ウィジェットの登録
+  useEffect(() => {
+    registerDefaultWidgets();
+  }, []);
+
   if (!biDashboard.items || biDashboard.items.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-500 bg-white rounded border border-dashed p-8 m-4">
@@ -47,14 +53,29 @@ const BiDashboard: React.FC = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full overflow-y-auto pb-8">
-      {biDashboard.items.map(item => (
-        <ErrorBoundary key={item.id}>
-          <div className="h-auto min-h-[500px] lg:h-[800px]">
-            <QueryWidget item={item} />
-          </div>
-        </ErrorBoundary>
-      ))}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 h-full overflow-y-auto pb-8 bg-gray-50">
+      {biDashboard.items.map((item: DashboardItem) => {
+        const WidgetComponent = getWidget(item.type);
+        
+        return (
+          <ErrorBoundary key={item.id}>
+            <div className={item.type === 'query' ? 'col-span-1 md:col-span-2 h-[500px]' : 'h-auto'}>
+              {WidgetComponent ? (
+                <WidgetComponent 
+                  {...(item as any)} 
+                  title={item.title || item.name} 
+                />
+              ) : (
+                <div className="p-4 border border-yellow-300 bg-yellow-50 text-yellow-700 rounded h-full flex flex-col items-center justify-center text-center">
+                  <AlertTriangle size={24} className="mb-2" />
+                  <p className="font-bold text-sm">Unknown Widget Type</p>
+                  <p className="text-xs mt-1">Type: {item.type}</p>
+                </div>
+              )}
+            </div>
+          </ErrorBoundary>
+        );
+      })}
     </div>
   );
 };

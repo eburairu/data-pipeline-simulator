@@ -216,7 +216,9 @@ export interface ConnectionDefinition {
 
 export interface DashboardItem {
   id: string;
+  type: string;
   title?: string;
+  name?: string;
   tableId: string;
   viewType: 'table' | 'chart';
   filters: DBFilter[];

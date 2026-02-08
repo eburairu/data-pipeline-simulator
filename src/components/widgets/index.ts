@@ -92,7 +92,7 @@ export type {
   WidgetRegistration,
 } from './types';
 
-// ウィジェットタイプの定数（将来のウィジェット追加用）
+// ウィジェットタイプの定数
 export const WIDGET_TYPES = {
   RECORD_COUNT: 'recordCount',
   THROUGHPUT: 'throughput',
@@ -100,6 +100,61 @@ export const WIDGET_TYPES = {
   PROCESSING_TIME: 'processingTime',
   DATA_QUALITY: 'dataQuality',
   PIPELINE_STATUS: 'pipelineStatus',
+  QUERY: 'query',
 } as const;
 
 export type WidgetType = (typeof WIDGET_TYPES)[keyof typeof WIDGET_TYPES];
+
+// ウィジェットコンポーネントのインポート
+import RecordCountWidget from './RecordCountWidget';
+import ThroughputWidget from './ThroughputWidget';
+import ErrorRateWidget from './ErrorRateWidget';
+import ProcessingTimeWidget from './ProcessingTimeWidget';
+import QueryWidget from './QueryWidget';
+
+/**
+ * デフォルトのウィジェットを登録する
+ * アプリケーション初期化時に呼び出す
+ */
+export function registerDefaultWidgets(): void {
+  // 各コンポーネントを参照することで副作用による登録を実行させる、
+  // または明示的にここで登録する。
+  
+  // 明示的な登録（コンポーネント側での登録と重複しても Map なので上書きされるだけ）
+  registerWidget({
+    type: 'recordCount',
+    component: RecordCountWidget as React.ComponentType<WidgetProps>,
+    defaultTitle: 'レコード数',
+    defaultSize: { width: 200, height: 120 },
+  });
+  
+  registerWidget({
+    type: 'throughput',
+    component: ThroughputWidget as React.ComponentType<WidgetProps>,
+    defaultTitle: 'スループット',
+    defaultSize: { width: 200, height: 120 },
+  });
+  
+  registerWidget({
+    type: 'errorRate',
+    component: ErrorRateWidget as React.ComponentType<WidgetProps>,
+    defaultTitle: 'エラー率',
+    defaultSize: { width: 200, height: 120 },
+  });
+  
+  registerWidget({
+    type: 'processingTime',
+    component: ProcessingTimeWidget as React.ComponentType<WidgetProps>,
+    defaultTitle: '処理時間',
+    defaultSize: { width: 200, height: 120 },
+  });
+
+  if (!hasWidget('query')) {
+    registerWidget({
+      type: 'query',
+      component: (QueryWidget as unknown) as React.ComponentType<WidgetProps>,
+      defaultTitle: 'クエリデータ',
+      defaultSize: { width: 600, height: 400 },
+    });
+  }
+}

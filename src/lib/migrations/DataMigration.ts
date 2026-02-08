@@ -48,6 +48,7 @@ export const migrateBiDashboardSettings = (parsed: any): BiDashboardSettings | n
             showDashboard: old.showDashboard,
             items: old.defaultTableId ? [{
                 id: 'dashboard_item_1',
+                type: 'query',
                 title: 'Default View',
                 tableId: old.defaultTableId,
                 viewType: old.defaultViewType || 'table',

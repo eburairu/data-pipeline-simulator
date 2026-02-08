@@ -21,6 +21,7 @@ const BiDashboardSettings: React.FC = () => {
   const addItem = () => {
     const newItem: DashboardItem = {
       id: `widget_${Date.now()}`,
+      type: 'query',
       title: 'New Widget',
       tableId: tables[0]?.id || '',
       viewType: 'table',

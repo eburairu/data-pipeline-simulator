@@ -102,6 +102,9 @@ export { default as HierarchyParserConfigPanel } from './HierarchyParserConfigPa
 export { default as CleansingConfigPanel } from './CleansingConfigPanel';
 export { default as UpdateStrategyConfigPanel } from './UpdateStrategyConfigPanel';
 
+// nodeTypes, edgeTypes のエクスポート
+export { nodeTypes, edgeTypes } from './DesignerNode';
+
 // デフォルトのパネル登録（初期化時に呼び出す）
 import SourceConfigPanel from './SourceConfigPanel';
 import TargetConfigPanel from './TargetConfigPanel';
