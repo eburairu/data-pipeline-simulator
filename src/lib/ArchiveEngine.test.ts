@@ -1,69 +1,150 @@
-import { compress, decompressRecursive, applyCompressionActions } from './ArchiveEngine';
+import { compress, decompressRecursive, applyCompressionActions, isCompressed, bundleTar } from './ArchiveEngine';
 import { describe, it, expect } from 'vitest';
 
 describe('ArchiveEngine', () => {
-    it('should handle single level compression', () => {
-        const content = 'test data';
-        const compressed = compress(content, 'gz', 'test.txt');
-        expect(compressed).toBe('[GZ]test data');
-        
-        const decompressed = decompressRecursive(compressed, 'test.txt.gz');
-        expect(decompressed.files).toHaveLength(1);
-        expect(decompressed.files[0].content).toBe('test data');
-        expect(decompressed.files[0].filename).toBe('test.txt');
+    describe('isCompressed', () => {
+        it('should return true for all supported formats', () => {
+            expect(isCompressed('[GZ]data')).toBe(true);
+            expect(isCompressed('[ZIP]data')).toBe(true);
+            expect(isCompressed('[TAR:file.txt]data')).toBe(true);
+        });
+
+        it('should return false for uncompressed content', () => {
+            expect(isCompressed('raw data')).toBe(false);
+            expect(isCompressed('')).toBe(false);
+            expect(isCompressed('[NOT_A_FORMAT]data')).toBe(false);
+        });
     });
 
-    it('should handle multi-level compression (tar.gz)', () => {
-        const content = 'csv data';
-        // 1. GZ
-        const gz = compress(content, 'gz', 'data.csv');
-        // 2. TAR
-        const tar = compress(gz, 'tar', 'data.csv.gz');
-        // 3. GZ (final tar.gz)
-        const final = compress(tar, 'gz', 'data.tar');
+    describe('Single Level Compression', () => {
+        it('should handle gz compression and decompression', () => {
+            const content = 'test data';
+            const compressed = compress(content, 'gz', 'test.txt');
+            expect(compressed).toBe('[GZ]test data');
+            
+            const decompressed = decompressRecursive(compressed, 'test.txt.gz');
+            expect(decompressed.files).toHaveLength(1);
+            expect(decompressed.files[0].content).toBe('test data');
+            expect(decompressed.files[0].filename).toBe('test.txt');
+        });
 
-        const result = decompressRecursive(final, 'data.tar.gz');
-        expect(result.files).toHaveLength(1);
-        expect(result.files[0].filename).toBe('data.csv');
-        expect(result.files[0].content).toBe('csv data');
+        it('should handle zip compression and decompression', () => {
+            const content = 'zip data';
+            const compressed = compress(content, 'zip', 'test.txt');
+            expect(compressed).toBe('[ZIP]zip data');
+            
+            const decompressed = decompressRecursive(compressed, 'test.txt.zip');
+            expect(decompressed.files).toHaveLength(1);
+            expect(decompressed.files[0].content).toBe('zip data');
+            expect(decompressed.files[0].filename).toBe('test.txt');
+        });
+
+        it('should return original content for "none" format', () => {
+            const content = 'no compression';
+            expect(compress(content, 'none', 'test.txt')).toBe(content);
+        });
     });
 
-    it('should handle multiple files in tar', () => {
-        // Create manual TAR content
-        const tarContent = '[TAR:file1.txt,file2.txt]--FILE:file1.txt--\ncontent1\n--FILE:file2.txt--\ncontent2';
-        
-        const result = decompressRecursive(tarContent, 'archive.tar');
-        expect(result.files).toHaveLength(2);
-        expect(result.files.find(f => f.filename === 'file1.txt')?.content).toBe('content1');
-        expect(result.files.find(f => f.filename === 'file2.txt')?.content).toBe('content2');
-    });
-    
-    it('should handle nested compression in tar (tar.gz containing csv.gz)', () => {
-         // file1.csv.gz inside archive.tar.gz
-         const csvContent = `id,val
-1,a`;
-         const gzContent = `[GZ]${csvContent}`;
-         
-         const tarContent = `[TAR:file1.csv.gz]--FILE:file1.csv.gz--
-${gzContent}`;
-         const finalGz = `[GZ]${tarContent}`;
-         
-         const result = decompressRecursive(finalGz, 'archive.tar.gz');
-         
-         // Should recursively unpack:
-         // 1. Un-GZ -> tarContent
-         // 2. Un-TAR -> file1.csv.gz (content: gzContent)
-         // 3. Un-GZ (inner) -> file1.csv (content: csvContent)
-         
-         expect(result.files).toHaveLength(1);
-         expect(result.files[0].filename).toBe('file1.csv');
-         expect(result.files[0].content).toBe(csvContent);
+    describe('TAR Bundling and Extraction', () => {
+        it('should bundle and extract multiple files correctly', () => {
+            const files = [
+                { filename: 'file1.csv', content: 'id,name\n1,Alice' },
+                { filename: 'file2.txt', content: 'hello world' }
+            ];
+            
+            const tarContent = bundleTar(files);
+            expect(tarContent).toContain('[TAR:file1.csv,file2.txt]');
+            
+            const result = decompressRecursive(tarContent, 'archive.tar');
+            expect(result.files).toHaveLength(2);
+            expect(result.files.find(f => f.filename === 'file1.csv')?.content).toBe('id,name\n1,Alice');
+            expect(result.files.find(f => f.filename === 'file2.txt')?.content).toBe('hello world');
+        });
+
+        it('should handle single file in tar via compress function', () => {
+            const content = 'data';
+            const tar = compress(content, 'tar', 'data.txt');
+            const result = decompressRecursive(tar, 'data.txt.tar');
+            expect(result.files).toHaveLength(1);
+            expect(result.files[0].filename).toBe('data.txt');
+            expect(result.files[0].content).toBe('data');
+        });
+
+        it('should return empty string when bundling empty file list', () => {
+            expect(bundleTar([])).toBe('');
+        });
     });
 
-    it('should apply compression actions sequentially', () => {
-        const content = 'raw';
-        const res = applyCompressionActions(content, ['gz', 'tar', 'gz'], 'data.csv');
-        expect(res.finalFilename).toBe('data.csv.gz.tar.gz');
-        expect(res.content.startsWith('[GZ][TAR:')).toBe(true);
+    describe('Recursive Decompression (Nested Formats)', () => {
+        it('should handle tar.gz', () => {
+            const content = 'csv data';
+            const tar = compress(content, 'tar', 'data.csv');
+            const final = compress(tar, 'gz', 'data.tar');
+
+            const result = decompressRecursive(final, 'data.tar.gz');
+            expect(result.files).toHaveLength(1);
+            expect(result.files[0].filename).toBe('data.csv');
+            expect(result.files[0].content).toBe('csv data');
+        });
+
+        it('should handle complex nesting (gz inside tar inside gz)', () => {
+             const csvContent = 'id,val\n1,a';
+             const innerGz = compress(csvContent, 'gz', 'file1.csv');
+             const tarContent = bundleTar([{ filename: 'file1.csv.gz', content: innerGz }]);
+             const finalGz = compress(tarContent, 'gz', 'archive.tar');
+             
+             const result = decompressRecursive(finalGz, 'archive.tar.gz');
+             
+             expect(result.files).toHaveLength(1);
+             expect(result.files[0].filename).toBe('file1.csv');
+             expect(result.files[0].content).toBe(csvContent);
+        });
+    });
+
+    describe('Sequential Actions', () => {
+        it('should apply compression actions sequentially', () => {
+            const content = 'raw';
+            const res = applyCompressionActions(content, ['gz', 'tar', 'gz'], 'data.csv');
+            expect(res.finalFilename).toBe('data.csv.gz.tar.gz');
+            expect(res.content.startsWith('[GZ][TAR:')).toBe(true);
+        });
+
+        it('should skip "none" action in sequence', () => {
+            const content = 'raw';
+            const res = applyCompressionActions(content, ['none', 'gz'], 'data.csv');
+            expect(res.finalFilename).toBe('data.csv.gz');
+            expect(res.content).toBe('[GZ]raw');
+        });
+    });
+
+    describe('Edge Cases and Error Handling', () => {
+        it('should handle malformed TAR header gracefully', () => {
+            const malformed = '[TAR:file1.txtfile2.txt]--FILE:file1.txt--\ncontent';
+            const result = decompressRecursive(malformed, 'bad.tar');
+            // Depending on implementation, it might fail to find files or return raw.
+            // Current implementation returns raw if TAR_HEADER_END is not found.
+            // If header is found but contents are weird:
+            const result2 = decompressRecursive('[TAR:file1.txt]MissingSeparator', 'bad.tar');
+            expect(result2.files).toHaveLength(0); // Files list says file1.txt but separator missing
+        });
+
+        it('should return as-is if no compression prefix is found', () => {
+            const raw = 'not compressed';
+            const result = decompressRecursive(raw, 'test.txt');
+            expect(result.files).toHaveLength(1);
+            expect(result.files[0].content).toBe(raw);
+            expect(result.files[0].filename).toBe('test.txt');
+        });
+
+        it('should handle recursive depth limit', () => {
+            // Create a self-referencing lookalike or just very deep
+            let deep = 'data';
+            for(let i=0; i<150; i++) {
+                deep = '[GZ]' + deep;
+            }
+            const result = decompressRecursive(deep, 'deep.gz');
+            // Should stop at MAX_ITERATIONS (100)
+            expect(result.files).toHaveLength(0); // Still in processingQueue after 100 iterations
+        });
     });
 });

@@ -21,6 +21,7 @@ const FILE_SEPARATOR_SUFFIX = '--';
  * Checks if the content is compressed with any supported format
  */
 export const isCompressed = (content: string): boolean => {
+  if (typeof content !== 'string') return false;
   return content.startsWith(GZ_PREFIX) || content.startsWith(ZIP_PREFIX) || content.startsWith(TAR_HEADER_START);
 };
 
