@@ -115,50 +115,94 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     };
 
 
-    // --- 1. Render Legacy Pipeline (Data Source, Collection, Delivery) ---
-    // (Keeping this for compatibility with existing UI)
+    // --- 0. Pre-register all Storage Nodes ---
+    // This ensures that intermediate directories (like archive targets) are created as nodes 
+    // even if they aren't explicitly defined as primary data sources.
 
-    const sourceKeys = new Set<string>();
+    const allStorageKeys = new Set<string>();
+    
+    // Data Source paths
     dataSource.jobs.forEach(job => {
         const conn = connections.find(c => c.id === job.connectionId);
-        if (conn && conn.type === 'file' && conn.host && job.path) {
-            sourceKeys.add(getLegacyKey(conn.host, job.path));
+        if (conn?.type === 'file' && conn.host && job.path) {
+            allStorageKeys.add(getLegacyKey(conn.host, job.path));
         }
     });
 
-    Array.from(sourceKeys).forEach((key, i) => {
-      const parts = key.split(':');
-      addLegacyStorageNode(parts[1], parts[2], 1, i);
-    });
-
-    // Collection/Delivery targets
-    const otherKeys = new Set<string>();
+    // Collection paths
     collection.jobs.forEach(j => {
+      const srcConn = connections.find(c => c.id === j.sourceConnectionId);
+      if (srcConn?.type === 'file' && j.sourcePath) {
+        allStorageKeys.add(getLegacyKey(srcConn.host, j.sourcePath));
+      }
+      
       if (j.targetType === 'topic' && j.targetTopicId) {
-          otherKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
+        allStorageKeys.add(getLegacyKey('localhost', `/topics/${j.targetTopicId}`));
       } else if (j.targetConnectionId && j.targetPath) {
-          const conn = connections.find(c => c.id === j.targetConnectionId);
-          if (conn && conn.type === 'file') {
-              otherKeys.add(getLegacyKey(conn.host, j.targetPath));
-          }
+        const conn = connections.find(c => c.id === j.targetConnectionId);
+        if (conn?.type === 'file') {
+          allStorageKeys.add(getLegacyKey(conn.host, j.targetPath));
+        }
       }
     });
+
+    // Archive paths
+    (dataSource.archiveJobs || []).forEach(j => {
+      const srcConn = connections.find(c => c.id === j.sourceConnectionId);
+      if (srcConn?.type === 'file' && j.sourcePath) {
+        allStorageKeys.add(getLegacyKey(srcConn.host, j.sourcePath));
+      }
+      const tgtConn = connections.find(c => c.id === j.targetConnectionId);
+      if (tgtConn?.type === 'file' && j.targetPath) {
+        allStorageKeys.add(getLegacyKey(tgtConn.host, j.targetPath));
+      }
+    });
+
+    // Delivery paths
     delivery.jobs.forEach(j => {
+      if (j.sourceType === 'topic' && j.sourceTopicId) {
+        allStorageKeys.add(getLegacyKey('localhost', `/topics/${j.sourceTopicId}`));
+      } else if (j.sourceConnectionId && j.sourcePath) {
+        const conn = connections.find(c => c.id === j.sourceConnectionId);
+        if (conn?.type === 'file') {
+          allStorageKeys.add(getLegacyKey(conn.host, j.sourcePath));
+        }
+      }
+
       if (j.targetConnectionId && j.targetPath) {
           const conn = connections.find(c => c.id === j.targetConnectionId);
-          if (conn && conn.type === 'file') {
-              otherKeys.add(getLegacyKey(conn.host, j.targetPath));
+          if (conn?.type === 'file') {
+              allStorageKeys.add(getLegacyKey(conn.host, j.targetPath));
           }
       }
     });
 
-    let rowIndex = 0;
-    otherKeys.forEach(key => {
+    // Create all collected nodes
+    let storageRowIndex = 0;
+    allStorageKeys.forEach(key => {
       const parts = key.split(':');
-      if (!keyNodeMap.has(key)) {
-        addLegacyStorageNode(parts[1], parts[2], 2, rowIndex++);
-      }
+      const host = parts[1];
+      const path = parts[2];
+      
+      // Determine column based on usage
+      let col = 1;
+      const isTopic = host === 'localhost' && path.startsWith('/topics/');
+      
+      // Heuristic: topics and intermediate paths move right
+      const isDataSource = dataSource.jobs.some(job => {
+        const conn = connections.find(c => c.id === job.connectionId);
+        return conn?.host === host && job.path === path;
+      });
+
+      if (isTopic) col = 2;
+      else if (!isDataSource) col = 2; // Intermediate or target
+
+      addLegacyStorageNode(host, path, col, storageRowIndex++);
     });
+
+
+    // --- 1. Render Legacy Pipeline (Data Source, Collection, Delivery) ---
+    // (Keeping this for compatibility with existing UI)
 
     // Legacy Process Nodes
     dataSource.jobs.forEach((job) => {
@@ -192,8 +236,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       const srcConn = connections.find(c => c.id === job.sourceConnectionId);
       if (srcConn && srcConn.type === 'file' && job.sourcePath) { sourceHost = srcConn.host; sourcePath = job.sourcePath; }
 
-      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
-      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
+      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath)) || (sourceHost && sourcePath ? addLegacyStorageNode(sourceHost, sourcePath, 1, 0) : null);
+      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath)) || (targetHost && targetPath ? addLegacyStorageNode(targetHost, targetPath, 2, 0) : null);
+      
       if (srcNode && tgtNode) {
         const id = `process-col-${job.id}`;
         calculatedNodes.push({
@@ -220,8 +265,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       const tgtConn = connections.find(c => c.id === job.targetConnectionId);
       if (tgtConn && tgtConn.type === 'file' && job.targetPath) { targetHost = tgtConn.host; targetPath = job.targetPath; }
 
-      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath));
-      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath));
+      const srcNode = keyNodeMap.get(getLegacyKey(sourceHost, sourcePath)) || (sourceHost && sourcePath ? addLegacyStorageNode(sourceHost, sourcePath, 1, 0) : null);
+      const tgtNode = keyNodeMap.get(getLegacyKey(targetHost, targetPath)) || (targetHost && targetPath ? addLegacyStorageNode(targetHost, targetPath, 2, 0) : null);
+      
       if (srcNode && tgtNode) {
         const id = `process-del-${job.id}`;
         calculatedNodes.push({
