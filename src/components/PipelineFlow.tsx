@@ -790,6 +790,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         <Background />
         <Controls />
         <MiniMap 
+            style={{ width: 140, height: 100 }}
             nodeStrokeColor={(n) => {
                 if (n.type === 'storage') return '#2563eb';
                 if (n.type === 'process') return '#ea580c';

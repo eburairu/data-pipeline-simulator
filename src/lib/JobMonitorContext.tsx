@@ -45,7 +45,7 @@ interface JobMonitorContextType {
 
 const JobMonitorContext = createContext<JobMonitorContextType | undefined>(undefined);
 
-const MAX_LOGS = 200;
+const MAX_LOGS = 500;
 
 export const JobMonitorProvider: React.FC<{ children: ReactNode; retryJob?: (jobId: string, jobType: JobType) => void }> = ({ children, retryJob }) => {
   const [logs, setLogs] = useState<JobExecutionLog[]>([]);

@@ -19,6 +19,13 @@ const JobMonitor: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<JobExecutionLog | null>(null);
   const [expandedFlows, setExpandedFlows] = useState<Set<string>>(new Set());
   const [showVisualizer, setShowVisualizer] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  // フィルタ変更時にページをリセット
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, typeFilter]);
 
   // 注：毎秒の再レンダリングをElapsedTimeDisplayコンポーネントに移動
   // 親コンポーネント全体の再レンダリングが不要になり、パフォーマンスが向上
@@ -56,14 +63,19 @@ const JobMonitor: React.FC = () => {
     });
   }, [logs, statusFilter, typeFilter]);
 
-  // ログをネスト構造で整理
-  const organizedLogs = useMemo(() => {
+  // ログをネスト構造で整理し、ページネーションを適用
+  const { paginatedLogs, totalPages, totalItems } = useMemo(() => {
     const topLevel = filteredLogs.filter(l => !l.parentLogId);
     const children = filteredLogs.filter(l => !!l.parentLogId);
+    
+    const total = topLevel.length;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const slicedTopLevel = topLevel.slice(start, end);
 
     const result: { log: JobExecutionLog; isChild: boolean; isVisible: boolean }[] = [];
 
-    topLevel.forEach(parent => {
+    slicedTopLevel.forEach(parent => {
       result.push({ log: parent, isChild: false, isVisible: true });
 
       const flowChildren = children.filter(c => c.parentLogId === parent.id);
@@ -78,16 +90,23 @@ const JobMonitor: React.FC = () => {
       });
     });
 
-    // 親がフィルタリングされた孤立した子ログを処理
-    const processedChildIds = new Set(result.filter(r => r.isChild).map(r => r.log.id));
-    children.forEach(child => {
-      if (!processedChildIds.has(child.id)) {
-        result.push({ log: child, isChild: true, isVisible: true });
-      }
-    });
+    // 親がフィルタリングされた、または現在のページに含まれない孤立した子ログを処理（デバッグ等で重要）
+    // ただし基本的にはページネーションは親単位で行うため、ここでの処理は補完的
+    if (currentPage === 1) {
+        const processedChildIds = new Set(result.filter(r => r.isChild).map(r => r.log.id));
+        children.forEach(child => {
+          if (!processedChildIds.has(child.id) && !topLevel.find(p => p.id === child.parentLogId)) {
+            result.push({ log: child, isChild: true, isVisible: true });
+          }
+        });
+    }
 
-    return result;
-  }, [filteredLogs, expandedFlows, typeFilter]);
+    return {
+        paginatedLogs: result,
+        totalPages: Math.max(1, Math.ceil(total / itemsPerPage)),
+        totalItems: total
+    };
+  }, [filteredLogs, expandedFlows, typeFilter, currentPage, itemsPerPage]);
 
   const getTypeIcon = (type: JobType) => {
     switch (type) {
@@ -107,7 +126,7 @@ const JobMonitor: React.FC = () => {
     <>
       <div className="h-full flex flex-col bg-white rounded shadow-sm border border-gray-200">
         {/* ヘッダー / ツールバー */}
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t">
+        <div className="p-2 px-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t">
           <div className="flex items-center gap-4">
             <h2 className="font-bold text-gray-700 flex items-center gap-2">
               <Activity className="w-5 h-5 text-gray-500" />
@@ -120,7 +139,7 @@ const JobMonitor: React.FC = () => {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as 'all' | JobStatus)}
-                  className="border border-gray-300 rounded px-2 py-1 text-gray-700 focus:outline-none focus:border-blue-500"
+                  className="border border-gray-300 rounded px-2 py-0.5 text-gray-700 focus:outline-none focus:border-blue-500 text-xs"
                 >
                   <option value="all">All Status</option>
                   <option value="running">Running</option>
@@ -133,7 +152,7 @@ const JobMonitor: React.FC = () => {
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value as 'all' | JobType)}
-                  className="border border-gray-300 rounded px-2 py-1 text-gray-700 focus:outline-none focus:border-blue-500"
+                  className="border border-gray-300 rounded px-2 py-0.5 text-gray-700 focus:outline-none focus:border-blue-500 text-xs"
                 >
                   <option value="all">All Types</option>
                   <option value="collection">Collection</option>
@@ -179,20 +198,20 @@ const JobMonitor: React.FC = () => {
         {/* ログリスト */}
         <div className="flex-grow overflow-auto p-0 bg-gray-50/50 min-h-0">
           {/* モバイルビュー（カード） */}
-          <div className="md:hidden space-y-2 p-2">
-            {organizedLogs.filter(r => r.isVisible).length === 0 ? (
+          <div className="md:hidden space-y-1.5 p-2">
+            {paginatedLogs.filter(r => r.isVisible).length === 0 ? (
               <div className="p-8 text-center text-gray-400 italic">
                 No execution logs found.
               </div>
             ) : (
-              organizedLogs.filter(r => r.isVisible).map(({ log, isChild }) => (
+              paginatedLogs.filter(r => r.isVisible).map(({ log, isChild }) => (
                 <div
                   key={log.id}
                   onClick={() => setSelectedLog(log)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedLog(log); } }}
                   role="button"
                   tabIndex={0}
-                  className={`bg-white p-3 rounded shadow-sm border border-gray-200 space-y-2 active:bg-blue-50 transition-colors ${isChild ? 'ml-4 bg-gray-50/50' : ''}`}
+                  className={`bg-white p-2 rounded shadow-sm border border-gray-200 space-y-1.5 active:bg-blue-50 transition-colors ${isChild ? 'ml-4 bg-gray-50/50' : ''}`}
                   aria-label={`${log.jobName} - ${log.status}`}
                 >
                   <div className="flex justify-between items-start">
@@ -209,7 +228,7 @@ const JobMonitor: React.FC = () => {
                           {log.jobName}
                           {log.jobType === 'taskflow' && (
                             <span className="ml-1 text-[10px] font-normal text-gray-400">
-                              ({organizedLogs.filter(r => r.log.parentLogId === log.id).length})
+                              ({filteredLogs.filter(r => r.parentLogId === log.id).length})
                             </span>
                           )}
                         </span>
@@ -230,35 +249,35 @@ const JobMonitor: React.FC = () => {
                     <div className="flex items-center gap-2">
                       {log.status === 'success' ? (
                         <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          <CheckCircle size={12} /> Success
+                          <CheckCircle size={10} /> Success
                         </span>
                       ) : log.status === 'failed' ? (
                         <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                          <XCircle size={12} /> Failed
+                          <XCircle size={10} /> Failed
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          <Loader2 size={12} className="animate-spin" /> Running
+                          <Loader2 size={10} className="animate-spin" /> Running
                         </span>
                       )}
                     </div>
-                    <div className="font-mono text-gray-600">
+                    <div className="font-mono text-[10px] text-gray-600">
                       <span className="text-gray-500">In:</span> {log.recordsInput} <span className="text-gray-300">|</span> <span className="text-gray-500">Out:</span> {log.recordsOutput}
                     </div>
                   </div>
 
                   {log.errorMessage && (
-                    <div className="text-xs text-red-600 bg-red-50 p-1.5 rounded border border-red-100 truncate">
+                    <div className="text-[10px] text-red-600 bg-red-50 p-1 rounded border border-red-100 truncate">
                       {log.errorMessage}
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-gray-100 flex justify-end" onClick={e => e.stopPropagation()}>
+                  <div className="pt-1.5 border-t border-gray-100 flex justify-end" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => retryJob(log.jobId, log.jobType)}
-                      className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                      className="flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 px-2 py-0.5 rounded hover:bg-blue-50 transition-colors"
                     >
-                      <RotateCw size={14} /> Retry Job
+                      <RotateCw size={12} /> Retry Job
                     </button>
                   </div>
                 </div>
@@ -270,25 +289,25 @@ const JobMonitor: React.FC = () => {
           <table className="hidden md:table w-full text-left text-sm bg-white">
             <thead className="bg-gray-100 text-gray-600 sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="p-3 font-semibold w-24">Time</th>
-                <th className="p-3 font-semibold w-32">Type</th>
-                <th className="p-3 font-semibold w-48">Job Name</th>
-                <th className="p-3 font-semibold w-24">Status</th>
-                <th className="p-3 font-semibold w-32 text-right">Duration</th>
-                <th className="p-3 font-semibold w-32 text-right">Records (In/Out)</th>
-                <th className="p-3 font-semibold">Details / Message</th>
-                <th className="p-3 font-semibold w-16 text-center">Action</th>
+                <th className="p-1.5 font-semibold w-24">Time</th>
+                <th className="p-1.5 font-semibold w-32">Type</th>
+                <th className="p-1.5 font-semibold w-48">Job Name</th>
+                <th className="p-1.5 font-semibold w-24">Status</th>
+                <th className="p-1.5 font-semibold w-32 text-right">Duration</th>
+                <th className="p-1.5 font-semibold w-32 text-right">Records (In/Out)</th>
+                <th className="p-1.5 font-semibold">Details / Message</th>
+                <th className="p-1.5 font-semibold w-16 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {organizedLogs.filter(r => r.isVisible).length === 0 ? (
+              {paginatedLogs.filter(r => r.isVisible).length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-gray-400 italic">
                     No execution logs found.
                   </td>
                 </tr>
               ) : (
-                organizedLogs.filter(r => r.isVisible).map(({ log, isChild }) => (
+                paginatedLogs.filter(r => r.isVisible).map(({ log, isChild }) => (
                   <tr
                     key={log.id}
                     onClick={() => setSelectedLog(log)}
@@ -297,18 +316,18 @@ const JobMonitor: React.FC = () => {
                     className={`hover:bg-blue-50 transition-colors cursor-pointer group ${isChild ? 'bg-gray-50/50' : ''}`}
                     aria-label={`${log.jobName} - ${log.status}`}
                   >
-                    <td className="p-3 text-gray-500 whitespace-nowrap font-mono text-xs">
+                    <td className="p-1.5 text-gray-500 whitespace-nowrap font-mono text-[10px]">
                       {formatTime(log.startTime)}
                     </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
+                    <td className="p-1.5">
+                      <div className="flex items-center gap-1.5">
                         {getTypeIcon(log.jobType)}
-                        <span className="capitalize">{log.jobType}</span>
+                        <span className="capitalize text-xs">{log.jobType}</span>
                       </div>
                     </td>
-                    <td className="p-3 font-medium text-gray-700 truncate max-w-[200px]" title={log.jobName}>
-                      <div className="flex items-center gap-2">
-                        {isChild && <CornerDownRight size={14} className="text-gray-400 shrink-0 ml-4" />}
+                    <td className="p-1.5 font-medium text-gray-700 truncate max-w-[200px]" title={log.jobName}>
+                      <div className="flex items-center gap-1.5">
+                        {isChild && <CornerDownRight size={12} className="text-gray-400 shrink-0 ml-4" />}
                         {log.jobType === 'taskflow' && (
                           <button
                             onClick={(e) => toggleFlow(log.id, e)}
@@ -317,67 +336,67 @@ const JobMonitor: React.FC = () => {
                             aria-expanded={expandedFlows.has(log.id)}
                           >
                             <ChevronRight
-                              size={14}
+                              size={12}
                               className={`transition-transform ${expandedFlows.has(log.id) ? 'rotate-90' : ''}`}
                               aria-hidden="true"
                             />
                           </button>
                         )}
-                        <span className="truncate">
+                        <span className="truncate text-xs">
                           {log.jobName}
                           {log.jobType === 'taskflow' && (
                             <span className="ml-1 text-[10px] font-normal text-gray-400">
-                              ({organizedLogs.filter(r => r.log.parentLogId === log.id).length} tasks)
+                              ({filteredLogs.filter(r => r.parentLogId === log.id).length} tasks)
                             </span>
                           )}
                         </span>
                       </div>
                     </td>
-                    <td className="p-3">
+                    <td className="p-1.5">
                       {log.status === 'success' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          <CheckCircle size={12} /> Success
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                          <CheckCircle size={10} /> Success
                         </span>
                       ) : log.status === 'failed' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                          <XCircle size={12} /> Failed
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                          <XCircle size={10} /> Failed
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          <Loader2 size={12} className="animate-spin" /> Running
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          <Loader2 size={10} className="animate-spin" /> Running
                         </span>
                       )}
                     </td>
-                    <td className="p-3 text-right text-gray-500 font-mono text-xs">
+                    <td className="p-1.5 text-right text-gray-500 font-mono text-[10px]">
                       <ElapsedTimeDisplay
                         startTime={log.startTime}
                         endTime={log.endTime}
                       />
                     </td>
-                    <td className="p-3 text-right font-mono text-xs">
+                    <td className="p-1.5 text-right font-mono text-[10px]">
                       <span className="text-gray-600">{log.recordsInput}</span>
                       <span className="text-gray-300 mx-1">/</span>
                       <span className="text-gray-900 font-semibold">{log.recordsOutput}</span>
                     </td>
-                    <td className="p-3 text-gray-600 truncate max-w-[300px]" title={log.errorMessage || log.details}>
+                    <td className="p-1.5 text-gray-600 truncate max-w-[300px]" title={log.errorMessage || log.details}>
                       <div className="flex justify-between items-center gap-2">
                         {log.errorMessage ? (
-                          <span className="text-red-600 flex items-center gap-1 truncate">
+                          <span className="text-red-600 flex items-center gap-1 truncate text-xs">
                             {log.errorMessage}
                           </span>
                         ) : (
-                          <span className="text-gray-400 text-xs truncate">{log.details}</span>
+                          <span className="text-gray-400 text-[10px] truncate">{log.details}</span>
                         )}
                       </div>
                     </td>
-                    <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
+                    <td className="p-1.5 text-center" onClick={e => e.stopPropagation()}>
                       <button
                         onClick={() => retryJob(log.jobId, log.jobType)}
                         className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-blue-100"
                         title="Retry Job"
                         aria-label={`${log.jobName} を再実行`}
                       >
-                        <RotateCw size={16} aria-hidden="true" />
+                        <RotateCw size={14} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>
@@ -385,6 +404,52 @@ const JobMonitor: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ページネーションフッター */}
+        <div className="p-2 border-t border-gray-200 bg-gray-50 flex flex-wrap justify-between items-center gap-2 text-xs text-gray-600">
+          <div className="flex items-center gap-4">
+            <span className="font-medium">
+              Total: <span className="text-gray-900">{totalItems}</span> jobs
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Rows per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                }}
+                className="border border-gray-300 rounded px-1 py-0.5 bg-white"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Prev
+            </button>
+            <div className="flex items-center px-2">
+              <span className="font-semibold text-blue-600">{currentPage}</span>
+              <span className="mx-1 text-gray-400">/</span>
+              <span>{totalPages}</span>
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
