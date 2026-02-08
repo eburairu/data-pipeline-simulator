@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSettings, type GenerationJob, type ColumnSchema, type GeneratorType, type CompressionFormat } from '../../lib/SettingsContext';
 import { validateGenerationJob, type ValidationError } from '../../lib/validation';
-import { Trash2, Plus, FileText, AlignJustify, List, Archive } from 'lucide-react';
+import { Trash2, Plus, FileText, AlignJustify, List, Archive, Package, Server } from 'lucide-react';
+import ArchiveSettings from './ArchiveSettings';
 
 const GENERATOR_TYPES: GeneratorType[] = ['static', 'randomInt', 'randomFloat', 'sin', 'cos', 'sequence', 'uuid', 'list', 'timestamp'];
 
@@ -176,6 +177,7 @@ const SchemaEditor: React.FC<{
 
 const DataSourceSettings: React.FC = () => {
   const { dataSource, setDataSource, hosts, connections } = useSettings();
+  const [activeSubTab, setActiveSubTab] = useState<'generation' | 'archive'>('generation');
 
   // --- Job Handlers ---
 
@@ -220,191 +222,212 @@ const DataSourceSettings: React.FC = () => {
 
   return (
     <div className="space-y-6 p-4 border rounded bg-white shadow-sm">
-      <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
-          <FileText className="w-5 h-5"/> File Generation Jobs
-      </h2>
-      <p className="text-sm text-gray-500">Configure rules for generating files into the Data Source Locations defined by File Connections.</p>
-
-      <div className="space-y-4">
-        {dataSource.jobs.map((job) => {
-          const errors = validateGenerationJob(job);
-          const hasError = (field: string) => errors.some(e => e.field === field);
-          const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
-          const currentMode = job.mode || 'template';
-
-          // Get host for current connection to list directories
-          const currentConn = connections.find(c => c.id === job.connectionId);
-          const currentHost = currentConn ? hosts.find(h => h.name === currentConn.host) : null;
-
-          return (
-          <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
-             <div className="absolute top-2 right-2">
-                <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job" aria-label={`ジョブ ${job.name} を削除`}>
-                  <Trash2 size={18} aria-hidden="true" />
-                </button>
-             </div>
-             <div className="grid gap-3">
-               <div>
-                 <label htmlFor={`job-name-${job.id}`} className="block text-xs font-medium text-gray-500">Job Name</label>
-                 <input
-                    id={`job-name-${job.id}`}
-                    type="text"
-                    value={job.name}
-                    onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
-                    className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
-                    title={getErrorMsg('name')}
-                 />
-               </div>
-               <div className="grid grid-cols-2 gap-3">
-                   <div>
-                        <label htmlFor={`job-conn-${job.id}`} className="block text-xs font-medium text-gray-500">Target Connection (File)</label>
-                        <select
-                            id={`job-conn-${job.id}`}
-                            value={job.connectionId}
-                            onChange={(e) => {
-                                const newConnId = e.target.value;
-                                // 新しいコネクションのホストを取得し、最初のディレクトリをデフォルト設定
-                                const newConn = connections.find(c => c.id === newConnId);
-                                const newHost = newConn ? hosts.find(h => h.name === newConn.host) : null;
-                                const defaultPath = newHost && newHost.directories.length > 0 ? newHost.directories[0] : '';
-                                setDataSource(prev => ({
-                                    ...prev,
-                                    jobs: prev.jobs.map(j =>
-                                        j.id === job.id
-                                        ? { ...j, connectionId: newConnId, path: defaultPath }
-                                        : j
-                                    )
-                                }));
-                            }}
-                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('connectionId') ? 'border-red-500 bg-red-50' : ''}`}
-                            title={getErrorMsg('connectionId')}
-                        >
-                            <option value="">Select Connection...</option>
-                            {connections.filter(c => c.type === 'file').map(conn => (
-                                <option key={conn.id} value={conn.id}>{conn.name} ({conn.host})</option>
-                            ))}
-                        </select>
-                   </div>
-                   <div>
-                        <label htmlFor={`job-path-${job.id}`} className="block text-xs font-medium text-gray-500">Target Path</label>
-                        <select
-                            id={`job-path-${job.id}`}
-                            value={job.path}
-                            onChange={(e) => handleJobChange(job.id, 'path', e.target.value)}
-                            className={`w-full border rounded p-1 text-sm bg-white ${hasError('path') ? 'border-red-500 bg-red-50' : ''}`}
-                            title={getErrorMsg('path')}
-                            disabled={!job.connectionId}
-                        >
-                            <option value="">Select Path...</option>
-                            {currentHost?.directories.map(dir => (
-                                <option key={dir} value={dir}>{dir}</option>
-                            ))}
-                        </select>
-                   </div>
-                </div>
-                 <div className="grid grid-cols-2 gap-3">
-                   <div>
-                     <label htmlFor={`job-pattern-${job.id}`} className="block text-xs font-medium text-gray-500">File Name Pattern</label>
-                     <input
-                        id={`job-pattern-${job.id}`}
-                        type="text"
-                        value={job.fileNamePattern}
-                        onChange={(e) => handleJobChange(job.id, 'fileNamePattern', e.target.value)}
-                        className={`w-full border rounded p-1 text-sm ${hasError('fileNamePattern') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('fileNamePattern')}
-                        placeholder="${host}_${timestamp}.csv"
-                     />
-                   </div>
-                   <div>
-                     <label htmlFor={`job-interval-${job.id}`} className="block text-xs font-medium text-gray-500">Interval (ms)</label>
-                     <input
-                        id={`job-interval-${job.id}`}
-                        type="number"
-                        value={job.executionInterval}
-                        onChange={(e) => handleJobChange(job.id, 'executionInterval', parseInt(e.target.value) || 0)}
-                        className={`w-full border rounded p-1 text-sm ${hasError('executionInterval') ? 'border-red-500 bg-red-50' : ''}`}
-                        title={getErrorMsg('executionInterval')}
-                     />
-                   </div>
-                </div>
-
-                <div className="border-t pt-3 mt-1">
-                    <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                        <Archive size={14} /> Compression Actions (Applied sequentially)
-                    </label>
-                    <CompressionActionsEditor 
-                        actions={job.compressionActions || []} 
-                        onChange={(newActions) => handleJobChange(job.id, 'compressionActions', newActions)} 
-                    />
-                </div>
-
-                {/* Mode Selector */}
-                <div className="flex items-center gap-4 border-t pt-3 mt-1">
-                    <label className="text-xs font-medium text-gray-500">Generation Mode:</label>
-                    <div className="flex bg-gray-100 rounded p-1">
-                        <button
-                            onClick={() => handleJobChange(job.id, 'mode', 'template')}
-                            className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'template' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            <AlignJustify size={14} /> Template Text
-                        </button>
-                        <button
-                            onClick={() => handleJobChange(job.id, 'mode', 'schema')}
-                            className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'schema' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            <List size={14} /> Schema List
-                        </button>
-                    </div>
-                </div>
-
-                {currentMode === 'template' ? (
-                     <div>
-                         <label htmlFor={`job-content-${job.id}`} className="block text-xs font-medium text-gray-500">File Content Template</label>
-                         <textarea
-                            id={`job-content-${job.id}`}
-                            value={job.fileContent}
-                            onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
-                            className="w-full border rounded p-1 text-sm font-mono h-32"
-                            placeholder="col1,col2,col3&#10;data1,data2,data3"
-                         />
-                    </div>
-                ) : (
-                    <div>
-                         <div className="mb-2">
-                             <label htmlFor={`job-rows-${job.id}`} className="block text-xs font-medium text-gray-500 mb-1">Rows per Execution</label>
-                             <input
-                                id={`job-rows-${job.id}`}
-                                type="number"
-                                value={job.rowCount || 1}
-                                onChange={(e) => handleJobChange(job.id, 'rowCount', parseInt(e.target.value) || 1)}
-                                className={`w-32 border rounded p-1 text-sm ${hasError('rowCount') ? 'border-red-500' : ''}`}
-                             />
-                         </div>
-                         <label className="block text-xs font-medium text-gray-500 mb-1">Column Definitions</label>
-                         {hasError('schema') && <p className="text-xs text-red-500 mb-1">{getErrorMsg('schema')}</p>}
-                         <div className="border rounded p-2 bg-gray-50">
-                             <SchemaEditor
-                                schema={job.schema || []}
-                                onChange={(newSchema) => handleJobChange(job.id, 'schema', newSchema)}
-                                errors={errors}
-                                jobId={job.id}
-                             />
-                         </div>
-                    </div>
-                )}
-             </div>
-          </div>
-        );
-        })}
-
-        <button
-            onClick={addJob}
-            className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-500 hover:text-blue-500 transition-colors"
-        >
-            <Plus size={20} /> Add Generation Job
-        </button>
+      <div className="border-b pb-2 flex justify-between items-end">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+              <Server className="w-5 h-5"/> Data Source Configuration
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Configure data generation and archiving rules.</p>
+        </div>
+        <div className="flex bg-gray-100 rounded p-1 mb-1">
+            <button
+                onClick={() => setActiveSubTab('generation')}
+                className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-all ${activeSubTab === 'generation' ? 'bg-white shadow text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+                <FileText size={16} /> File Generation
+            </button>
+            <button
+                onClick={() => setActiveSubTab('archive')}
+                className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 transition-all ${activeSubTab === 'archive' ? 'bg-white shadow text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+                <Package size={16} /> Archiving & Bundling
+            </button>
+        </div>
       </div>
 
+      {activeSubTab === 'generation' ? (
+        <div className="space-y-4">
+            {dataSource.jobs.map((job) => {
+                const errors = validateGenerationJob(job);
+                const hasError = (field: string) => errors.some(e => e.field === field);
+                const getErrorMsg = (field: string) => errors.find(e => e.field === field)?.message;
+                const currentMode = job.mode || 'template';
+
+                // Get host for current connection to list directories
+                const currentConn = connections.find(c => c.id === job.connectionId);
+                const currentHost = currentConn ? hosts.find(h => h.name === currentConn.host) : null;
+
+                return (
+                <div key={job.id} className="border p-4 rounded-md bg-gray-50 relative">
+                    <div className="absolute top-2 right-2">
+                        <button onClick={() => removeJob(job.id)} className="text-red-500 hover:text-red-700" title="Delete Job" aria-label={`ジョブ ${job.name} を削除`}>
+                        <Trash2 size={18} aria-hidden="true" />
+                        </button>
+                    </div>
+                    <div className="grid gap-3">
+                    <div>
+                        <label htmlFor={`job-name-${job.id}`} className="block text-xs font-medium text-gray-500">Job Name</label>
+                        <input
+                            id={`job-name-${job.id}`}
+                            type="text"
+                            value={job.name}
+                            onChange={(e) => handleJobChange(job.id, 'name', e.target.value)}
+                            className={`w-full border rounded p-1 text-sm ${hasError('name') ? 'border-red-500 bg-red-50' : ''}`}
+                            title={getErrorMsg('name')}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                                <label htmlFor={`job-conn-${job.id}`} className="block text-xs font-medium text-gray-500">Target Connection (File)</label>
+                                <select
+                                    id={`job-conn-${job.id}`}
+                                    value={job.connectionId}
+                                    onChange={(e) => {
+                                        const newConnId = e.target.value;
+                                        // 新しいコネクションのホストを取得し、最初のディレクトリをデフォルト設定
+                                        const newConn = connections.find(c => c.id === newConnId);
+                                        const newHost = newConn ? hosts.find(h => h.name === newConn.host) : null;
+                                        const defaultPath = newHost && newHost.directories.length > 0 ? newHost.directories[0] : '';
+                                        setDataSource(prev => ({
+                                            ...prev,
+                                            jobs: prev.jobs.map(j =>
+                                                j.id === job.id
+                                                ? { ...j, connectionId: newConnId, path: defaultPath }
+                                                : j
+                                            )
+                                        }));
+                                    }}
+                                    className={`w-full border rounded p-1 text-sm bg-white ${hasError('connectionId') ? 'border-red-500 bg-red-50' : ''}`}
+                                    title={getErrorMsg('connectionId')}
+                                >
+                                    <option value="">Select Connection...</option>
+                                    {connections.filter(c => c.type === 'file').map(conn => (
+                                        <option key={conn.id} value={conn.id}>{conn.name} ({conn.host})</option>
+                                    ))}
+                                </select>
+                        </div>
+                        <div>
+                                <label htmlFor={`job-path-${job.id}`} className="block text-xs font-medium text-gray-500">Target Path</label>
+                                <select
+                                    id={`job-path-${job.id}`}
+                                    value={job.path}
+                                    onChange={(e) => handleJobChange(job.id, 'path', e.target.value)}
+                                    className={`w-full border rounded p-1 text-sm bg-white ${hasError('path') ? 'border-red-500 bg-red-50' : ''}`}
+                                    title={getErrorMsg('path')}
+                                    disabled={!job.connectionId}
+                                >
+                                    <option value="">Select Path...</option>
+                                    {currentHost?.directories.map(dir => (
+                                        <option key={dir} value={dir}>{dir}</option>
+                                    ))}
+                                </select>
+                        </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label htmlFor={`job-pattern-${job.id}`} className="block text-xs font-medium text-gray-500">File Name Pattern</label>
+                            <input
+                                id={`job-pattern-${job.id}`}
+                                type="text"
+                                value={job.fileNamePattern}
+                                onChange={(e) => handleJobChange(job.id, 'fileNamePattern', e.target.value)}
+                                className={`w-full border rounded p-1 text-sm ${hasError('fileNamePattern') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('fileNamePattern')}
+                                placeholder="${host}_${timestamp}.csv"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor={`job-interval-${job.id}`} className="block text-xs font-medium text-gray-500">Interval (ms)</label>
+                            <input
+                                id={`job-interval-${job.id}`}
+                                type="number"
+                                value={job.executionInterval}
+                                onChange={(e) => handleJobChange(job.id, 'executionInterval', parseInt(e.target.value) || 0)}
+                                className={`w-full border rounded p-1 text-sm ${hasError('executionInterval') ? 'border-red-500 bg-red-50' : ''}`}
+                                title={getErrorMsg('executionInterval')}
+                            />
+                        </div>
+                        </div>
+
+                        <div className="border-t pt-3 mt-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                <Archive size={14} /> Compression Actions (Applied sequentially)
+                            </label>
+                            <CompressionActionsEditor 
+                                actions={job.compressionActions || []} 
+                                onChange={(newActions) => handleJobChange(job.id, 'compressionActions', newActions)} 
+                            />
+                        </div>
+
+                        {/* Mode Selector */}
+                        <div className="flex items-center gap-4 border-t pt-3 mt-1">
+                            <label className="text-xs font-medium text-gray-500">Generation Mode:</label>
+                            <div className="flex bg-gray-100 rounded p-1">
+                                <button
+                                    onClick={() => handleJobChange(job.id, 'mode', 'template')}
+                                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'template' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    <AlignJustify size={14} /> Template Text
+                                </button>
+                                <button
+                                    onClick={() => handleJobChange(job.id, 'mode', 'schema')}
+                                    className={`px-3 py-1 rounded text-xs flex items-center gap-1 ${currentMode === 'schema' ? 'bg-white shadow text-blue-600 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    <List size={14} /> Schema List
+                                </button>
+                            </div>
+                        </div>
+
+                        {currentMode === 'template' ? (
+                            <div>
+                                <label htmlFor={`job-content-${job.id}`} className="block text-xs font-medium text-gray-500">File Content Template</label>
+                                <textarea
+                                    id={`job-content-${job.id}`}
+                                    value={job.fileContent}
+                                    onChange={(e) => handleJobChange(job.id, 'fileContent', e.target.value)}
+                                    className="w-full border rounded p-1 text-sm font-mono h-32"
+                                    placeholder="col1,col2,col3&#10;data1,data2,data3"
+                                />
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="mb-2">
+                                    <label htmlFor={`job-rows-${job.id}`} className="block text-xs font-medium text-gray-500 mb-1">Rows per Execution</label>
+                                    <input
+                                        id={`job-rows-${job.id}`}
+                                        type="number"
+                                        value={job.rowCount || 1}
+                                        onChange={(e) => handleJobChange(job.id, 'rowCount', parseInt(e.target.value) || 1)}
+                                        className={`w-32 border rounded p-1 text-sm ${hasError('rowCount') ? 'border-red-500' : ''}`}
+                                    />
+                                </div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Column Definitions</label>
+                                {hasError('schema') && <p className="text-xs text-red-500 mb-1">{getErrorMsg('schema')}</p>}
+                                <div className="border rounded p-2 bg-gray-50">
+                                    <SchemaEditor
+                                        schema={job.schema || []}
+                                        onChange={(newSchema) => handleJobChange(job.id, 'schema', newSchema)}
+                                        errors={errors}
+                                        jobId={job.id}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                );
+            })}
+
+            <button
+                onClick={addJob}
+                className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-500 hover:text-blue-500 transition-colors"
+            >
+                <Plus size={20} /> Add Generation Job
+            </button>
+        </div>
+      ) : (
+          <ArchiveSettings />
+      )}
     </div>
   );
 };

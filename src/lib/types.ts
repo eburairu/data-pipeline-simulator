@@ -41,8 +41,24 @@ export interface GenerationJob {
   compressionActions?: CompressionFormat[];
 }
 
+export interface ArchiveJob {
+  id: string;
+  name: string;
+  sourceConnectionId: string;
+  sourcePath: string;
+  filterRegex: string;
+  targetConnectionId: string;
+  targetPath: string;
+  fileNamePattern: string;
+  format: 'tar' | 'zip' | 'gz';
+  enabled: boolean;
+  executionInterval: number;
+  deleteSourceAfterArchive?: boolean;
+}
+
 export interface DataSourceSettings {
   jobs: GenerationJob[];
+  archiveJobs?: ArchiveJob[];
 }
 
 export interface TopicDefinition {

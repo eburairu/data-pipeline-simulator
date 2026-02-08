@@ -116,7 +116,8 @@ export const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ child
 
   const isHostInUse = useCallback((hostName: string) => {
     const connectionsUsingHost = connections.filter(c => c.type === 'file' && c.host === hostName).map(c => c.id);
-    const inDataSource = dataSource.jobs.some(j => connectionsUsingHost.includes(j.connectionId));
+    const inDataSource = dataSource.jobs.some(j => connectionsUsingHost.includes(j.connectionId)) ||
+                       (dataSource.archiveJobs || []).some(j => connectionsUsingHost.includes(j.sourceConnectionId) || connectionsUsingHost.includes(j.targetConnectionId));
 
     const inCollection = collection.jobs.some(j =>
       (connectionsUsingHost.includes(j.sourceConnectionId)) ||
@@ -133,7 +134,11 @@ export const SettingsContextFacade: React.FC<{ children: ReactNode }> = ({ child
 
   const isDirectoryInUse = useCallback((hostName: string, path: string) => {
     const connectionsUsingHost = connections.filter(c => c.type === 'file' && c.host === hostName).map(c => c.id);
-    const inDataSource = dataSource.jobs.some(j => connectionsUsingHost.includes(j.connectionId) && j.path === path);
+    const inDataSource = dataSource.jobs.some(j => connectionsUsingHost.includes(j.connectionId) && j.path === path) ||
+                       (dataSource.archiveJobs || []).some(j => 
+                         (connectionsUsingHost.includes(j.sourceConnectionId) && j.sourcePath === path) ||
+                         (connectionsUsingHost.includes(j.targetConnectionId) && j.targetPath === path)
+                       );
 
     const inCollection = collection.jobs.some(j => {
       const srcConn = connections.find(c => c.id === j.sourceConnectionId);

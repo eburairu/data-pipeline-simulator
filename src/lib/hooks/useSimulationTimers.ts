@@ -4,7 +4,7 @@ import { useFileSystem } from '../VirtualFileSystem';
 import { generateDataFromSchema } from '../DataGenerator';
 import { processTemplate } from '../templateUtils';
 import { TIMEOUTS } from '../constants';
-import { applyCompressionActions } from '../ArchiveEngine';
+import { applyCompressionActions, bundleTar, compress } from '../ArchiveEngine';
 
 export const useSimulationTimers = (
     isRunning: { generator: boolean; transfer: boolean; mapping: boolean },
@@ -17,7 +17,7 @@ export const useSimulationTimers = (
     }
 ) => {
     const { dataSource, collection, delivery, mappingTasks, taskFlows, connections } = useSettings();
-    const { writeFile } = useFileSystem();
+    const { writeFile, listFiles, deleteFile } = useFileSystem();
     const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
     // エンジン関数への安定した参照（タイマーの再設定を防止）
@@ -62,6 +62,48 @@ export const useSimulationTimers = (
         }).filter(Boolean) as ReturnType<typeof setInterval>[];
         return () => timers.forEach(clearInterval);
     }, [isRunning.generator, dataSource, writeFile, connections]);
+
+    // Archive Timers
+    useEffect(() => {
+        if (!isRunning.generator || !dataSource.archiveJobs) return;
+        const timers = dataSource.archiveJobs.map(job => {
+            if (!job.enabled) return null;
+            const srcConn = connections.find(c => c.id === job.sourceConnectionId);
+            const tgtConn = connections.find(c => c.id === job.targetConnectionId);
+            if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) return null;
+
+            return setInterval(() => {
+                const files = listFiles(srcConn.host, job.sourcePath);
+                const regex = new RegExp(job.filterRegex);
+                const matchingFiles = files.filter(f => regex.test(f.name));
+
+                if (matchingFiles.length === 0) return;
+
+                const ctx = { hostname: tgtConn.host, timestamp: new Date() };
+                let archiveName = processTemplate(job.fileNamePattern, ctx);
+                
+                let archiveContent = '';
+                if (job.format === 'tar') {
+                    archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+                } else if (job.format === 'gz' || job.format === 'zip') {
+                    // If multiple files, we'd normally tar then gz. For simplicity here, 
+                    // if gz/zip is selected, we just compress the first file or join them.
+                    // But bundleTar is better for multiple files.
+                    // Let's assume if it's multiple files and not tar, we still bundle then compress?
+                    // Spec says flatten is fine.
+                    const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+                    archiveContent = compress(bundled, job.format, archiveName);
+                }
+
+                writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
+
+                if (job.deleteSourceAfterArchive) {
+                    matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
+                }
+            }, job.executionInterval);
+        }).filter(Boolean) as ReturnType<typeof setInterval>[];
+        return () => timers.forEach(clearInterval);
+    }, [isRunning.generator, dataSource.archiveJobs, connections, listFiles, writeFile, deleteFile]);
 
     // Transfer Timers (Collection)
     useEffect(() => {

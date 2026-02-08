@@ -45,7 +45,8 @@ export const DataSourceProvider: React.FC<{ children: ReactNode }> = ({ children
         executionInterval: 1000,
         enabled: true,
       }
-    ]
+    ],
+    archiveJobs: []
   });
 
   const [topics, setTopics] = useState<TopicDefinition[]>([

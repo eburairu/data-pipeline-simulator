@@ -44,6 +44,19 @@ export const validateGenerationJob = (job: GenerationJob): ValidationError[] => 
   return errors;
 };
 
+export const validateArchiveJob = (job: any): ValidationError[] => {
+  const errors: ValidationError[] = [];
+  if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
+  if (!job.sourceConnectionId) errors.push({ id: job.id, field: 'sourceConnectionId', message: 'Source Connection is required' });
+  if (!job.sourcePath) errors.push({ id: job.id, field: 'sourcePath', message: 'Source Path is required' });
+  if (!job.targetConnectionId) errors.push({ id: job.id, field: 'targetConnectionId', message: 'Target Connection is required' });
+  if (!job.targetPath) errors.push({ id: job.id, field: 'targetPath', message: 'Target Path is required' });
+  if (!job.fileNamePattern.trim()) errors.push({ id: job.id, field: 'fileNamePattern', message: 'File Name Pattern is required' });
+  if (job.executionInterval <= 0) errors.push({ id: job.id, field: 'executionInterval', message: 'Interval must be > 0' });
+  if (!isValidRegex(job.filterRegex)) errors.push({ id: job.id, field: 'filterRegex', message: 'Invalid Regular Expression' });
+  return errors;
+};
+
 export const validateCollectionJob = (job: CollectionJob): ValidationError[] => {
   const errors: ValidationError[] = [];
   if (!job.name.trim()) errors.push({ id: job.id, field: 'name', message: 'Name is required' });
@@ -147,11 +160,18 @@ export const validateAllSettings = (
 ): ValidationError[] => {
   let errors: ValidationError[] = [];
 
-  // Data Source (File Generation)
+  // Data Source (File Generation & Archiving)
   dataSource.jobs.forEach(job => {
     const jobErrors = validateGenerationJob(job);
     errors = [...errors, ...addSectionInfo(jobErrors, 'Data Source', job.name)];
   });
+
+  if (dataSource.archiveJobs) {
+    dataSource.archiveJobs.forEach(job => {
+      const jobErrors = validateArchiveJob(job);
+      errors = [...errors, ...addSectionInfo(jobErrors, 'Data Source', job.name)];
+    });
+  }
 
   // Collection
   if (collection.processingTime < 0) {
