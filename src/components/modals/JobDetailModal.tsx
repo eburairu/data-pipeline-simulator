@@ -3,14 +3,13 @@
  * ジョブの実行結果、統計情報、エラー詳細を表示
  */
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails } from '../../lib/JobMonitorContext';
+import { type JobStatus, type JobExecutionLog, type MappingExecutionDetails, type TransferExecutionDetails, type JobType } from '../../lib/JobMonitorContext';
 import { useSettings } from '../../lib/SettingsContext';
 import MappingDesigner from '../settings/MappingDesigner';
-import { CheckCircle, XCircle, X, Info, AlertTriangle, Loader2, Workflow, Truck, Database, GitBranch, Activity } from 'lucide-react';
+import { CheckCircle, XCircle, X, Info, AlertTriangle, Loader2, Workflow, Truck, Database, GitBranch, Activity, Archive } from 'lucide-react';
 import { UI } from '../../lib/constants';
 
-// ジョブタイプ定義
-type JobType = 'collection' | 'delivery' | 'mapping' | 'taskflow';
+// ジョブタイプ定義は JobMonitorContext からインポートするように変更
 
 export interface JobDetailModalProps {
   /** 表示するジョブログ */
@@ -28,6 +27,7 @@ const getTypeIcon = (type: JobType) => {
     case 'delivery': return <Truck size={20} className="text-blue-600" />;
     case 'mapping': return <Database size={20} className="text-purple-600" />;
     case 'taskflow': return <GitBranch size={20} className="text-indigo-600" />;
+    case 'archive': return <Archive size={20} className="text-amber-600" />;
   }
 };
 

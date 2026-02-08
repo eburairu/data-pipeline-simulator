@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { LayoutGrid, GitBranch, Workflow, BarChart3 } from 'lucide-react';
+import { LayoutGrid, GitBranch, Workflow, BarChart3, Archive } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
 import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
@@ -234,8 +234,36 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       }
     });
 
+    // --- 2. Render Archive Jobs ---
 
-    // --- 2. Render Mapping Tasks ---
+    (dataSource.archiveJobs || []).forEach((job) => {
+        if (!job.enabled) return;
+
+        const srcConn = connections.find(c => c.id === job.sourceConnectionId);
+        const tgtConn = connections.find(c => c.id === job.targetConnectionId);
+        if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) return;
+
+        const srcNode = keyNodeMap.get(getLegacyKey(srcConn.host, job.sourcePath)) || 
+                        addLegacyStorageNode(srcConn.host, job.sourcePath, 1, 0);
+        const tgtNode = keyNodeMap.get(getLegacyKey(tgtConn.host, job.targetPath)) || 
+                        addLegacyStorageNode(tgtConn.host, job.targetPath, 2, 0);
+
+        const id = `process-arc-${job.id}`;
+        calculatedNodes.push({
+            id, type: 'process',
+            position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
+            data: { 
+                label: job.name, 
+                isProcessing: activeSteps.includes(`${STEP_KEYS.ARCHIVE_JOB}_${job.id}`),
+                icon: <Archive size={16} className="text-amber-600" />
+            }
+        });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+    });
+
+
+    // --- 3. Render Mapping Tasks ---
 
     // We try to place them to the right of existing nodes if possible, or new rows.
     let taskRowIndex = 0;

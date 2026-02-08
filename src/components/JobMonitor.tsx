@@ -3,15 +3,14 @@
  * パイプラインの実行状態を監視・表示
  */
 import React, { useState, useMemo } from 'react';
-import { useJobMonitor, type JobStatus, type JobExecutionLog } from '../lib/JobMonitorContext';
+import { useJobMonitor, type JobStatus, type JobExecutionLog, type JobType } from '../lib/JobMonitorContext';
 import PipelineFlow from './PipelineFlow';
 import ElapsedTimeDisplay from './common/ElapsedTimeDisplay';
 import JobDetailModal from './modals/JobDetailModal';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, Loader2, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, Loader2, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2, Archive } from 'lucide-react';
 import { STEP_KEYS } from '../lib/constants';
 
-// ジョブタイプ定義
-type JobType = 'collection' | 'delivery' | 'mapping' | 'taskflow';
+// ジョブタイプ定義は JobMonitorContext からインポートするように変更
 
 const JobMonitor: React.FC = () => {
   const { logs, clearLogs, retryJob } = useJobMonitor();
@@ -33,6 +32,7 @@ const JobMonitor: React.FC = () => {
         if (l.jobType === 'delivery') return `${STEP_KEYS.DELIVERY_TRANSFER}_${l.jobId}`;
         if (l.jobType === 'mapping') return `${STEP_KEYS.MAPPING_TASK}_${l.jobId}`;
         if (l.jobType === 'taskflow') return `${STEP_KEYS.TASK_FLOW}_${l.jobId}`;
+        if (l.jobType === 'archive') return `${STEP_KEYS.ARCHIVE_JOB}_${l.jobId}`;
         return '';
       })
       .filter(Boolean);
@@ -95,6 +95,7 @@ const JobMonitor: React.FC = () => {
       case 'delivery': return <Truck size={16} className="text-blue-600" />;
       case 'mapping': return <Database size={16} className="text-purple-600" />;
       case 'taskflow': return <GitBranch size={16} className="text-indigo-600" />;
+      case 'archive': return <Archive size={16} className="text-amber-600" />;
     }
   };
 
@@ -139,6 +140,7 @@ const JobMonitor: React.FC = () => {
                   <option value="delivery">Delivery</option>
                   <option value="mapping">Mapping</option>
                   <option value="taskflow">Task Flow</option>
+                  <option value="archive">Archive</option>
                 </select>
               </div>
             </div>

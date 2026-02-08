@@ -9,7 +9,7 @@ import BiDashboard from './components/BiDashboard';
 import SettingsPanel from './components/settings/SettingsPanel';
 import JobMonitor from './components/JobMonitor';
 import 'reactflow/dist/style.css';
-import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, Grid3X3, MonitorPlay, Book, Globe } from 'lucide-react';
+import { Settings, Play, Pause, Activity, FilePlus, AlertTriangle, Grid3X3, MonitorPlay, Book, Globe, FolderArchive } from 'lucide-react';
 import Documentation from './components/Documentation';
 import { useTranslation } from './lib/i18n/LanguageContext';
 import { useSimulationEngine } from './lib/hooks/useSimulationEngine';
@@ -17,6 +17,7 @@ import { useSimulationTimers } from './lib/hooks/useSimulationTimers';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { processTemplate } from './lib/templateUtils';
 import { generateDataFromSchema } from './lib/DataGenerator';
+import { applyCompressionActions, bundleTar, compress } from './lib/ArchiveEngine';
 import { StorageView } from './components/views/StorageView';
 import { DatabaseView } from './components/views/DatabaseView';
 import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition } from './lib/types';
@@ -27,11 +28,12 @@ import { TIMEOUTS } from './lib/constants';
 const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type: JobType) => void) => void }> = ({ setRetryHandler }) => {
   const { t } = useTranslation();
   const [isGeneratorRunning, setIsGeneratorRunning] = useState(false);
+  const [isArchiveRunning, setIsArchiveRunning] = useState(false);
   const [isTransferRunning, setIsTransferRunning] = useState(false);
   const [isMappingRunning, setIsMappingRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
-  const { listFiles, writeFile } = useFileSystem();
+  const { listFiles, writeFile, deleteFile } = useFileSystem();
   const { select } = useVirtualDB();
   const { dataSource, collection, delivery, topics, connections, tables } = useSettings();
   const sequenceStates = useRef<Record<string, Record<string, number>>>({});
@@ -42,7 +44,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const engine = useSimulationEngine(toggleStep, setErrors);
 
   useSimulationTimers(
-    { generator: isGeneratorRunning, transfer: isTransferRunning, mapping: isMappingRunning },
+    { generator: isGeneratorRunning, archive: isArchiveRunning, transfer: isTransferRunning, mapping: isMappingRunning },
     engine
   );
 
@@ -74,8 +76,55 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
         } else {
           content = processTemplate(job.fileContent, ctx);
         }
-        writeFile(conn.host, job.path, processTemplate(job.fileNamePattern, ctx), content);
+        
+        let finalContent = content;
+        let finalFileName = processTemplate(job.fileNamePattern, ctx);
+
+        if (job.compressionActions && job.compressionActions.length > 0) {
+            const result = applyCompressionActions(finalContent, job.compressionActions, finalFileName);
+            finalContent = result.content;
+            finalFileName = result.finalFilename;
+        }
+
+        writeFile(conn.host, job.path, finalFileName, finalContent);
       }
+    });
+  };
+
+  const handleCreateArchive = () => {
+    (dataSource.archiveJobs || []).forEach(job => {
+        if (!job.enabled) return;
+        const srcConn = connections.find(c => c.id === job.sourceConnectionId);
+        const tgtConn = connections.find(c => c.id === job.targetConnectionId);
+        if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) return;
+
+        try {
+            const files = listFiles(srcConn.host, job.sourcePath);
+            const regex = new RegExp(job.filterRegex);
+            const matchingFiles = files.filter(f => regex.test(f.name));
+
+            if (matchingFiles.length === 0) return;
+
+            const ctx = { hostname: tgtConn.host, timestamp: new Date() };
+            let archiveName = processTemplate(job.fileNamePattern, ctx);
+            
+            let archiveContent = '';
+            if (job.format === 'tar') {
+                archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+            } else if (job.format === 'gz' || job.format === 'zip') {
+                const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+                archiveContent = compress(bundled, job.format, archiveName);
+            }
+
+            writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
+
+            if (job.deleteSourceAfterArchive) {
+                matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
+            }
+        } catch (e) {
+            console.error("Archive failed", e);
+            setErrors(prev => [...prev, `Archive failed for ${job.name}: ${e instanceof Error ? e.message : String(e)}`]);
+        }
     });
   };
 
@@ -105,22 +154,33 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => {
-            const all = isGeneratorRunning && isTransferRunning && isMappingRunning;
-            setIsGeneratorRunning(!all); setIsTransferRunning(!all); setIsMappingRunning(!all);
+            const all = isGeneratorRunning && isArchiveRunning && isTransferRunning && isMappingRunning;
+            setIsGeneratorRunning(!all); setIsArchiveRunning(!all); setIsTransferRunning(!all); setIsMappingRunning(!all);
           }}
-          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning && isTransferRunning && isMappingRunning ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+          className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning && isArchiveRunning && isTransferRunning && isMappingRunning ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
         >
-          {isGeneratorRunning && isTransferRunning && isMappingRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />} {t('app.control.all')}
+          {isGeneratorRunning && isArchiveRunning && isTransferRunning && isMappingRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />} {t('app.control.all')}
         </button>
         <button onClick={() => setIsGeneratorRunning(!isGeneratorRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isGeneratorRunning ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{isGeneratorRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.gen')}</button>
+        <button onClick={() => setIsArchiveRunning(!isArchiveRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isArchiveRunning ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>{isArchiveRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} Arc</button>
         <button onClick={() => setIsTransferRunning(!isTransferRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isTransferRunning ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{isTransferRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.trans')}</button>
         <button onClick={() => setIsMappingRunning(!isMappingRunning)} className={`flex items-center gap-2 px-3 py-2 rounded transition-colors text-xs sm:text-sm ${isMappingRunning ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{isMappingRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />} {t('app.control.map')}</button>
-        <button
-          onClick={handleCreateSourceFile}
-          className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm"
-        >
-          <FilePlus className="w-4 h-4" /> <span className="hidden xs:inline">{t('app.control.createFile')}</span><span className="xs:hidden">File+</span>
-        </button>
+        <div className="flex gap-1 ml-auto">
+            <button
+                onClick={handleCreateSourceFile}
+                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                title="Create Source File Once"
+            >
+                <FilePlus className="w-4 h-4" /> <span className="hidden xs:inline">{t('app.control.createFile')}</span><span className="xs:hidden">File+</span>
+            </button>
+            <button
+                onClick={handleCreateArchive}
+                className="flex items-center gap-2 bg-amber-600 text-white px-3 py-2 rounded hover:bg-amber-700 transition-colors text-xs sm:text-sm"
+                title="Run Archive Jobs Once"
+            >
+                <FolderArchive className="w-4 h-4" /> <span className="hidden xs:inline">Archive+</span><span className="xs:hidden">Arc+</span>
+            </button>
+        </div>
       </div>
 
       <StorageViews dataSource={dataSource} collection={collection} delivery={delivery} topics={topics} listFiles={safeListFiles} connections={connections} />

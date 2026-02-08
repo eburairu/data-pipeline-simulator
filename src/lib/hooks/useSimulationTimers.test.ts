@@ -4,12 +4,16 @@ import { renderHook } from '@testing-library/react';
 import { useSimulationTimers } from './useSimulationTimers';
 import * as SettingsContext from '../SettingsContext';
 import * as VirtualFileSystem from '../VirtualFileSystem';
+import * as JobMonitorContext from '../JobMonitorContext';
 
 vi.mock('../SettingsContext');
 vi.mock('../VirtualFileSystem');
+vi.mock('../JobMonitorContext');
 
 describe('useSimulationTimers', () => {
     const mockWriteFile = vi.fn();
+    const mockAddLog = vi.fn().mockReturnValue('log-1');
+    const mockUpdateLog = vi.fn();
     const mockEngines = {
         executeCollectionJob: vi.fn(),
         executeDeliveryJob: vi.fn(),
@@ -24,10 +28,15 @@ describe('useSimulationTimers', () => {
 
         (VirtualFileSystem.useFileSystem as any).mockReturnValue({
             writeFile: mockWriteFile,
-            listFiles: vi.fn(),
+            listFiles: vi.fn().mockReturnValue([]),
             readFile: vi.fn(),
             deleteFile: vi.fn(),
             moveFile: vi.fn(),
+        });
+
+        (JobMonitorContext.useJobMonitor as any).mockReturnValue({
+            addLog: mockAddLog,
+            updateLog: mockUpdateLog,
         });
     });
 
@@ -59,7 +68,7 @@ describe('useSimulationTimers', () => {
         });
 
         renderHook(() => useSimulationTimers(
-            { generator: true, transfer: false, mapping: false },
+            { generator: true, archive: false, transfer: false, mapping: false },
             mockEngines as any
         ));
 
@@ -99,7 +108,7 @@ describe('useSimulationTimers', () => {
         });
 
         renderHook(() => useSimulationTimers(
-            { generator: true, transfer: false, mapping: false },
+            { generator: true, archive: false, transfer: false, mapping: false },
             mockEngines as any
         ));
 
@@ -130,7 +139,7 @@ describe('useSimulationTimers', () => {
         });
 
         renderHook(() => useSimulationTimers(
-            { generator: true, transfer: false, mapping: false },
+            { generator: true, archive: false, transfer: false, mapping: false },
             mockEngines as any
         ));
 

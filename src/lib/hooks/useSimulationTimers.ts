@@ -5,9 +5,10 @@ import { generateDataFromSchema } from '../DataGenerator';
 import { processTemplate } from '../templateUtils';
 import { TIMEOUTS } from '../constants';
 import { applyCompressionActions, bundleTar, compress } from '../ArchiveEngine';
+import { useJobMonitor } from '../JobMonitorContext';
 
 export const useSimulationTimers = (
-    isRunning: { generator: boolean; transfer: boolean; mapping: boolean },
+    isRunning: { generator: boolean; archive: boolean; transfer: boolean; mapping: boolean },
     engines: {
         executeCollectionJob: (id: string) => Promise<void>;
         executeDeliveryJob: (id: string) => Promise<void>;
@@ -18,6 +19,7 @@ export const useSimulationTimers = (
 ) => {
     const { dataSource, collection, delivery, mappingTasks, taskFlows, connections } = useSettings();
     const { writeFile, listFiles, deleteFile } = useFileSystem();
+    const { addLog, updateLog } = useJobMonitor();
     const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
     // エンジン関数への安定した参照（タイマーの再設定を防止）
@@ -65,7 +67,7 @@ export const useSimulationTimers = (
 
     // Archive Timers
     useEffect(() => {
-        if (!isRunning.generator || !dataSource.archiveJobs) return;
+        if (!isRunning.archive || !dataSource.archiveJobs) return;
         const timers = dataSource.archiveJobs.map(job => {
             if (!job.enabled) return null;
             const srcConn = connections.find(c => c.id === job.sourceConnectionId);
@@ -73,37 +75,66 @@ export const useSimulationTimers = (
             if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) return null;
 
             return setInterval(() => {
-                const files = listFiles(srcConn.host, job.sourcePath);
-                const regex = new RegExp(job.filterRegex);
-                const matchingFiles = files.filter(f => regex.test(f.name));
+                const logId = addLog({
+                    jobId: job.id,
+                    jobName: job.name,
+                    jobType: 'archive',
+                    status: 'running',
+                    startTime: Date.now(),
+                    recordsInput: 0,
+                    recordsOutput: 0,
+                    details: 'Scanning for files...'
+                });
 
-                if (matchingFiles.length === 0) return;
+                try {
+                    const files = listFiles(srcConn.host, job.sourcePath);
+                    const regex = new RegExp(job.filterRegex);
+                    const matchingFiles = files.filter(f => regex.test(f.name));
 
-                const ctx = { hostname: tgtConn.host, timestamp: new Date() };
-                let archiveName = processTemplate(job.fileNamePattern, ctx);
-                
-                let archiveContent = '';
-                if (job.format === 'tar') {
-                    archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
-                } else if (job.format === 'gz' || job.format === 'zip') {
-                    // If multiple files, we'd normally tar then gz. For simplicity here, 
-                    // if gz/zip is selected, we just compress the first file or join them.
-                    // But bundleTar is better for multiple files.
-                    // Let's assume if it's multiple files and not tar, we still bundle then compress?
-                    // Spec says flatten is fine.
-                    const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
-                    archiveContent = compress(bundled, job.format, archiveName);
-                }
+                    if (matchingFiles.length === 0) {
+                        updateLog(logId, {
+                            status: 'success',
+                            endTime: Date.now(),
+                            details: 'No matching files found'
+                        });
+                        return;
+                    }
 
-                writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
+                    const ctx = { hostname: tgtConn.host, timestamp: new Date() };
+                    let archiveName = processTemplate(job.fileNamePattern, ctx);
+                    
+                    let archiveContent = '';
+                    if (job.format === 'tar') {
+                        archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+                    } else if (job.format === 'gz' || job.format === 'zip') {
+                        const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+                        archiveContent = compress(bundled, job.format, archiveName);
+                    }
 
-                if (job.deleteSourceAfterArchive) {
-                    matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
+                    writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
+
+                    if (job.deleteSourceAfterArchive) {
+                        matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
+                    }
+
+                    updateLog(logId, {
+                        status: 'success',
+                        endTime: Date.now(),
+                        recordsInput: matchingFiles.length,
+                        recordsOutput: 1,
+                        details: `Archived ${matchingFiles.length} files into ${archiveName}`
+                    });
+                } catch (error) {
+                    updateLog(logId, {
+                        status: 'failed',
+                        endTime: Date.now(),
+                        errorMessage: error instanceof Error ? error.message : String(error)
+                    });
                 }
             }, job.executionInterval);
         }).filter(Boolean) as ReturnType<typeof setInterval>[];
         return () => timers.forEach(clearInterval);
-    }, [isRunning.generator, dataSource.archiveJobs, connections, listFiles, writeFile, deleteFile]);
+    }, [isRunning.archive, dataSource.archiveJobs, connections, listFiles, writeFile, deleteFile]);
 
     // Transfer Timers (Collection)
     useEffect(() => {

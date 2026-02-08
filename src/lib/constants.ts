@@ -93,6 +93,8 @@ export const STEP_KEYS = {
   MAPPING_TASK: 'mapping_task',
   /** タスクフローのステップキープレフィックス */
   TASK_FLOW: 'task_flow',
+  /** アーカイブジョブのステップキープレフィックス */
+  ARCHIVE_JOB: 'archive_job',
 } as const;
 
 // タイムアウト・遅延定数
