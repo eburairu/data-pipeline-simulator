@@ -4,6 +4,7 @@
  * 各変換タイプの設定パネルを登録し、動的に取得できる仕組みを提供。
  * 将来的にConfigPanelコンポーネントを追加する際は、このファイルに登録する。
  */
+import React from 'react';
 import type { TransformationType } from '../../../lib/MappingTypes';
 import type { TransformationConfigProps, ConfigPanelRegistration } from './types';
 
@@ -239,6 +240,9 @@ export function registerDefaultConfigPanels(): void {
     displayName: '更新戦略',
   });
 }
+
+// 初期化時にデフォルトの設定パネルを登録
+registerDefaultConfigPanels();
 
 // 変換タイプと日本語表示名のマッピング（デフォルト値）
 export const TRANSFORMATION_DISPLAY_NAMES: Record<TransformationType, string> = {

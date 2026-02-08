@@ -1,10 +1,10 @@
 /**
  * BIダッシュボード - ウィジェットグリッド表示
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSettings } from '../lib/SettingsContext';
 import { Activity, AlertTriangle } from 'lucide-react';
-import { getWidget, registerDefaultWidgets } from './widgets';
+import { getWidget } from './widgets';
 import type { DashboardItem } from '../lib/types';
 
 /** ウィジェット描画エラーを局所化するErrorBoundary */
@@ -36,11 +36,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 const BiDashboard: React.FC = () => {
   const { biDashboard } = useSettings();
-
-  // ウィジェットの登録
-  useEffect(() => {
-    registerDefaultWidgets();
-  }, []);
 
   if (!biDashboard.items || biDashboard.items.length === 0) {
     return (

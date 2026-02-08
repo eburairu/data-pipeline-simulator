@@ -5,7 +5,6 @@
 import React from 'react';
 import { Database } from 'lucide-react';
 import type { NumericWidgetProps } from './types';
-import { registerWidget } from './index';
 
 const RecordCountWidget: React.FC<NumericWidgetProps> = ({
   title,
@@ -16,7 +15,9 @@ const RecordCountWidget: React.FC<NumericWidgetProps> = ({
   formatter,
   className = '',
 }) => {
-  const displayValue = formatter ? formatter(value) : value.toLocaleString();
+  const displayValue = value !== undefined 
+    ? (formatter ? formatter(value) : value.toLocaleString())
+    : '---';
 
   return (
     <div className={`bg-white rounded-lg shadow border p-4 flex flex-col gap-2 ${className}`}>
@@ -39,13 +40,5 @@ const RecordCountWidget: React.FC<NumericWidgetProps> = ({
     </div>
   );
 };
-
-/** ウィジェット登録 */
-registerWidget({
-  type: 'recordCount',
-  component: RecordCountWidget as React.ComponentType<import('./types').WidgetProps>,
-  defaultTitle: 'レコード数',
-  defaultSize: { width: 200, height: 120 },
-});
 
 export default RecordCountWidget;

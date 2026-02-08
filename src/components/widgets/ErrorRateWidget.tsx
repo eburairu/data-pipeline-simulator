@@ -5,7 +5,6 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { NumericWidgetProps } from './types';
-import { registerWidget } from './index';
 
 const ErrorRateWidget: React.FC<NumericWidgetProps> = ({
   title,
@@ -16,10 +15,12 @@ const ErrorRateWidget: React.FC<NumericWidgetProps> = ({
   formatter,
   className = '',
 }) => {
-  const displayValue = formatter ? formatter(value) : value.toFixed(2);
+  const displayValue = value !== undefined 
+    ? (formatter ? formatter(value) : value.toFixed(2))
+    : '---';
 
   // エラー率に応じた色を決定
-  const valueColor = value > 5 ? 'text-red-600' : value > 1 ? 'text-yellow-600' : 'text-green-600';
+  const valueColor = value === undefined ? 'text-gray-400' : value > 5 ? 'text-red-600' : value > 1 ? 'text-yellow-600' : 'text-green-600';
 
   return (
     <div className={`bg-white rounded-lg shadow border p-4 flex flex-col gap-2 ${className}`}>
@@ -42,13 +43,5 @@ const ErrorRateWidget: React.FC<NumericWidgetProps> = ({
     </div>
   );
 };
-
-/** ウィジェット登録 */
-registerWidget({
-  type: 'errorRate',
-  component: ErrorRateWidget as React.ComponentType<import('./types').WidgetProps>,
-  defaultTitle: 'エラー率',
-  defaultSize: { width: 200, height: 120 },
-});
 
 export default ErrorRateWidget;

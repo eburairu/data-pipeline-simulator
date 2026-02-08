@@ -4,6 +4,7 @@
  * 各ウィジェットタイプを登録し、動的に取得できる仕組みを提供。
  * 将来的にウィジェットコンポーネントを追加する際は、このファイルに登録する。
  */
+import React from 'react';
 import type { WidgetProps, WidgetRegistration } from './types';
 
 // ウィジェットの登録レジストリ
@@ -158,3 +159,6 @@ export function registerDefaultWidgets(): void {
     });
   }
 }
+
+// 初期化時にデフォルトのウィジェットを登録
+registerDefaultWidgets();

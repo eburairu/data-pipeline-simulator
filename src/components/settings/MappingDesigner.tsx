@@ -8,7 +8,7 @@ import type {
 } from '../../lib/MappingTypes';
 import type { ExecutionStats } from '../../lib/MappingEngine';
 import { Trash2, Save, X, LayoutGrid } from 'lucide-react';
-import { registerDefaultConfigPanels, nodeTypes, edgeTypes } from './mapping';
+import { nodeTypes, edgeTypes } from './mapping';
 import { createDefaultTransformation } from './mapping/constants';
 import { getLayoutedElements, applyDagreLayout } from './mapping/layoutHelper';
 import MappingPropertyPanel from './mapping/MappingPropertyPanel';
@@ -41,11 +41,6 @@ const MappingDesigner: React.FC<MappingDesignerProps> = ({ executionStats, readO
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
     const [hasAutoAligned, setHasAutoAligned] = useState(false);
-
-    // ConfigPanelの登録（コンポーネントマウント時に1回のみ）
-    useEffect(() => {
-        registerDefaultConfigPanels();
-    }, []);
 
     useEffect(() => {
         if (initialMappingId) {
