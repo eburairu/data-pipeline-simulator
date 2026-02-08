@@ -23,6 +23,7 @@ const SQLConfigPanel: React.FC<TransformationConfigProps> = ({
   const sqlQuery = sqlConfig.sqlQuery || '';
   const dbConnectionId = sqlConfig.dbConnectionId || '';
   const mode = sqlConfig.mode || 'query';
+  const mockResult = sqlConfig.mockResult || '';
 
   // データベース接続のみをフィルタリング
   const dbConnections = connections.filter((c) => c.type === 'database');
@@ -93,6 +94,24 @@ const SQLConfigPanel: React.FC<TransformationConfigProps> = ({
           value={sqlQuery}
           onChange={(e) => onChange({ ...config, sqlQuery: e.target.value })}
         />
+      </div>
+
+      {/* モック結果 */}
+      <div>
+        <label className="block text-xs text-gray-500 font-medium mb-1">
+          モック結果 (JSON Array)
+        </label>
+        <textarea
+          disabled={readOnly}
+          className="w-full border rounded p-2 text-sm font-mono disabled:bg-gray-100"
+          rows={4}
+          placeholder='[{"id": 1, "value": "Result"}]'
+          value={mockResult}
+          onChange={(e) => onChange({ ...config, mockResult: e.target.value })}
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          DBを実行せずにこの結果を返します。空の場合はパススルーされます。
+        </p>
       </div>
 
       {/* ヒント */}

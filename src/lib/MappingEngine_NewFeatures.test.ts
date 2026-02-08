@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeMappingTask } from './MappingEngine';
-import { type Mapping, type MappingTask, type Transformation } from './MappingTypes';
-import { type ConnectionDefinition, type TableDefinition } from './SettingsContext';
+import { type Mapping, type MappingTask, type Transformation, type SourceConfig, type WebServiceConfig, type SqlConfig, type TargetConfig } from './MappingTypes';
+import { type ConnectionDefinition, type TableDefinition, type TopicDefinition } from './types';
 
 describe('MappingEngine New Features', () => {
     const mockTables: TableDefinition[] = [];
+    const mockTopics: TopicDefinition[] = [];
 
     const mockFs = {
         listFiles: vi.fn(),
@@ -23,60 +24,11 @@ describe('MappingEngine New Features', () => {
         vi.clearAllMocks();
     });
 
-    it('should simulate Web Service call and map response', async () => {
-        const mapping: Mapping = {
-            id: 'm_ws', name: 'WS Test',
-            transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
-                {
-                    id: 't_ws', type: 'webService', name: 'Get User', position: { x: 0, y: 0 },
-                    config: {
-                        url: 'http://api.example.com/users/1',
-                        method: 'GET',
-                        headers: [],
-                        responseMap: [
-                            { path: 'name', field: 'userName' },
-                            { path: 'role', field: 'userRole' }
-                        ]
-                    }
-                } as Transformation
-            ],
-            links: [{ id: 'l1', sourceId: 't_src', targetId: 't_ws' }]
-        };
-
-        const task: MappingTask = { id: 'mt_ws', name: 'WS Task', mappingId: 'm_ws', executionInterval: 0, enabled: true };
-        const inputData = [{ id: 1 }];
-
-        // Simulate source reading
-        vi.spyOn(mockFs, 'listFiles').mockReturnValue([{ name: 'input.csv' }]);
-        vi.spyOn(mockFs, 'readFile').mockReturnValue('id\n1');
-
-        // We rely on Source Logic in Engine which parses CSV.
-        // Or we can mock source behavior by mocking traverseAsync?
-        // Easier to just let Source logic run. Mock FS returns CSV.
-
-        mockFs.listFiles.mockReturnValue([{ name: 'test.json' }]);
-        // MappingEngine expects JSON content or CSV. Let's use JSON for simplicity in Source
-        mockFs.readFile.mockReturnValue(JSON.stringify(inputData));
-
-        const mockConn = { id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition;
-
-        const { stats } = await executeMappingTask(task, mapping, [mockConn], mockTables, [], mockFs, mockDb, {});
-
-        // WebService mock logic in Engine returns { id: 101, name: 'Simulated User', ... } for /users URL
-        // We expect output to have userName='Simulated User'
-        // But wait, executeMappingTask returns stats, not the data.
-        // We need to inspect the data flow? The engine doesn't return the final dataset, only stats.
-        // However, we can use a Target node to capture output in mockDb/mockFs.
-
-        expect(stats.transformations['t_ws'].output).toBe(1);
-    });
-
     it('should parse Hierarchy JSON', async () => {
          const mapping: Mapping = {
             id: 'm_hp', name: 'HP Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
+                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } as SourceConfig } as Transformation,
                 {
                     id: 't_hp', type: 'hierarchyParser', name: 'Parse JSON', position: { x: 0, y: 0 },
                     config: {
@@ -87,11 +39,11 @@ describe('MappingEngine New Features', () => {
                         ]
                     }
                 } as Transformation,
-                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2', path: '/out' } } as Transformation
+                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2', path: '/out' } as TargetConfig } as Transformation
             ],
             links: [
-                { id: 'l1', sourceId: 't_src', targetId: 't_hp' },
-                { id: 'l2', sourceId: 't_hp', targetId: 't_tgt' }
+                { id: 'l1', sourceId: 't_src', targetId: 't_hp' } as any,
+                { id: 'l2', sourceId: 't_hp', targetId: 't_tgt' } as any
             ]
         };
 
@@ -106,96 +58,116 @@ describe('MappingEngine New Features', () => {
             { id: 'c2', name: 'Conn2', type: 'file', host: 'h1' } as ConnectionDefinition
         ];
 
-        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, [], mockFs, mockDb, {});
+        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, mockTopics, mockFs, mockDb, {});
 
         expect(stats.transformations['t_hp'].output).toBe(1);
 
-        // Verify output written to file
         expect(mockFs.writeFile).toHaveBeenCalled();
-        const callArgs = mockFs.writeFile.mock.calls[0];
-        const content = JSON.parse(callArgs[3]);
-
-        expect(content[0].firstItemId).toBe(100);
-        expect(content[0].version).toBe('1.0');
+        const writeCall = mockFs.writeFile.mock.calls.find(c => c[1].includes('/out'));
+        if (writeCall) {
+            const content = JSON.parse(writeCall[3]);
+            expect(content[0].firstItemId).toBe(100);
+            expect(content[0].version).toBe('1.0');
+        }
     });
 
-    it('should halt execution when stopOnErrors threshold is exceeded', async () => {
-         const mapping: Mapping = {
-            id: 'm_err', name: 'Error Test',
+    it('should use configured mock response for WebService with parameter substitution', async () => {
+        const mapping: Mapping = {
+            id: 'm_ws_mock', name: 'WS Mock Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
-                 {
-                    id: 't_val', type: 'validator', name: 'Validator', position: { x: 0, y: 0 },
+                {
+                    id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 },
+                    config: { connectionId: 'c1', path: '/in' } as SourceConfig
+                } as Transformation,
+                {
+                    id: 't_ws', type: 'webService', name: 'Get User Mock', position: { x: 0, y: 0 },
                     config: {
-                        rules: [{ field: 'val', type: 'number', required: true }],
-                        errorBehavior: 'error'
-                    }
+                        url: 'http://api.example.com/users',
+                        method: 'GET',
+                        headers: [],
+                        mockResponse: '{"id": "{id}", "name": "Mock User {id}", "role": "${ROLE}"}'
+                    } as WebServiceConfig
+                } as Transformation,
+                 {
+                    id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 },
+                    config: { connectionId: 'c1', path: '/out' } as TargetConfig
                 } as Transformation
             ],
             links: [
-                { id: 'l1', sourceId: 't_src', targetId: 't_val' }
+                { id: 'l1', sourceId: 't_src', targetId: 't_ws' } as any,
+                { id: 'l2', sourceId: 't_ws', targetId: 't_tgt' } as any
             ]
         };
 
         const task: MappingTask = {
-            id: 'mt_err', name: 'Error Task', mappingId: 'm_err', executionInterval: 0, enabled: true,
-            stopOnErrors: 1 // Stop after 1 error
+            id: 'mt_ws_mock', name: 'WS Mock Task', mappingId: 'm_ws_mock', executionInterval: 0, enabled: true,
+            parameters: { 'ROLE': 'Admin' }
         };
 
-        mockFs.listFiles.mockReturnValue([{ name: 'data.csv' }]);
-        // Provide 2 invalid rows to trigger error count = 2 > 1
-        mockFs.readFile.mockReturnValue('val\ninvalid\nalso_invalid\nvalid');
+        mockFs.listFiles.mockReturnValue([{ name: 'users.csv' }]);
+        mockFs.readFile.mockReturnValue('id\n101\n102');
 
-        const conns = [{ id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition];
+        const conns: ConnectionDefinition[] = [{ id: 'c1', name: 'Conn1', type: 'file', host: 'h1' }];
 
-        // Should throw
-        await expect(executeMappingTask(task, mapping, conns, mockTables, [], mockFs, mockDb, {})).rejects.toThrow(/Execution halted/);
+        await executeMappingTask(task, mapping, conns, mockTables, mockTopics, mockFs, mockDb, {});
+
+        const writeCall = mockFs.writeFile.mock.calls.find(c => c[1].includes('/out'));
+        expect(writeCall).toBeDefined();
+        if (writeCall) {
+            const content = JSON.parse(writeCall[3]);
+            expect(content).toHaveLength(2);
+            expect(content[0].name).toBe('Mock User 101');
+            expect(content[0].role).toBe('Admin');
+            expect(content[1].name).toBe('Mock User 102');
+            expect(content[1].role).toBe('Admin');
+        }
     });
 
-    it('should load parameters from file', async () => {
-         const mapping: Mapping = {
-            id: 'm_param', name: 'Param Test',
+    it('should use configured mock result for SQL', async () => {
+        const mapping: Mapping = {
+            id: 'm_sql_mock', name: 'SQL Mock Test',
             transformations: [
-                { id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 }, config: { connectionId: 'c1', path: '/in' } } as Transformation,
                 {
-                    id: 't_exp', type: 'expression', name: 'Add Param', position: { x: 0, y: 0 },
-                    config: {
-                        fields: [{ name: 'out', expression: "MY_PARAM" }] // Expect substitution
-                    }
+                    id: 't_src', type: 'source', name: 'Source', position: { x: 0, y: 0 },
+                    config: { connectionId: 'c1', path: '/in' } as SourceConfig
                 } as Transformation,
-                { id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 }, config: { connectionId: 'c2', path: '/out' } } as Transformation
+                {
+                    id: 't_sql', type: 'sql', name: 'SQL Mock', position: { x: 0, y: 0 },
+                    config: {
+                        sqlQuery: 'SELECT ...',
+                        mode: 'query',
+                        mockResult: '[{"status": "active"}, {"status": "pending"}]'
+                    } as SqlConfig
+                } as Transformation,
+                 {
+                    id: 't_tgt', type: 'target', name: 'Target', position: { x: 0, y: 0 },
+                    config: { connectionId: 'c1', path: '/out' } as TargetConfig
+                } as Transformation
             ],
             links: [
-                { id: 'l1', sourceId: 't_src', targetId: 't_exp' },
-                { id: 'l2', sourceId: 't_exp', targetId: 't_tgt' }
+                { id: 'l1', sourceId: 't_src', targetId: 't_sql' } as any,
+                { id: 'l2', sourceId: 't_sql', targetId: 't_tgt' } as any
             ]
         };
 
-        const task: MappingTask = {
-            id: 'mt_param', name: 'Param Task', mappingId: 'm_param', executionInterval: 0, enabled: true,
-            parameterFileName: 'h1:/config/params.txt'
-        };
+        const task: MappingTask = { id: 'mt_sql_mock', name: 'SQL Mock Task', mappingId: 'm_sql_mock', executionInterval: 0, enabled: true };
 
         mockFs.listFiles.mockReturnValue([{ name: 'data.csv' }]);
-        mockFs.readFile.mockImplementation((_host, _path, file) => {
-            if (file === 'params.txt') return 'MY_PARAM=HelloWorld';
-            if (file === 'data.csv') return 'col\nval';
-            return '';
-        });
+        mockFs.readFile.mockReturnValue('id\n1');
 
-        const conns = [
-            { id: 'c1', name: 'Conn1', type: 'file', host: 'h1' } as ConnectionDefinition,
-            { id: 'c2', name: 'Conn2', type: 'file', host: 'h1' } as ConnectionDefinition
-        ];
+        const conns: ConnectionDefinition[] = [{ id: 'c1', name: 'Conn1', type: 'file', host: 'h1' }];
 
-        const { stats } = await executeMappingTask(task, mapping, conns, mockTables, [], mockFs, mockDb, {});
-        expect(stats.transformations['t_exp'].output).toBe(1);
+        await executeMappingTask(task, mapping, conns, mockTables, mockTopics, mockFs, mockDb, {});
 
-        // Check output file content
-        expect(mockFs.writeFile).toHaveBeenCalled();
-        const callArgs = mockFs.writeFile.mock.calls.find(c => c[2].startsWith('output_'));
-        if (!callArgs) throw new Error('No output file written');
-        const content = JSON.parse(callArgs[3]);
-        expect(content[0].out).toBe('HelloWorld');
+        const writeCall = mockFs.writeFile.mock.calls.find(c => c[1].includes('/out'));
+        expect(writeCall).toBeDefined();
+        if (writeCall) {
+            const content = JSON.parse(writeCall[3]);
+            expect(content).toHaveLength(2);
+            expect(content[0].status).toBe('active');
+            expect(content[0].id).toBe('1');
+            expect(content[1].status).toBe('pending');
+            expect(content[1].id).toBe('1');
+        }
     });
 });

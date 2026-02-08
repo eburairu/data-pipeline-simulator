@@ -307,6 +307,15 @@ export const useSimulationEngine = (
                         .filter(Boolean)
                 );
                 currentFiles = currentFiles.filter(f => !processedSet.has(f.name));
+
+                // Check for delay (Topic source only)
+                if (job.delayMs && job.delayMs > 0) {
+                    const now = Date.now();
+                    currentFiles = currentFiles.filter(f => {
+                        const age = now - f.createdAt;
+                        return age >= (job.delayMs || 0);
+                    });
+                }
             }
             if (currentFiles.length === 0) return;
 

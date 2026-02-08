@@ -190,6 +190,8 @@ export interface DeliveryJob {
   enabled: boolean;
   /** If true, delete source file after successful transfer. Default: true (move). If false, copy the file. Only applies when sourceType is 'host'. */
   deleteSourceAfterTransfer?: boolean;
+  /** Delay in milliseconds before delivering files from a Topic source. */
+  delayMs?: number;
 }
 
 export interface DeliverySettings {

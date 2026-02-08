@@ -20,6 +20,7 @@ const WebServiceConfigPanel: React.FC<TransformationConfigProps> = ({
   const method = webServiceConfig.method || 'GET';
   const headers = webServiceConfig.headers || [];
   const requestBody = webServiceConfig.requestBody || '';
+  const mockResponse = webServiceConfig.mockResponse || '';
   const responseMap = webServiceConfig.responseMap || [];
 
   /** ヘッダーを追加 */
@@ -178,6 +179,24 @@ const WebServiceConfigPanel: React.FC<TransformationConfigProps> = ({
           />
         </div>
       )}
+
+      {/* モックレスポンス */}
+      <div>
+        <label className="block text-xs text-gray-500 font-medium mb-1">
+          モックレスポンス (JSON)
+        </label>
+        <textarea
+          disabled={readOnly}
+          className="w-full border rounded p-2 text-sm font-mono disabled:bg-gray-100"
+          rows={4}
+          placeholder='[{"id": 1, "name": "Test"}]'
+          value={mockResponse}
+          onChange={(e) => onChange({ ...config, mockResponse: e.target.value })}
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          実際のAPIを呼び出さずにこの値を返します。{'${param}'} でパラメータ置換可能。
+        </p>
+      </div>
 
       {/* レスポンスマッピング */}
       <div>

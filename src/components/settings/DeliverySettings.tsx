@@ -162,19 +162,32 @@ const DeliverySettings: React.FC = () => {
                            </div>
 
                            {job.sourceType === 'topic' ? (
-                              <div>
-                                 <label className="block text-xs font-medium text-gray-500">Source Topic</label>
-                                 <select
-                                    value={job.sourceTopicId || ''}
-                                    onChange={(e) => handleJobChange(job.id, 'sourceTopicId', e.target.value)}
-                                    className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceTopicId') ? 'border-red-500 bg-red-50' : ''}`}
-                                    title={getErrorMsg('sourceTopicId')}
-                                 >
-                                    <option value="">Select Topic</option>
-                                    {topics.map(t => (
-                                       <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                 </select>
+                              <div className="space-y-2">
+                                 <div>
+                                    <label className="block text-xs font-medium text-gray-500">Source Topic</label>
+                                    <select
+                                       value={job.sourceTopicId || ''}
+                                       onChange={(e) => handleJobChange(job.id, 'sourceTopicId', e.target.value)}
+                                       className={`w-full border rounded p-1 text-sm bg-white ${hasError('sourceTopicId') ? 'border-red-500 bg-red-50' : ''}`}
+                                       title={getErrorMsg('sourceTopicId')}
+                                    >
+                                       <option value="">Select Topic</option>
+                                       {topics.map(t => (
+                                          <option key={t.id} value={t.id}>{t.name}</option>
+                                       ))}
+                                    </select>
+                                 </div>
+                                 <div>
+                                    <label className="block text-xs font-medium text-gray-500">Delay (ms)</label>
+                                    <input
+                                       type="number"
+                                       value={job.delayMs || 0}
+                                       onChange={(e) => handleJobChange(job.id, 'delayMs', parseInt(e.target.value) || 0)}
+                                       className="w-full border rounded p-1 text-sm"
+                                       placeholder="0"
+                                    />
+                                    <p className="text-[10px] text-gray-400">Wait time after file creation before delivery.</p>
+                                 </div>
                               </div>
                            ) : (
                               <div>

@@ -167,6 +167,7 @@ export interface SqlConfig {
   sqlQuery: string;
   dbConnectionId?: string;
   mode: 'query' | 'procedure' | 'script';
+  mockResult?: string;
 }
 
 export interface WebServiceConfig {
@@ -175,6 +176,7 @@ export interface WebServiceConfig {
   headers: { key: string; value: string }[];
   requestBody?: string;
   responseMap?: { path: string; field: string }[];
+  mockResponse?: string;
 }
 
 export interface HierarchyParserConfig {
