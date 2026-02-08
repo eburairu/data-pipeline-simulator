@@ -50,11 +50,10 @@ describe('MappingEngine Error Handling Enhancement', () => {
 
         const task: MappingTask = {
             id: 't1',
-            jobId: 'j1',
+            name: 'Task 1',
             mappingId: 'm1',
-            // @ts-ignore
-            mapping,
-            status: 'pending'
+            executionInterval: 0,
+            enabled: true
         };
 
         const state: ExecutionState = {
@@ -122,11 +121,10 @@ describe('MappingEngine Error Handling Enhancement', () => {
 
         const task: MappingTask = {
             id: 't2',
-            jobId: 'j2',
+            name: 'Task 2',
             mappingId: 'm2',
-            // @ts-ignore
-            mapping,
-            status: 'pending'
+            executionInterval: 0,
+            enabled: true
         };
 
         // Mock DB schema to have mismatched columns
