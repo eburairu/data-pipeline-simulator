@@ -56,12 +56,7 @@ describe('MappingEngine Error Handling Enhancement', () => {
             enabled: true
         };
 
-        const state: ExecutionState = {
-            processedCount: 0,
-            errorCount: 0,
-            startTime: Date.now(),
-            stopOnErrors: false
-        };
+        const state: ExecutionState = {};
 
         const connections = [{ id: 'conn1', name: 'File Source', type: 'file', host: 'localhost' }];
 
@@ -134,31 +129,26 @@ describe('MappingEngine Error Handling Enhancement', () => {
         // The current processTarget uses `Object.keys(record)` and tries to match with target columns or just inserts.
         // If it's a VirtualDB, insert(table, row) is called.
         // We need to simulate the check logic inside MappingEngine.
-        
+
         // Let's assume the fix will check keys against something.
         // But wait, standard SQL INSERT doesn't automatically check against schema in this engine unless VirtualDB throws.
         // However, the spec says "Validate column matching".
         // So we expect MappingEngine to detect this *before* insert or catch it.
         // For this test, we assume MappingEngine will look at the target definition or data.
-        
+
         // NOTE: The current engine extracts columns from the *record* itself. 
         // If the record has {colA: val1}, and target expects {colX: val1}, 
         // normally we'd need a transformation. If no transformation, it tries to insert {colA: val1}.
         // If the DB is strict, it fails. If lenient (VirtualDB), it might accept.
         // The requirement is to *enforce* this check in MappingEngine.
-        
+
         // To make this test fail currently (or pass after fix), we need to assert that errorCount increases.
-        
-        const state: ExecutionState = {
-            processedCount: 0,
-            errorCount: 0,
-            startTime: Date.now(),
-            stopOnErrors: false
-        };
+
+        const state: ExecutionState = {};
 
         // We mock VirtualDB insert to NOT throw, so we can verify MappingEngine catches it.
         mockDb.insert.mockImplementation(() => { /* success */ });
-        
+
         // We also need to provide "target schema" somehow if MappingEngine is to check it.
         // Or, simpler: "If the record has keys A, B and the user mapped nothing or target has X, Y..."
         // The spec says: "Compare record keys with target table columns".
@@ -167,16 +157,16 @@ describe('MappingEngine Error Handling Enhancement', () => {
         // The spec implies we should probably fetch schema or at least warn if the resulting object is empty?
         // Ah, "record keys ... and target table columns ... match nothing".
         // Currently MappingEngine doesn't know target table columns unless we fetch them.
-        
+
         // Let's adjust expectation: If the engine *cannot* know target columns without fetching,
         // maybe the requirement implies "if the resulting record to insert is empty"? 
         // No, if keys don't match, the record is not empty, just wrong keys.
-        
+
         // Maybe the requirement assumes we *should* fetch schema. 
         // Or maybe for this test, we just check if MappingEngine is modified to do this check.
         // For now, let's write the test assuming we inject the table schema into the mockDb.select or similar,
         // OR MappingEngine will receive the schema.
-        
+
         // Wait, `tables` in App.tsx context are passed to VirtualDB, but MappingEngine receives `dbOps`.
         // `dbOps` has `select`. We might need `getSchema` or similar? 
         // Or we rely on `insert` throwing an error?
@@ -184,13 +174,13 @@ describe('MappingEngine Error Handling Enhancement', () => {
         // Let's assume we will add `getColumns` or similar to DbOps, OR we just check if keys match *mapped* columns?
         // Actually, if we use `automap` or manual map.
         // If manual map is empty, and automap finds nothing.
-        
+
         // Let's simplify: The spec says "Target (DB) writing... validation".
         // If we implement checking against `mockDb` or if we simply check if "mapped record is empty" (if filtering applied)?
         // Re-reading spec: "Compare record keys... and target table columns".
         // So we MUST know target table columns.
         // Currently `DbOps` interface might not expose this. We might need to add `getTableSchema` to `DbOps`.
-        
+
         // For the test, we'll mock `getTableInfo` (which we might need to add).
         // Let's assume we add `getTableColumns` to DbOps.
         (mockDb as any).getTableColumns = vi.fn().mockReturnValue(['colX', 'colY']);

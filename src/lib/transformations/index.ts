@@ -81,3 +81,70 @@ export type {
     DbRecord,
     ExpressionEvaluator,
 } from './types';
+
+// ===========================================
+// すべてのStrategyをインポートして自動登録
+// ===========================================
+
+import { filterStrategy } from './FilterStrategy';
+import { expressionStrategy } from './ExpressionStrategy';
+import { aggregatorStrategy } from './AggregatorStrategy';
+import { sorterStrategy } from './SorterStrategy';
+import { rankStrategy } from './RankStrategy';
+import { sequenceStrategy } from './SequenceStrategy';
+import { joinerStrategy } from './JoinerStrategy';
+import { lookupStrategy } from './LookupStrategy';
+import { unionStrategy } from './UnionStrategy';
+import { routerStrategy } from './RouterStrategy';
+import { normalizerStrategy } from './NormalizerStrategy';
+import { deduplicatorStrategy } from './DeduplicatorStrategy';
+import { pivotStrategy } from './PivotStrategy';
+import { unpivotStrategy } from './UnpivotStrategy';
+import { sqlStrategy } from './SQLStrategy';
+import { webServiceStrategy } from './WebServiceStrategy';
+import { hierarchyParserStrategy } from './HierarchyParserStrategy';
+import { cleansingStrategy } from './CleansingStrategy';
+import { updateStrategyStrategy } from './UpdateStrategyStrategy';
+import { sourceStrategy } from './SourceStrategy';
+import { targetStrategy } from './TargetStrategy';
+import { validatorStrategy } from './ValidatorStrategy';
+
+/**
+ * すべてのStrategyを登録
+ */
+function initializeStrategies(): void {
+    // 基本変換
+    registerStrategy(filterStrategy);
+    registerStrategy(expressionStrategy);
+    registerStrategy(aggregatorStrategy);
+    registerStrategy(sorterStrategy);
+    registerStrategy(rankStrategy);
+    registerStrategy(sequenceStrategy);
+    registerStrategy(validatorStrategy);
+
+    // 結合変換
+    registerStrategy(joinerStrategy);
+    registerStrategy(lookupStrategy);
+    registerStrategy(unionStrategy);
+
+    // データ処理変換
+    registerStrategy(routerStrategy);
+    registerStrategy(normalizerStrategy);
+    registerStrategy(deduplicatorStrategy);
+    registerStrategy(pivotStrategy);
+    registerStrategy(unpivotStrategy);
+
+    // 高度な変換
+    registerStrategy(sqlStrategy);
+    registerStrategy(webServiceStrategy);
+    registerStrategy(hierarchyParserStrategy);
+    registerStrategy(cleansingStrategy);
+    registerStrategy(updateStrategyStrategy);
+
+    // ソース/ターゲット
+    registerStrategy(sourceStrategy);
+    registerStrategy(targetStrategy);
+}
+
+// モジュールロード時に自動登録
+initializeStrategies();

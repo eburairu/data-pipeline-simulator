@@ -165,8 +165,16 @@ export class TargetStrategy implements TransformationStrategy<TargetTransformati
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const baseName = `output_${timestamp}_${Math.random().toString(36).substr(2, 5)}`;
 
-            const content = JSON.stringify(batch, null, 2);
-            const filename = `${baseName}.json`;
+            let content = JSON.stringify(batch, null, 2);
+            let filename = `${baseName}.json`;
+
+            // Apply compression if configured
+            if (node.config.compressionActions && node.config.compressionActions.length > 0) {
+                const { applyCompressionActions } = await import('../ArchiveEngine');
+                const result = applyCompressionActions(content, node.config.compressionActions, filename);
+                content = result.content;
+                filename = result.finalFilename;
+            }
 
             fs.writeFile(host, path, filename, content);
             processedBatch.push(...batch);

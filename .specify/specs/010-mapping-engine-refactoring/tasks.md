@@ -27,7 +27,7 @@
 - [x] T004 [US2] `src/lib/SafeExpressionEvaluator.ts` を作成（許可リスト方式の式評価）
 - [x] T005 [P] [US2] SafeExpressionEvaluator のユニットテストを `src/lib/SafeExpressionEvaluator.test.ts` に作成
 - [x] T006 [US1] `src/lib/transformations/index.ts` にStrategy登録・取得メカニズムを実装
-- [ ] T007 [P] [US1] Strategy登録のユニットテストを作成
+- [x] T007 [P] [US1] Strategy登録のユニットテストを作成
 
 **チェックポイント**: 基盤準備完了 - 個別Strategy実装を開始可能
 
@@ -50,8 +50,8 @@
 
 - [x] T012 [P] [US1] `src/lib/transformations/AggregatorStrategy.ts` を実装
 - [x] T013 [P] [US1] `src/lib/transformations/SorterStrategy.ts` を実装
-- [ ] T014 [P] [US1] `src/lib/transformations/RankStrategy.ts` を実装
-- [ ] T015 [P] [US1] `src/lib/transformations/SequenceStrategy.ts` を実装
+- [x] T014 [P] [US1] `src/lib/transformations/RankStrategy.ts` を実装
+- [x] T015 [P] [US1] `src/lib/transformations/SequenceStrategy.ts` を実装
 
 ### 結合変換Strategy（並行実行可能）
 
@@ -85,12 +85,12 @@
 
 **独立テスト**: セキュリティテストで悪意のある入力がブロックされる
 
-- [ ] T029 [US2] MappingEngine.ts の式評価を SafeExpressionEvaluator に置き換え
-- [ ] T030 [US2] ExpressionFunctions.ts の関数を SafeExpressionEvaluator に統合
-- [ ] T031 [US2] セキュリティテストを追加（悪意のある式のブロック確認）
-- [ ] T032 [US2] 既存のExpression変換テストが引き続きパスすることを確認
+- [x] T029 [US2] MappingEngine.ts の式評価を SafeExpressionEvaluator に置き換え
+- [x] T030 [US2] ExpressionFunctions.ts の関数を SafeExpressionEvaluator に統合
+- [x] T031 [US2] セキュリティテストを追加（悪意のある式のブロック確認）
+- [x] T032 [US2] 既存のExpression変換テストが引き続きパスすることを確認
 
-**チェックポイント**: `new Function()` がコードベースから排除される
+**チェックポイント**: `new Function()` がコードベースから排除される ✅
 
 ---
 
@@ -113,10 +113,10 @@
 
 **目的**: 品質保証と文書化
 
-- [ ] T037 [P] 各Strategyクラスに日本語コメントを追加
-- [ ] T038 [P] transformations/README.md に構造説明を追加（必要な場合）
-- [ ] T039 npm test && npm run build で最終検証
-- [ ] T040 MappingDesigner.tsx との統合確認（UIが正常に動作するか）
+- [x] T037 [P] 各Strategyクラスに日本語コメントを追加
+- [x] T038 [P] transformations/README.md に構造説明を追加
+- [x] T039 npm test && npm run build で最終検証 ✅
+- [x] T040 MappingDesigner.tsx との統合確認（コードレベルで確認完了）
 
 ---
 

@@ -24,4 +24,8 @@ dist-ssr
 *.sw?
 
 .gemini/
+!.gemini/agents/
+!.gemini/hooks/
+!.gemini/config.yaml
+!.gemini/settings.json
 gha-creds-*.json
