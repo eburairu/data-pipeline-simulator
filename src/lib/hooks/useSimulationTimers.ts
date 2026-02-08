@@ -4,13 +4,13 @@ import { useFileSystem } from '../VirtualFileSystem';
 import { generateDataFromSchema } from '../DataGenerator';
 import { processTemplate } from '../templateUtils';
 import { TIMEOUTS } from '../constants';
-import { applyCompressionActions, bundleTar, compress } from '../ArchiveEngine';
-import { useJobMonitor } from '../JobMonitorContext';
+import { applyCompressionActions } from '../ArchiveEngine';
 
 export const useSimulationTimers = (
     isRunning: { generator: boolean; archive: boolean; transfer: boolean; mapping: boolean },
     engines: {
         executeCollectionJob: (id: string) => Promise<void>;
+        executeArchiveJob: (id: string) => Promise<void>;
         executeDeliveryJob: (id: string) => Promise<void>;
         executeMappingJob: (id: string) => Promise<unknown>;
         executeTaskFlow: (id: string) => Promise<void>;
@@ -18,8 +18,7 @@ export const useSimulationTimers = (
     }
 ) => {
     const { dataSource, collection, delivery, mappingTasks, taskFlows, connections } = useSettings();
-    const { writeFile, listFiles, deleteFile } = useFileSystem();
-    const { addLog, updateLog } = useJobMonitor();
+    const { writeFile } = useFileSystem();
     const sequenceStates = useRef<Record<string, Record<string, number>>>({});
 
     // エンジン関数への安定した参照（タイマーの再設定を防止）
@@ -70,71 +69,10 @@ export const useSimulationTimers = (
         if (!isRunning.archive || !dataSource.archiveJobs) return;
         const timers = dataSource.archiveJobs.map(job => {
             if (!job.enabled) return null;
-            const srcConn = connections.find(c => c.id === job.sourceConnectionId);
-            const tgtConn = connections.find(c => c.id === job.targetConnectionId);
-            if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) return null;
-
-            return setInterval(() => {
-                const logId = addLog({
-                    jobId: job.id,
-                    jobName: job.name,
-                    jobType: 'archive',
-                    status: 'running',
-                    startTime: Date.now(),
-                    recordsInput: 0,
-                    recordsOutput: 0,
-                    details: 'Scanning for files...'
-                });
-
-                try {
-                    const files = listFiles(srcConn.host, job.sourcePath);
-                    const regex = new RegExp(job.filterRegex);
-                    const matchingFiles = files.filter(f => regex.test(f.name));
-
-                    if (matchingFiles.length === 0) {
-                        updateLog(logId, {
-                            status: 'success',
-                            endTime: Date.now(),
-                            details: 'No matching files found'
-                        });
-                        return;
-                    }
-
-                    const ctx = { hostname: tgtConn.host, timestamp: new Date() };
-                    let archiveName = processTemplate(job.fileNamePattern, ctx);
-                    
-                    let archiveContent = '';
-                    if (job.format === 'tar') {
-                        archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
-                    } else if (job.format === 'gz' || job.format === 'zip') {
-                        const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
-                        archiveContent = compress(bundled, job.format, archiveName);
-                    }
-
-                    writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
-
-                    if (job.deleteSourceAfterArchive) {
-                        matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
-                    }
-
-                    updateLog(logId, {
-                        status: 'success',
-                        endTime: Date.now(),
-                        recordsInput: matchingFiles.length,
-                        recordsOutput: 1,
-                        details: `Archived ${matchingFiles.length} files into ${archiveName}`
-                    });
-                } catch (error) {
-                    updateLog(logId, {
-                        status: 'failed',
-                        endTime: Date.now(),
-                        errorMessage: error instanceof Error ? error.message : String(error)
-                    });
-                }
-            }, job.executionInterval);
+            return setInterval(() => enginesRef.current.executeArchiveJob(job.id), job.executionInterval);
         }).filter(Boolean) as ReturnType<typeof setInterval>[];
         return () => timers.forEach(clearInterval);
-    }, [isRunning.archive, dataSource.archiveJobs, connections, listFiles, writeFile, deleteFile]);
+    }, [isRunning.archive, dataSource.archiveJobs]);
 
     // Transfer Timers (Collection)
     useEffect(() => {

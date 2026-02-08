@@ -5,6 +5,7 @@ import { useSettings } from '../SettingsContext';
 import { useJobMonitor } from '../JobMonitorContext';
 import { processTemplate } from '../templateUtils';
 import { executeMappingTaskRecursive, type ExecutionState, type ExecutionStats, type DbRecord } from '../MappingEngine';
+import { bundleTar, compress } from '../ArchiveEngine';
 import type { DataRow } from '../types';
 import { SYSTEM_TABLES, STEP_KEYS, TIMEOUTS } from '../constants';
 
@@ -14,11 +15,12 @@ export const useSimulationEngine = (
 ) => {
     const { writeFile, moveFile, listFiles, deleteFile } = useFileSystem();
     const { insert, select, update, remove } = useVirtualDB();
-    const { connections, collection, delivery, mappings, mappingTasks, taskFlows, tables, topics } = useSettings();
+    const { connections, collection, delivery, mappings, mappingTasks, taskFlows, tables, topics, dataSource } = useSettings();
     const { addLog, updateLog } = useJobMonitor();
 
     const collectionLocks = useRef<Record<string, boolean>>({});
     const deliveryLocks = useRef<Record<string, boolean>>({});
+    const archiveLocks = useRef<Record<string, boolean>>({});
     const mappingStates = useRef<Record<string, ExecutionState>>({});
     const mappingLocks = useRef<Record<string, boolean>>({});
     const fileLocks = useRef<Set<string>>(new Set());
@@ -392,6 +394,80 @@ export const useSimulationEngine = (
     // ref を更新して、executeCollectionJob から最新の executeDeliveryJob を呼び出せるようにする
     executeDeliveryJobRef.current = executeDeliveryJob;
 
+    const executeArchiveJob = useCallback(async (jobId: string) => {
+        const job = dataSource.archiveJobs?.find(j => j.id === jobId);
+        if (!job || !job.enabled) return;
+
+        const srcConn = connections.find(c => c.id === job.sourceConnectionId);
+        const tgtConn = connections.find(c => c.id === job.targetConnectionId);
+        if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) {
+            setErrors(prev => [...new Set([...prev, `Archive Job ${job.name}: Invalid Connection or Path` ])]);
+            return;
+        }
+
+        if (archiveLocks.current[job.id]) return;
+
+        const logId = addLog({
+            jobId: job.id,
+            jobName: job.name,
+            jobType: 'archive',
+            status: 'running',
+            startTime: Date.now(),
+            recordsInput: 0,
+            recordsOutput: 0,
+            details: 'Scanning for files...'
+        });
+
+        try {
+            archiveLocks.current[job.id] = true;
+            const files = listFiles(srcConn.host, job.sourcePath);
+            const regex = new RegExp(job.filterRegex);
+            const matchingFiles = files.filter(f => regex.test(f.name));
+
+            if (matchingFiles.length === 0) {
+                updateLog(logId, {
+                    status: 'success',
+                    endTime: Date.now(),
+                    details: 'No matching files found'
+                });
+                return;
+            }
+
+            const ctx = { hostname: tgtConn.host, timestamp: new Date() };
+            let archiveName = processTemplate(job.fileNamePattern, ctx);
+            
+            let archiveContent = '';
+            if (job.format === 'tar') {
+                archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+            } else if (job.format === 'gz' || job.format === 'zip') {
+                const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
+                archiveContent = compress(bundled, job.format, archiveName);
+            }
+
+            writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
+
+            if (job.deleteSourceAfterArchive) {
+                matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
+            }
+
+            updateLog(logId, {
+                status: 'success',
+                endTime: Date.now(),
+                recordsInput: matchingFiles.length,
+                recordsOutput: 1,
+                details: `Archived ${matchingFiles.length} files into ${archiveName}`
+            });
+        } catch (error) {
+            updateLog(logId, {
+                status: 'failed',
+                endTime: Date.now(),
+                errorMessage: error instanceof Error ? error.message : String(error)
+            });
+        } finally {
+            archiveLocks.current[job.id] = false;
+        }
+    }, [dataSource.archiveJobs, connections, listFiles, addLog, updateLog, writeFile, deleteFile, setErrors]);
+
     const executeMappingJob = useCallback(async (taskId: string, parentLogId?: string): Promise<{ input: number, output: number } | null> => {
         const task = mappingTasks.find(t => t.id === taskId);
         if (!task) return null;
@@ -565,6 +641,7 @@ export const useSimulationEngine = (
 
     return {
         executeCollectionJob,
+        executeArchiveJob,
         executeDeliveryJob,
         executeMappingJob,
         executeTaskFlow,

@@ -17,7 +17,7 @@ import { useSimulationTimers } from './lib/hooks/useSimulationTimers';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { processTemplate } from './lib/templateUtils';
 import { generateDataFromSchema } from './lib/DataGenerator';
-import { applyCompressionActions, bundleTar, compress } from './lib/ArchiveEngine';
+import { applyCompressionActions } from './lib/ArchiveEngine';
 import { StorageView } from './components/views/StorageView';
 import { DatabaseView } from './components/views/DatabaseView';
 import type { DataSourceSettings, CollectionSettings, DeliverySettings, TopicDefinition, ConnectionDefinition } from './lib/types';
@@ -33,7 +33,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const [isMappingRunning, setIsMappingRunning] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
-  const { listFiles, writeFile, deleteFile } = useFileSystem();
+  const { listFiles, writeFile } = useFileSystem();
   const { select } = useVirtualDB();
   const { dataSource, collection, delivery, topics, connections, tables } = useSettings();
   const sequenceStates = useRef<Record<string, Record<string, number>>>({});
@@ -94,37 +94,7 @@ const SimulationManager: React.FC<{ setRetryHandler: (handler: (id: string, type
   const handleCreateArchive = () => {
     (dataSource.archiveJobs || []).forEach(job => {
         if (!job.enabled) return;
-        const srcConn = connections.find(c => c.id === job.sourceConnectionId);
-        const tgtConn = connections.find(c => c.id === job.targetConnectionId);
-        if (!srcConn || !tgtConn || !job.sourcePath || !job.targetPath) return;
-
-        try {
-            const files = listFiles(srcConn.host, job.sourcePath);
-            const regex = new RegExp(job.filterRegex);
-            const matchingFiles = files.filter(f => regex.test(f.name));
-
-            if (matchingFiles.length === 0) return;
-
-            const ctx = { hostname: tgtConn.host, timestamp: new Date() };
-            let archiveName = processTemplate(job.fileNamePattern, ctx);
-            
-            let archiveContent = '';
-            if (job.format === 'tar') {
-                archiveContent = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
-            } else if (job.format === 'gz' || job.format === 'zip') {
-                const bundled = bundleTar(matchingFiles.map(f => ({ filename: f.name, content: f.content })));
-                archiveContent = compress(bundled, job.format, archiveName);
-            }
-
-            writeFile(tgtConn.host, job.targetPath, archiveName, archiveContent);
-
-            if (job.deleteSourceAfterArchive) {
-                matchingFiles.forEach(f => deleteFile(srcConn.host, f.name, job.sourcePath));
-            }
-        } catch (e) {
-            console.error("Archive failed", e);
-            setErrors(prev => [...prev, `Archive failed for ${job.name}: ${e instanceof Error ? e.message : String(e)}`]);
-        }
+        engine.executeArchiveJob(job.id);
     });
   };
 
