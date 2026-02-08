@@ -216,4 +216,109 @@ describe('MappingEngine Compression Integration', () => {
         expect(callArgs[2]).toMatch(/\.zip$/);
         expect(callArgs[3]).toMatch(/^\[ZIP\]/);
     });
+
+    it('should preserve the source filename in a dedicated column when extracting from archive', async () => {
+        const sourceId = 'src1';
+        const targetId = 'tgt1';
+        const mapping: Mapping = {
+            id: 'm_fn',
+            name: 'Filename Preservation',
+            transformations: [
+                {
+                    id: sourceId,
+                    type: 'source',
+                    name: 'Source',
+                    position: { x: 0, y: 0 },
+                    config: { 
+                        connectionId: 'conn1', 
+                        path: '/in', 
+                        decompression: true,
+                        filenameColumn: 'original_file'
+                    }
+                },
+                {
+                    id: targetId,
+                    type: 'target',
+                    name: 'Target',
+                    position: { x: 200, y: 0 },
+                    config: { connectionId: 'conn2', path: '/out' }
+                }
+            ],
+            links: [{ id: 'l1', sourceId: sourceId, targetId: targetId }]
+        };
+
+        const task: MappingTask = { id: 't_fn', name: 'FN Task', mappingId: 'm_fn', executionInterval: 0, enabled: true };
+        const connections = [
+            { id: 'conn1', name: 'In', type: 'file', host: 'local' },
+            { id: 'conn2', name: 'Out', type: 'file', host: 'local' }
+        ];
+
+        const tarContent = bundleTar([
+            { filename: 'nested_data.csv', content: 'id,val\n101,nested' }
+        ]);
+
+        mockFs.listFiles.mockReturnValue([{ name: 'outer.tar' }]);
+        mockFs.readFile.mockReturnValue(tarContent);
+
+        await executeMappingTaskRecursive(task, mapping, connections as any, [], [], mockFs, mockDb, {});
+
+        expect(mockFs.writeFile).toHaveBeenCalled();
+        const callArgs = mockFs.writeFile.mock.calls[0];
+        const content = JSON.parse(callArgs[3]);
+        
+        expect(content[0].original_file).toBe('nested_data.csv');
+        expect(content[0].val).toBe('nested');
+    });
+
+    it('should extract and parse mixed CSV and JSON files from a single TAR archive', async () => {
+        const sourceId = 'src1';
+        const targetId = 'tgt1';
+        const mapping: Mapping = {
+            id: 'm_mix',
+            name: 'Mixed Format Mapping',
+            transformations: [
+                {
+                    id: sourceId,
+                    type: 'source',
+                    name: 'Source',
+                    position: { x: 0, y: 0 },
+                    config: { connectionId: 'conn1', path: '/in', decompression: true }
+                },
+                {
+                    id: targetId,
+                    type: 'target',
+                    name: 'Target',
+                    position: { x: 200, y: 0 },
+                    config: { connectionId: 'conn2', path: '/out' }
+                }
+            ],
+            links: [{ id: 'l1', sourceId: sourceId, targetId: targetId }]
+        };
+
+        const task: MappingTask = { id: 't_mix', name: 'Mix Task', mappingId: 'm_mix', executionInterval: 0, enabled: true };
+        const connections = [
+            { id: 'conn1', name: 'In', type: 'file', host: 'local' },
+            { id: 'conn2', name: 'Out', type: 'file', host: 'local' }
+        ];
+
+        const csvContent = 'id,type\n1,csv';
+        const jsonContent = JSON.stringify({ id: 2, type: 'json' });
+        const tarContent = bundleTar([
+            { filename: 'data.csv', content: csvContent },
+            { filename: 'data.json', content: jsonContent }
+        ]);
+
+        mockFs.listFiles.mockReturnValue([{ name: 'mixed.tar' }]);
+        mockFs.readFile.mockReturnValue(tarContent);
+
+        await executeMappingTaskRecursive(task, mapping, connections as any, [], [], mockFs, mockDb, {});
+
+        expect(mockFs.writeFile).toHaveBeenCalled();
+        const callArgs = mockFs.writeFile.mock.calls[0];
+        const content = JSON.parse(callArgs[3]);
+        
+        expect(content).toHaveLength(2);
+        expect(content.find((r: any) => r.type === 'csv')).toBeDefined();
+        expect(content.find((r: any) => r.type === 'json')).toBeDefined();
+    });
 });

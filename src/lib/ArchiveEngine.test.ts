@@ -146,5 +146,24 @@ describe('ArchiveEngine', () => {
             // Should stop at MAX_ITERATIONS (100)
             expect(result.files).toHaveLength(0); // Still in processingQueue after 100 iterations
         });
+
+        it('should handle empty content compression and decompression', () => {
+            const empty = '';
+            const compressed = compress(empty, 'gz', 'empty.txt');
+            expect(compressed).toBe('[GZ]');
+            const result = decompressRecursive(compressed, 'empty.txt.gz');
+            expect(result.files).toHaveLength(1);
+            expect(result.files[0].content).toBe('');
+        });
+
+        it('should be robust against separator lookalikes in content', () => {
+            const content = 'This is a fake separator: --FILE:other.txt-- and should not be split.';
+            const tar = compress(content, 'tar', 'real.txt');
+            // tar format: [TAR:real.txt]--FILE:real.txt--\n<content>
+            const result = decompressRecursive(tar, 'archive.tar');
+            expect(result.files).toHaveLength(1);
+            expect(result.files[0].filename).toBe('real.txt');
+            expect(result.files[0].content).toBe(content);
+        });
     });
 });
