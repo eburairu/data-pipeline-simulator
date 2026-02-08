@@ -1,5 +1,5 @@
-import React, { useEffect, useCallback, useState } from 'react';
-import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance } from 'reactflow';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
+import ReactFlow, { type Node, type Edge, Background, Controls, Panel, Position, useNodesState, useEdgesState, type ReactFlowInstance, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { LayoutGrid, GitBranch, Workflow, BarChart3, Archive } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
@@ -8,12 +8,20 @@ import { useSettings, type ConnectionDefinition } from '../lib/SettingsContext';
 import { type SourceConfig, type TargetConfig } from '../lib/MappingTypes';
 import { usePipelineLayout } from '../lib/hooks/usePipelineLayout';
 import { STEP_KEYS } from '../lib/constants';
-import StorageNode from './nodes/StorageNode';
+import StorageNode, { type StorageNodeData } from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
+import FlowingEdge from './FlowingEdge';
+import MetricEdge from './MetricEdge';
+import NodeDetailPanel from './NodeDetailPanel';
 
 const nodeTypes = {
   storage: StorageNode,
   process: ProcessNode,
+};
+
+const edgeTypes = {
+  flowing: FlowingEdge,
+  default: MetricEdge,
 };
 
 interface PipelineFlowProps {
@@ -28,9 +36,27 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState<ReactFlowInstance | null>(null);
+  
+  // Highlight state
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
+
+  // Trend calculation
+  const prevCounts = useRef<Record<string, number>>({});
+  
+  // Selection state
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   // dagreレイアウト計算のカスタムフック（メモ化済み）
   const { calculateLayout } = usePipelineLayout();
+
+  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setSelectedNode(node);
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null);
+  }, []);
 
   const getCount = useCallback((conn: ConnectionDefinition, path?: string, tableName?: string) => {
     try {
@@ -53,6 +79,36 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       return 0;
     }
   }, [listFiles]);
+
+  // Highlight logic
+  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
+    setHoveredNodeId(node.id);
+    
+    if (!rfInstance) return;
+    
+    const connected = new Set<string>();
+    connected.add(node.id);
+    
+    const allEdges = rfInstance.getEdges();
+    
+    // Simple 1-hop connection finding (can be expanded to full path)
+    allEdges.forEach(edge => {
+      if (edge.source === node.id) {
+        connected.add(edge.target);
+        connected.add(edge.id);
+      } else if (edge.target === node.id) {
+        connected.add(edge.source);
+        connected.add(edge.id);
+      }
+    });
+    
+    setConnectedIds(connected);
+  }, [rfInstance]);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+    setConnectedIds(new Set());
+  }, []);
 
   useEffect(() => {
     const calculatedNodes: Node[] = [];
@@ -79,11 +135,25 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       }
 
       const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-      const node: Node = {
+      const count = getLegacyCount(host, path);
+      
+      // Calculate Trend
+      const prev = prevCounts.current[id] ?? count;
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (count > prev) trend = 'up';
+      else if (count < prev) trend = 'down';
+      prevCounts.current[id] = count;
+
+      const node: Node<StorageNodeData> = {
         id,
         type: 'storage',
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
-        data: { label, type: 'fs', count: getLegacyCount(host, path) },
+        data: { 
+            label, 
+            type: 'fs', 
+            count,
+            trend
+        },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       };
@@ -97,14 +167,25 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       if (keyNodeMap.has(key)) return keyNodeMap.get(key)!;
 
       const id = `storage-${key.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-      const node: Node = {
+      const count = getCount(conn, path, tableName);
+      
+      // Calculate Trend
+      const prev = prevCounts.current[id] ?? count;
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (count > prev) trend = 'up';
+      else if (count < prev) trend = 'down';
+      prevCounts.current[id] = count;
+
+      const node: Node<StorageNodeData> = {
         id,
         type: 'storage',
         position: { x: 50 + colIndex * 300, y: 50 + rowIndex * 150 },
         data: {
           label: conn.type === 'database' ? `DB: ${tableName || conn.name}` : `${conn.host}:${path || '?'}`,
           type: conn.type === 'database' ? 'db' : 'fs',
-          count: getCount(conn, path, tableName)
+          count,
+          trend,
+          capacity: conn.type === 'database' ? 10000 : 1000 // Fake capacity for visual demo
         },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
@@ -116,8 +197,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
 
     // --- 0. Pre-register all Storage Nodes ---
-    // This ensures that intermediate directories (like archive targets) are created as nodes 
-    // even if they aren't explicitly defined as primary data sources.
+    // (Existing logic preserved)
 
     const allStorageKeys = new Set<string>();
     
@@ -184,25 +264,22 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       const host = parts[1];
       const path = parts[2];
       
-      // Determine column based on usage
       let col = 1;
       const isTopic = host === 'localhost' && path.startsWith('/topics/');
       
-      // Heuristic: topics and intermediate paths move right
       const isDataSource = dataSource.jobs.some(job => {
         const conn = connections.find(c => c.id === job.connectionId);
         return conn?.host === host && job.path === path;
       });
 
       if (isTopic) col = 2;
-      else if (!isDataSource) col = 2; // Intermediate or target
+      else if (!isDataSource) col = 2;
 
       addLegacyStorageNode(host, path, col, storageRowIndex++);
     });
 
 
-    // --- 1. Render Legacy Pipeline (Data Source, Collection, Delivery) ---
-    // (Keeping this for compatibility with existing UI)
+    // --- 1. Render Legacy Pipeline ---
 
     // Legacy Process Nodes
     dataSource.jobs.forEach((job) => {
@@ -214,12 +291,24 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       if (!targetNode) return;
 
       const id = `process-gen-${job.id}`;
+      
       calculatedNodes.push({
         id, type: 'process',
         position: { x: targetNode.position.x - 250, y: targetNode.position.y },
-        data: { label: job.name, isProcessing: false },
+        data: { 
+            label: job.name, 
+            status: 'idle',
+            progress: 0
+        },
       });
-      calculatedEdges.push({ id: `e-${id}-${targetNode.id}`, source: id, target: targetNode.id, animated: true });
+      calculatedEdges.push({ 
+          id: `e-${id}-${targetNode.id}`, 
+          source: id, 
+          target: targetNode.id, 
+          type: 'flowing', 
+          animated: true,
+          data: { isAnimating: true, count: targetNode.data.count } // Show count on edge
+      });
     });
 
     collection.jobs.forEach((job) => {
@@ -241,13 +330,19 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       
       if (srcNode && tgtNode) {
         const id = `process-col-${job.id}`;
+        const isProcessing = activeSteps.includes(`${STEP_KEYS.COLLECTION_TRANSFER}_${job.id}`);
+        
         calculatedNodes.push({
           id, type: 'process',
           position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
-          data: { label: job.name, isProcessing: activeSteps.includes(`${STEP_KEYS.COLLECTION_TRANSFER}_${job.id}`) }
+          data: { 
+              label: job.name, 
+              status: isProcessing ? 'running' : 'idle',
+              progress: isProcessing ? 65 : undefined 
+            }
         });
-        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, type: 'flowing', animated: true, data: { isAnimating: isProcessing } });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, type: 'flowing', animated: true, data: { isAnimating: isProcessing, count: tgtNode.data.count } });
       }
     });
 
@@ -270,13 +365,19 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       
       if (srcNode && tgtNode) {
         const id = `process-del-${job.id}`;
+        const isProcessing = activeSteps.includes(`${STEP_KEYS.DELIVERY_TRANSFER}_${job.id}`);
+
         calculatedNodes.push({
           id, type: 'process',
           position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
-          data: { label: job.name, isProcessing: activeSteps.includes(`${STEP_KEYS.DELIVERY_TRANSFER}_${job.id}`) }
+          data: { 
+              label: job.name, 
+              status: isProcessing ? 'running' : 'idle',
+              progress: isProcessing ? 45 : undefined
+            }
         });
-        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, type: 'flowing', animated: true, data: { isAnimating: isProcessing } });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, type: 'flowing', animated: true, data: { isAnimating: isProcessing, count: tgtNode.data.count } });
       }
     });
 
@@ -295,25 +396,27 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
                         addLegacyStorageNode(tgtConn.host, job.targetPath, 2, 0);
 
         const id = `process-arc-${job.id}`;
+        const isProcessing = activeSteps.includes(`${STEP_KEYS.ARCHIVE_JOB}_${job.id}`);
+
         calculatedNodes.push({
             id, type: 'process',
             position: { x: (srcNode.position.x + tgtNode.position.x) / 2, y: (srcNode.position.y + tgtNode.position.y) / 2 },
             data: { 
                 label: job.name, 
-                isProcessing: activeSteps.includes(`${STEP_KEYS.ARCHIVE_JOB}_${job.id}`),
+                status: isProcessing ? 'running' : 'idle',
+                progress: isProcessing ? 80 : undefined,
                 icon: <Archive size={16} className="text-amber-600" />
             }
         });
-        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, animated: true });
-        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, animated: true });
+        calculatedEdges.push({ id: `e-${srcNode.id}-${id}`, source: srcNode.id, target: id, type: 'flowing', animated: true, data: { isAnimating: isProcessing } });
+        calculatedEdges.push({ id: `e-${id}-${tgtNode.id}`, source: id, target: tgtNode.id, type: 'flowing', animated: true, data: { isAnimating: isProcessing } });
     });
 
 
     // --- 3. Render Mapping Tasks ---
 
-    // We try to place them to the right of existing nodes if possible, or new rows.
     let taskRowIndex = 0;
-    const TASK_START_X = 600; // Start placing mapping stuff further right?
+    const TASK_START_X = 600;
 
     mappingTasks.forEach(task => {
       if (!task.enabled) return;
@@ -321,6 +424,7 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       if (!mapping) return;
 
       const taskId = `process-task-${task.id}`;
+      const isProcessing = activeSteps.includes(`${STEP_KEYS.MAPPING_TASK}_${task.id}`);
 
       // Find Connections
       const sources = mapping.transformations.filter(t => t.type === 'source');
@@ -333,8 +437,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         const conf = src.config as SourceConfig;
         const conn = connections.find(c => c.id === conf.connectionId);
         if (conn) {
-          // Determine layout hint: if it's a file connection that might already exist from legacy, it will be reused.
-          // If it's a DB, it's new.
           const node = addConnectionStorageNode(conn, 3, taskRowIndex, conf.path, conf.tableName);
           sourceNodes.push(node);
         }
@@ -350,7 +452,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       });
 
       // Place Task Node
-      // Average Y of inputs and outputs
       const allConnectedNodes = [...sourceNodes, ...targetNodes];
       let avgY = 0;
       if (allConnectedNodes.length > 0) {
@@ -359,20 +460,23 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         avgY = 50 + taskRowIndex * 150;
       }
 
-      // If we reused nodes, avgY might be weird. Let's just create the task node and let Dagre fix layout.
       calculatedNodes.push({
         id: taskId,
         type: 'process',
         position: { x: TASK_START_X + 200, y: avgY },
-        data: { label: task.name, isProcessing: activeSteps.includes(`${STEP_KEYS.MAPPING_TASK}_${task.id}`) }
+        data: { 
+            label: task.name, 
+            status: isProcessing ? 'running' : 'idle',
+            progress: isProcessing ? 50 : undefined
+        }
       });
 
       // Edges
       sourceNodes.forEach(src => {
-        calculatedEdges.push({ id: `e-${src.id}-${taskId}`, source: src.id, target: taskId, animated: true });
+        calculatedEdges.push({ id: `e-${src.id}-${taskId}`, source: src.id, target: taskId, type: 'flowing', animated: true, data: { isAnimating: isProcessing } });
       });
       targetNodes.forEach(tgt => {
-        calculatedEdges.push({ id: `e-${taskId}-${tgt.id}`, source: taskId, target: tgt.id, animated: true });
+        calculatedEdges.push({ id: `e-${taskId}-${tgt.id}`, source: taskId, target: tgt.id, type: 'flowing', animated: true, data: { isAnimating: isProcessing, count: tgt.data.count } });
       });
 
       taskRowIndex++;
@@ -402,7 +506,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
 
     // --- 4. Render Task Flows ---
 
-    // TaskFlowに含まれるすべてのタスクが使用するSource/Targetを収集し、必要ならノードを作成するヘルパー関数
     const collectTaskFlowDataSources = (flow: typeof taskFlows[0]) => {
       const sources = new Set<string>();
       const targets = new Set<string>();
@@ -418,7 +521,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
           const conf = src.config as SourceConfig;
           const conn = connections.find(c => c.id === conf.connectionId);
           if (conn) {
-            // ノードが存在しない場合は作成する
             if (!keyNodeMap.has(getConnectionKey(conn, conf.path, conf.tableName))) {
               addConnectionStorageNode(conn, 3, taskRowIndex++, conf.path, conf.tableName);
             }
@@ -430,7 +532,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
           const conf = tgt.config as TargetConfig;
           const conn = connections.find(c => c.id === conf.connectionId);
           if (conn) {
-            // ノードが存在しない場合は作成する
             if (!keyNodeMap.has(getConnectionKey(conn, conf.path, conf.tableName))) {
               addConnectionStorageNode(conn, 5, taskRowIndex++, conf.path, conf.tableName);
             }
@@ -446,20 +547,20 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       if (!flow.enabled) return;
 
       const flowId = `process-flow-${flow.id}`;
+      const isProcessing = activeSteps.includes(`${STEP_KEYS.TASK_FLOW}_${flow.id}`);
 
-      // Represent Flow as a specialized process node
       calculatedNodes.push({
         id: flowId,
         type: 'process',
         position: { x: TASK_START_X + 500, y: 50 },
         data: {
             label: `Flow: ${flow.name}`,
-            isProcessing: activeSteps.includes(`${STEP_KEYS.TASK_FLOW}_${flow.id}`),
+            status: isProcessing ? 'running' : 'idle',
+            progress: isProcessing ? 30 : undefined,
             icon: <GitBranch size={16} className="text-indigo-600" />
         }
       });
 
-      // Connect Flow to its contained tasks (制御フロー - 紫色破線)
       flow.taskIds.forEach(taskId => {
         const targetTaskId = `process-task-${taskId}`;
         if (calculatedNodes.some(n => n.id === targetTaskId)) {
@@ -474,19 +575,15 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         }
       });
 
-      // TaskFlow内のタスク間の依存関係を表示（赤色破線）
       flow.taskIds.forEach(taskId => {
         const task = mappingTasks.find(t => t.id === taskId);
         if (!task?.dependencies) return;
 
         const targetTaskId = `process-task-${taskId}`;
         task.dependencies.forEach(depId => {
-          // 依存元もTaskFlow内に含まれている場合のみ表示
           if (flow.taskIds.includes(depId)) {
             const sourceTaskId = `process-task-${depId}`;
-            // 両方のノードが存在する場合のみエッジを追加
             if (calculatedNodes.some(n => n.id === sourceTaskId) && calculatedNodes.some(n => n.id === targetTaskId)) {
-              // 重複チェック（Task Dependenciesセクションで追加済みの場合はスキップ）
               const edgeId = `e-flow-dep-${flow.id}-${depId}-${taskId}`;
               if (!calculatedEdges.some(e => e.id === edgeId || e.id === `e-dep-${depId}-${taskId}`)) {
                 calculatedEdges.push({
@@ -503,7 +600,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
         });
       });
 
-      // TaskFlowからデータソースへの接続（データフロー - インディゴ実線）
       const { sources, targets } = collectTaskFlowDataSources(flow);
 
       sources.forEach(sourceKey => {
@@ -541,25 +637,31 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
     biDashboard.items.forEach((item, index) => {
       const dashboardId = `process-bi-${item.id}`;
 
-      // ダッシュボードノードを追加
       calculatedNodes.push({
         id: dashboardId,
         type: 'process',
         position: { x: TASK_START_X + 700, y: 50 + index * 150 },
         data: {
           label: `BI: ${item.title || 'Dashboard'}`,
-          isProcessing: false,
+          status: 'idle',
           icon: <BarChart3 size={16} className="text-emerald-600" />
         }
       });
 
-      // テーブルへの接続（データソース）
       const tableDef = tables.find(t => t.id === item.tableId);
       if (tableDef) {
-        // テーブルノードを追加（存在しない場合のみ）
         const tableKey = `db:${tableDef.name}`;
         if (!keyNodeMap.has(tableKey)) {
           const tableNodeId = `storage-${tableKey.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+          const count = select(tableDef.name).length;
+          
+           // Trend for BI tables
+          const prev = prevCounts.current[tableNodeId] ?? count;
+          let trend: 'up' | 'down' | 'stable' = 'stable';
+          if (count > prev) trend = 'up';
+          else if (count < prev) trend = 'down';
+          prevCounts.current[tableNodeId] = count;
+
           const tableNode: Node = {
             id: tableNodeId,
             type: 'storage',
@@ -567,7 +669,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
             data: {
               label: `DB: ${tableDef.name}`,
               type: 'db',
-              count: select(tableDef.name).length
+              count,
+              trend,
+              capacity: 10000
             },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
@@ -576,7 +680,6 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
           keyNodeMap.set(tableKey, tableNode);
         }
 
-        // テーブルからダッシュボードへのエッジ
         const tableNode = keyNodeMap.get(tableKey);
         if (tableNode) {
           calculatedEdges.push({
@@ -591,15 +694,38 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       }
     });
 
+    // Apply highlighting
+    const finalNodes = calculatedNodes.map(node => ({
+      ...node,
+      style: {
+        ...node.style,
+        opacity: hoveredNodeId && !connectedIds.has(node.id) ? 0.2 : 1,
+        transition: 'opacity 0.2s ease-in-out'
+      }
+    }));
 
-    // --- Legacy ETL (Disabled visual) ---
-    // (Old ETL visualization code removed)
+    const finalEdges = calculatedEdges.map(edge => ({
+      ...edge,
+      style: {
+        ...edge.style,
+        opacity: hoveredNodeId && !connectedIds.has(edge.id) ? 0.1 : 1,
+        stroke: hoveredNodeId && connectedIds.has(edge.id) ? '#3b82f6' : (edge.style?.stroke || '#b1b1b7'),
+        strokeWidth: hoveredNodeId && connectedIds.has(edge.id) ? 3 : (edge.style?.strokeWidth || 1.5),
+        transition: 'all 0.2s ease-in-out'
+      },
+      // Ensure flowing edges get the data prop for animation
+      data: {
+          ...edge.data,
+          // If we are hovering, maybe stop animation or highlight? 
+          // For now, keep as is.
+      }
+    }));
 
 
     // Preserve positions of existing nodes to prevent jitter
     setNodes((prevNodes) => {
       const prevNodeMap = new Map(prevNodes.map(n => [n.id, n]));
-      return calculatedNodes.map(n => {
+      return finalNodes.map(n => {
         const prev = prevNodeMap.get(n.id);
         if (prev) {
           return {
@@ -615,16 +741,15 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
       });
     });
 
-    setEdges(calculatedEdges);
+    setEdges(finalEdges);
 
-  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, biDashboard, tables, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges]);
+  }, [dataSource, collection, delivery, etl, topics, mappings, mappingTasks, taskFlows, connections, biDashboard, tables, listFiles, select, activeSteps, getLegacyCount, getCount, setNodes, setEdges, hoveredNodeId, connectedIds]);
 
-  // Auto-align nodes when the flow is initialized
+  // Auto-align logic ... (Same as before)
   const [hasAutoAligned, setHasAutoAligned] = useState(false);
   useEffect(() => {
     if (rfInstance && nodes.length > 0 && edges.length > 0 && !hasAutoAligned) {
       setHasAutoAligned(true);
-      // ノードが描画されるのを待ってからレイアウト計算
       window.requestAnimationFrame(() => {
         const layoutedNodes = calculateLayout(nodes, edges);
         setNodes(layoutedNodes);
@@ -645,19 +770,37 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
   }, [nodes, edges, setNodes, rfInstance, calculateLayout]);
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onInit={setRfInstance}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         fitView
         attributionPosition="bottom-right"
+        minZoom={0.2}
       >
         <Background />
         <Controls />
+        <MiniMap 
+            nodeStrokeColor={(n) => {
+                if (n.type === 'storage') return '#2563eb';
+                if (n.type === 'process') return '#ea580c';
+                return '#eee';
+            }}
+            nodeColor={(n) => {
+                if (n.type === 'storage') return '#eff6ff';
+                if (n.type === 'process') return '#fff7ed';
+                return '#fff';
+            }}
+        />
         <Panel position="top-left">
           <div className="bg-white/80 backdrop-blur-sm px-3 py-2 rounded shadow border border-gray-200">
             <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
@@ -677,6 +820,9 @@ const PipelineFlow: React.FC<PipelineFlowProps> = ({ activeSteps = [] }) => {
           </button>
         </Panel>
       </ReactFlow>
+      
+      {/* Detail Panel Overlay */}
+      <NodeDetailPanel node={selectedNode} onClose={() => setSelectedNode(null)} />
     </div>
   );
 };
