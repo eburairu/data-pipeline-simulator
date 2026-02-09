@@ -72,8 +72,11 @@ export interface ExecutionState {
 
 export type ExecutionObserver = (stats: ExecutionStats) => void;
 
+// 式の評価関数をキャッシュするためのマップ
+const expressionCache = new Map<string, Function>();
+
 // Helper to evaluate conditions/expressions safely-ish
-const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): DataValue => {
+export const evaluateExpression = (record: DataRow, expression: string, parameters: Record<string, string> = {}): DataValue => {
     try {
         const recordKeys = Object.keys(record);
         const recordValues = Object.values(record);
@@ -84,9 +87,17 @@ const evaluateExpression = (record: DataRow, expression: string, parameters: Rec
         const funcKeys = Object.keys(ExpressionFunctions);
         const funcValues = Object.values(ExpressionFunctions);
 
-        // Create a function with keys as arguments
-        // Order: Record Fields, Parameters, Functions
-        const func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
+        // キャッシュキーの作成: 式と引数名のリストを組み合わせる
+        const cacheKey = `${expression}|${recordKeys.join(',')}|${paramKeys.join(',')}`;
+
+        let func = expressionCache.get(cacheKey);
+        if (!func) {
+            // Create a function with keys as arguments
+            // Order: Record Fields, Parameters, Functions
+            func = new Function(...recordKeys, ...paramKeys, ...funcKeys, `return ${expression};`);
+            expressionCache.set(cacheKey, func);
+        }
+
         return func(...recordValues, ...paramValues, ...funcValues) as DataValue;
     } catch {
         // console.warn(`Expression evaluation failed: ${expression}`, e);
