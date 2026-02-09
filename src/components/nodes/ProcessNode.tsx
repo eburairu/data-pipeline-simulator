@@ -1,10 +1,11 @@
 import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { Settings, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { getNodeStatusColor, getNodeStatusIcon, type NodeStatus } from '../../lib/statusUtils';
+import ProgressBar from '../common/ProgressBar';
 
 export type ProcessNodeData = {
   label: string;
-  status: 'idle' | 'running' | 'success' | 'error' | 'warning';
+  status: NodeStatus;
   progress?: number; // 0-100
   errorMessage?: string;
   sourcePos?: Position;
@@ -16,31 +17,11 @@ export type ProcessNodeData = {
 const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ data, selected }) => {
   const { status = 'idle', progress } = data;
 
-  const getStatusColor = () => {
-    switch (status) {
-      case 'running': return 'border-orange-500 bg-orange-50';
-      case 'success': return 'border-green-500 bg-green-50';
-      case 'error': return 'border-red-500 bg-red-50';
-      case 'warning': return 'border-yellow-500 bg-yellow-50';
-      default: return 'border-blue-500 bg-blue-50';
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (status) {
-      case 'running': return <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />;
-      case 'success': return <CheckCircle2 className="w-8 h-8 text-green-600" />;
-      case 'error': return <XCircle className="w-8 h-8 text-red-600" />;
-      case 'warning': return <AlertCircle className="w-8 h-8 text-yellow-600" />;
-      default: return data.icon ? <div className="text-blue-600">{data.icon}</div> : <Settings className="w-8 h-8 text-blue-600" />;
-    }
-  };
-
   return (
     <div className={`relative group flex flex-col items-center justify-center transition-transform duration-200 ${selected ? 'scale-110' : ''}`}>
        {/* Main Circle Node */}
        <div 
-         className={`relative flex items-center justify-center w-16 h-16 rounded-full border-2 shadow-sm transition-all duration-300 ${getStatusColor()} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''}`}
+         className={`relative flex items-center justify-center w-16 h-16 rounded-full border-2 shadow-sm transition-all duration-300 ${getNodeStatusColor(status)} ${selected ? 'ring-2 ring-blue-400 ring-offset-2' : ''}`}
          title={data.errorMessage || data.label}
        >
         <Handle
@@ -51,7 +32,7 @@ const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ data, selected }) =
         />
 
         <div className="flex items-center justify-center w-full h-full">
-           {getStatusIcon()}
+           {getNodeStatusIcon(status, data.icon)}
         </div>
 
         {/* Progress Circular Overlay for Running State */}
@@ -91,12 +72,11 @@ const ProcessNode: React.FC<NodeProps<ProcessNodeData>> = ({ data, selected }) =
         
         {/* Progress Bar (Linear) */}
         {status === 'running' && progress !== undefined && (
-            <div className="w-16 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
-                <div 
-                    className="h-full bg-orange-500 transition-all duration-300 ease-out"
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
+            <ProgressBar 
+              percent={progress} 
+              colorClass="bg-orange-500" 
+              className="w-16 mt-1" 
+            />
         )}
       </div>
     </div>

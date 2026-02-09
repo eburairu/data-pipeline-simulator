@@ -1,6 +1,7 @@
 import React from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { Folder, Database, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import ProgressBar from '../common/ProgressBar';
 
 export type StorageNodeData = {
   label: string;
@@ -61,12 +62,11 @@ const StorageNode: React.FC<NodeProps<StorageNodeData>> = ({ data, selected }) =
 
         {/* Capacity / Usage Bar */}
         {data.capacity && (
-            <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden border border-gray-200">
-                <div 
-                    className={`h-full transition-all duration-500 ${usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-yellow-500' : 'bg-blue-500'}`}
-                    style={{ width: `${usagePercent}%` }}
-                />
-            </div>
+            <ProgressBar 
+              percent={usagePercent}
+              colorFn={(p) => p > 90 ? 'bg-red-500' : p > 70 ? 'bg-yellow-500' : 'bg-blue-500'}
+              className="mt-2 border border-gray-200"
+            />
         )}
         
         {data.capacity && (

@@ -1,7 +1,9 @@
 import React from 'react';
-import { X, FileText, Database, Activity, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, FileText, Database, Activity, Clock } from 'lucide-react';
 import { useFileSystem } from '../lib/VirtualFileSystem';
 import { useVirtualDB } from '../lib/VirtualDB';
+import { getNodeStatusColor, getNodeStatusIcon } from '../lib/statusUtils';
+import ProgressBar from './common/ProgressBar';
 import type { ProcessNodeData } from './nodes/ProcessNode';
 import type { StorageNodeData } from './nodes/StorageNode';
 import type { Node } from 'reactflow';
@@ -57,9 +59,11 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, onClose }) => {
             <div className="text-sm text-gray-500 mb-1">Current Count</div>
             <div className="text-2xl font-bold text-gray-800">{storageData.count.toLocaleString()}</div>
             {storageData.capacity && (
-                <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
-                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${(storageData.count / storageData.capacity) * 100}%` }} />
-                </div>
+                <ProgressBar 
+                  percent={(storageData.count / storageData.capacity) * 100}
+                  colorClass="bg-blue-500"
+                  className="mt-2"
+                />
             )}
           </div>
 
@@ -88,29 +92,21 @@ const NodeDetailPanel: React.FC<NodeDetailPanelProps> = ({ node, onClose }) => {
             <span className="font-medium">Process Job</span>
           </div>
 
-          <div className={`p-3 rounded border ${
-            processData.status === 'running' ? 'bg-orange-50 border-orange-200' :
-            processData.status === 'success' ? 'bg-green-50 border-green-200' :
-            processData.status === 'error' ? 'bg-red-50 border-red-200' :
-            'bg-gray-50 border-gray-200'
-          }`}>
+          <div className={`p-3 rounded border ${getNodeStatusColor(processData.status)}`}>
              <div className="flex items-center gap-2 mb-2">
-                {processData.status === 'running' && <Activity className="animate-spin text-orange-500" size={16} />}
-                {processData.status === 'success' && <CheckCircle2 className="text-green-500" size={16} />}
-                {processData.status === 'error' && <AlertTriangle className="text-red-500" size={16} />}
+                <div className="transform scale-50 -ml-2 -mr-2">
+                  {getNodeStatusIcon(processData.status, <Activity size={16} />)}
+                </div>
                 <span className="capitalize font-bold text-sm text-gray-800">{processData.status}</span>
              </div>
              
              {processData.progress !== undefined && (
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div 
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ 
-                            width: `${processData.progress}%`,
-                            backgroundColor: processData.status === 'error' ? '#ef4444' : '#f97316'
-                        }} 
-                    />
-                </div>
+                <ProgressBar 
+                  percent={processData.progress}
+                  colorClass={processData.status === 'error' ? 'bg-red-500' : 'bg-orange-500'}
+                  heightClass="h-2"
+                  className="mt-2"
+                />
              )}
           </div>
 

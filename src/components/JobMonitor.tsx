@@ -6,8 +6,9 @@ import React, { useState, useMemo } from 'react';
 import { useJobMonitor, type JobStatus, type JobExecutionLog, type JobType } from '../lib/JobMonitorContext';
 import PipelineFlow from './PipelineFlow';
 import ElapsedTimeDisplay from './common/ElapsedTimeDisplay';
+import StatusBadge from './common/StatusBadge';
 import JobDetailModal from './modals/JobDetailModal';
-import { CheckCircle, XCircle, Filter, Trash2, Activity, Truck, Database, RotateCw, Loader2, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2, Archive } from 'lucide-react';
+import { Filter, Trash2, Activity, Truck, Database, RotateCw, GitBranch, CornerDownRight, ChevronRight, Maximize2, Minimize2, Archive } from 'lucide-react';
 import { STEP_KEYS } from '../lib/constants';
 
 // ジョブタイプ定義は JobMonitorContext からインポートするように変更
@@ -247,19 +248,7 @@ const JobMonitor: React.FC = () => {
 
                   <div className="flex justify-between items-center text-xs">
                     <div className="flex items-center gap-2">
-                      {log.status === 'success' ? (
-                        <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          <CheckCircle size={10} /> Success
-                        </span>
-                      ) : log.status === 'failed' ? (
-                        <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                          <XCircle size={10} /> Failed
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          <Loader2 size={10} className="animate-spin" /> Running
-                        </span>
-                      )}
+                      <StatusBadge status={log.status} />
                     </div>
                     <div className="font-mono text-[10px] text-gray-600">
                       <span className="text-gray-500">In:</span> {log.recordsInput} <span className="text-gray-300">|</span> <span className="text-gray-500">Out:</span> {log.recordsOutput}
@@ -353,19 +342,7 @@ const JobMonitor: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-1.5">
-                      {log.status === 'success' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          <CheckCircle size={10} /> Success
-                        </span>
-                      ) : log.status === 'failed' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                          <XCircle size={10} /> Failed
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          <Loader2 size={10} className="animate-spin" /> Running
-                        </span>
-                      )}
+                      <StatusBadge status={log.status} className="text-[10px]" />
                     </td>
                     <td className="p-1.5 text-right text-gray-500 font-mono text-[10px]">
                       <ElapsedTimeDisplay

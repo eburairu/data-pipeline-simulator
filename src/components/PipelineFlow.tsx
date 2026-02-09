@@ -11,7 +11,6 @@ import { STEP_KEYS } from '../lib/constants';
 import StorageNode, { type StorageNodeData } from './nodes/StorageNode';
 import ProcessNode from './nodes/ProcessNode';
 import FlowingEdge from './FlowingEdge';
-import MetricEdge from './MetricEdge';
 import NodeDetailPanel from './NodeDetailPanel';
 
 const nodeTypes = {
@@ -21,7 +20,7 @@ const nodeTypes = {
 
 const edgeTypes = {
   flowing: FlowingEdge,
-  default: MetricEdge,
+  default: FlowingEdge,
 };
 
 interface PipelineFlowProps {

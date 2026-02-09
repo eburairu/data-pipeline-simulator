@@ -2,7 +2,7 @@
  * MappingDesigner用のカスタムノードコンポーネント
  */
 import { Handle, Position } from 'reactflow';
-import MetricEdge from '../../MetricEdge';
+import FlowingEdge from '../../FlowingEdge';
 
 /** DesignerNodeのdata型 */
 export interface DesignerNodeData {
@@ -50,7 +50,7 @@ export const nodeTypes = {
 
 /** ReactFlowのedgeTypes定義 */
 export const edgeTypes = {
-  metric: MetricEdge,
+  metric: FlowingEdge,
 };
 
 export default DesignerNode;
