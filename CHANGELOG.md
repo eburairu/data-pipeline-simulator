@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/eburairu/data-pipeline-simulator/compare/v1.6.0...v1.6.1) (2026-02-09)
+
+
+### Performance Improvements
+
+* cache compiled functions in evaluateExpression ([bb46359](https://github.com/eburairu/data-pipeline-simulator/commit/bb463597e1a037d8c8c302de48d8254b2d201cf8))
+
 # [1.6.0](https://github.com/eburairu/data-pipeline-simulator/compare/v1.5.0...v1.6.0) (2026-02-06)
 
 
