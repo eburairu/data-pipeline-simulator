@@ -14,13 +14,15 @@
     *   **式言語 (Expression Functions)**: `LPAD`, `SYSDATE`, `IS_DATE` などの豊富な関数を使用したデータ変換。
     *   **バリデーション**: データ品質チェックと、エラー行のBad Fileへの出力機能。
     *   **多様な変換 (Transformations)**:
-        *   Joiner, Lookup (キャッシュ対応), Router, Sorter, Union
+        *   Joiner, Lookup (キャッシュ対応), Router (条件分岐), Sorter, Union
         *   Normalizer, Rank, Sequence (永続化対応), UpdateStrategy
         *   Cleansing, Deduplicator, Pivot, Unpivot
         *   SQL (仮想DB操作), WebService (Mock APIコール), HierarchyParser (JSONフラット化)
 
 ### 2. データ連携ハブ (Data Hub)
-*   **トピック管理 (Topics)**: データをカテゴリごとに保持・管理するトピックを定義し、データの保持期間（Retention）を設定できます。
+*   **トピック管理 (Topics)**: データをカテゴリごとに保持・管理するトピックを定義します。
+    *   **スキーマ強制 (Schema Enforcement)**: トピック定義にスキーマを設定し、パブリッシュされるデータの型や構造を厳格（Strict）または寛容（Lenient）に検証できます。
+    *   **保持期間 (Retention)**: データの自動削除期間を設定できます。
 *   **Pub/Subモデル**:
     *   **Publication (Collection)**: 外部ソースからデータを収集し、トピックへパブリッシュします。
     *   **Subscription (Delivery)**: トピックからデータをサブスクライブし、ターゲットシステムへ配信します。
