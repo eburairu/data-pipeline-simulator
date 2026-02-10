@@ -1,4 +1,9 @@
-# Archive Job Processing Simulation
+# 機能仕様書: アーカイブ処理シミュレーション
+
+**ID**: 019
+**機能ブランチ**: `019-archive-processing-simulation`
+**作成日**: 2026-02-11
+**ステータス**: 完了 (Completed)
 
 ## Goal
 Simulate processing time for archive jobs based on the total size of files being archived. This enhances the realism of the simulation and ensures the "running" state persists long enough for the visualizer to display the animation.

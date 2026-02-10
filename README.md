@@ -32,6 +32,7 @@
     *   サポートされるジェネレータ: `Static`, `Random Int/Float`, `Sequence`, `UUID`, `List`, `Timestamp`, `Sin/Cos` (周期的変動)
 *   **アーカイブ・圧縮サポート (Archive Support)**: Gzip, Tar, Tar.Gzip 形式の自動展開および生成時の圧縮をサポート。
     *   **エラーハンドリング**: 圧縮ファイルを展開せずに読み込んだ場合の検知と警告機能により、設定ミスを防止します。
+    *   **処理時間シミュレーション**: ファイルサイズに基づいた処理時間をシミュレーションし、大規模なアーカイブ処理の挙動をよりリアルに再現します。
 *   **仮想ファイルシステム**: ブラウザメモリ上で動作するファイルシステムにより、物理的なファイル操作なしにETLフローを再現します。
 *   **仮想データベース**: SQLライクなクエリをサポートするインメモリデータベースで、処理結果を検証できます。
 
@@ -108,6 +109,8 @@ npm run dev
 *   [アーカイブ圧縮サポート仕様](.specify/specs/015-archive-compression-support/spec.md)
 *   [シミュレーションタブ統合仕様](.specify/specs/016-simulation-tab-integration/spec.md)
 *   [エラーハンドリング強化仕様](.specify/specs/017-error-handling-enhancement/spec.md)
+*   [ビジュアライザー共通化仕様](.specify/specs/018-visualizer-deduplication/spec.md)
+*   [アーカイブ処理シミュレーション仕様](.specify/specs/019-archive-processing-simulation/spec.md)
 
 ## 技術スタック
 
