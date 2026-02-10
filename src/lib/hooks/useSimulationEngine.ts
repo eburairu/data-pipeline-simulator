@@ -7,7 +7,7 @@ import { processTemplate } from '../templateUtils';
 import { executeMappingTaskRecursive, type ExecutionState, type ExecutionStats, type DbRecord } from '../MappingEngine';
 import { bundleTar, compress } from '../ArchiveEngine';
 import type { DataRow } from '../types';
-import { SYSTEM_TABLES, STEP_KEYS, TIMEOUTS } from '../constants';
+import { SYSTEM_TABLES, STEP_KEYS, TIMEOUTS, EXECUTION_DEFAULTS } from '../constants';
 
 export const useSimulationEngine = (
     toggleStep: (step: string, active: boolean) => void,
@@ -407,12 +407,13 @@ export const useSimulationEngine = (
 
         if (archiveLocks.current[job.id]) return;
 
+        const startTime = Date.now();
         const logId = addLog({
             jobId: job.id,
             jobName: job.name,
             jobType: 'archive',
             status: 'running',
-            startTime: Date.now(),
+            startTime: startTime,
             recordsInput: 0,
             recordsOutput: 0,
             details: 'Scanning for files...'
@@ -432,6 +433,21 @@ export const useSimulationEngine = (
                 });
                 return;
             }
+
+            // Calculate total size and processing time
+            const totalSize = matchingFiles.reduce((sum, f) => sum + f.content.length, 0);
+            const bandwidth = EXECUTION_DEFAULTS.BANDWIDTH_KBPS;
+            // Use same calculation logic as collection/delivery
+            const processingTime = calculateProcessingTime('', bandwidth, 500); // Base latency 500ms
+            const dataTransferTime = (totalSize / bandwidth) * 1000;
+            const totalProcessingTime = dataTransferTime + processingTime;
+
+            toggleStep(`${STEP_KEYS.ARCHIVE_JOB}_${job.id}`, true);
+            updateLog(logId, {
+                details: `Processing ${matchingFiles.length} files (Total size: ${(totalSize / 1024).toFixed(2)} KB)...`
+            });
+
+            await delay(totalProcessingTime);
 
             const ctx = { hostname: tgtConn.host, timestamp: new Date() };
             let archiveName = processTemplate(job.fileNamePattern, ctx);
@@ -455,7 +471,12 @@ export const useSimulationEngine = (
                 endTime: Date.now(),
                 recordsInput: matchingFiles.length,
                 recordsOutput: 1,
-                details: `Archived ${matchingFiles.length} files into ${archiveName}`
+                details: `Archived ${matchingFiles.length} files into ${archiveName}`,
+                extendedDetails: {
+                    fileSize: totalSize,
+                    bandwidth,
+                    throughput: (totalSize / ((Date.now() - startTime) / 1000))
+                }
             });
         } catch (error) {
             updateLog(logId, {
@@ -464,9 +485,10 @@ export const useSimulationEngine = (
                 errorMessage: error instanceof Error ? error.message : String(error)
             });
         } finally {
+            toggleStep(`${STEP_KEYS.ARCHIVE_JOB}_${job.id}`, false);
             archiveLocks.current[job.id] = false;
         }
-    }, [dataSource.archiveJobs, connections, listFiles, addLog, updateLog, writeFile, deleteFile, setErrors]);
+    }, [dataSource.archiveJobs, connections, listFiles, addLog, updateLog, writeFile, deleteFile, setErrors, toggleStep]);
 
     const executeMappingJob = useCallback(async (taskId: string, parentLogId?: string): Promise<{ input: number, output: number } | null> => {
         const task = mappingTasks.find(t => t.id === taskId);
