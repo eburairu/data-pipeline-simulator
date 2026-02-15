@@ -1,21 +1,25 @@
-## ドキュメント同期レポート - 2026-02-14
+## ドキュメント同期レポート - 2026-02-15
 
 ### 検出された変更
-- **初期コミット/大規模インポート**: 2026-02-13 以前の履歴は浅く、ほぼ全てのファイルが `Added` 状態で検出されました。
-- **機能実装**: アーカイブシミュレーション (spec 019)、ビジュアライザー共通化 (spec 018) が実装されています。
-
-### ドキュメントの整合性チェック結果
-- **README.md**: 最新の機能（アーカイブシミュレーション、ビジュアライザー改善など）が反映されており、仕様書へのリンクも適切です。
-- **.specify/specs/**:
-  - `017-error-handling-enhancement`: ステータスは `Partially Implemented` であり、DB書き込み時のスキーマバリデーション機能が未実装であること、および関連テストがスキップされていることと整合しています。
-  - `018-visualizer-deduplication`: ステータスは `Completed` であり、実装と整合しています。
-  - `019-archive-processing-simulation`: ステータスは `Completed` であり、実装と整合しています。
+- **機能実装**: Router 変換におけるグループルーティング機能が実装されています。
+- **コード品質**: Expression Functions がジェネリクスに対応し、型安全性が向上しています。
+- **仕様書**: `.specify/specs/` 配下の仕様書がコードベースの実装状況と一部乖離していました（特に Spec 007）。
 
 ### 更新したドキュメント
-- **.specify/specs/017-error-handling-enhancement/spec.md**: 未実装機能に関連するテストの状況（スキップ中）を追記しました。
+- **README.md**:
+  - `Router` の機能説明に「条件分岐・グループルーティング対応」を追記。
+  - `Expression Functions` の説明に「ジェネリクス対応による型安全性向上」を追記。
+- **.specify/specs/007-cdi-router-fix/spec.md**:
+  - ステータスを `実装完了 (Implemented)` に更新。
+
+### ドキュメントの整合性チェック結果
+- **.specify/specs/**:
+  - `007-cdi-router-fix`: 実装済みであることを確認し、ステータスを更新しました。
+  - `013-type-safety-improvements`: 既に `Completed` となっており、実装と整合しています。
+  - `017-error-handling-enhancement`: ステータスは `Partially Implemented` のままであり、Target Strategy のバリデーション未実装と整合しています。
 
 ### 注意が必要な項目
-- **CHANGELOG.md**: 最近の機能（018, 019など）が記載されていませんが、自動生成されるため手動更新は行っていません。
+- **specs/spec.md**: ルート直下の `specs/` ディレクトリに非推奨の `spec.md` が残っていますが、`README.md` は正しく `.specify/specs/` を参照しているため、実害はありません。
 
 ### 推奨事項
-- 次回リリース時にCHANGELOGが正しく生成されるか確認することをお勧めします。
+- `specs/` ディレクトリの削除または整理を検討してください。
