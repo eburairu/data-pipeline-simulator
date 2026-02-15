@@ -1,5 +1,7 @@
 # 仕様書 007: CDI Router 変換の修正
 
+**ステータス**: 実装完了 (Implemented)
+
 ## 背景
 `MappingEngine` 内の `Router` 変換の現在の実装が不完全です。ルーティングされた行を計算しますが、`defaultGroup` の行のみをダウンストリームの変換に渡しています。実際のData Integration環境（Informatica CDI など）では、Router 変換は条件に基づいてデータの異なるサブセットを異なるダウンストリームブランチに送ることができます。
 

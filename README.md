@@ -11,10 +11,10 @@
 *   **コネクション管理 (Connections)**: ファイルシステムやデータベースへの接続情報を抽象化して管理します。
 *   **マッピングタスク (Mapping Tasks)**: 定義したマッピングを実行可能なタスクとしてスケジュールし、実行履歴や統計（処理行数、エラー行数）をモニタリングできます。
 *   **高度なETL機能**:
-    *   **式言語 (Expression Functions)**: `LPAD`, `SYSDATE`, `IS_DATE` などの豊富な関数を使用したデータ変換。
+    *   **式言語 (Expression Functions)**: `LPAD`, `SYSDATE`, `IS_DATE` などの豊富な関数を使用したデータ変換（ジェネリクス対応による型安全性向上）。
     *   **バリデーション**: データ品質チェックと、エラー行のBad Fileへの出力機能。
     *   **多様な変換 (Transformations)**:
-        *   Joiner, Lookup (キャッシュ対応), Router (条件分岐), Sorter, Union
+        *   Joiner, Lookup (キャッシュ対応), Router (条件分岐・グループルーティング対応), Sorter, Union
         *   Normalizer, Rank, Sequence (永続化対応), UpdateStrategy
         *   Cleansing, Deduplicator, Pivot, Unpivot
         *   SQL (仮想DB操作), WebService (Mock APIコール), HierarchyParser (JSONフラット化)
