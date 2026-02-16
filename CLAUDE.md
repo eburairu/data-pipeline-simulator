@@ -70,7 +70,7 @@ src/
 
 .specify/                        # 仕様フレームワーク
 ├── memory/constitution.md       # プロジェクト原則
-├── specs/                       # 機能仕様（001-007）
+├── specs/                       # 機能仕様
 └── templates/                   # 仕様テンプレート
 
 .github/workflows/               # CI/CD
