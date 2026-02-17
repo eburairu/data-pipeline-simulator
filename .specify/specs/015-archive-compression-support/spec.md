@@ -65,7 +65,7 @@ export interface SourceConfig {
 // Mapping TargetConfig の拡張
 export interface TargetConfig {
   // ...既存フィールド
-  compression?: CompressionFormat; // 書き出し時の圧縮形式
+  compressionActions?: CompressionFormat[]; // 書き出し時の圧縮形式（順序通りに適用）
 }
 ```
 
@@ -84,7 +84,7 @@ export interface TargetConfig {
 ### Step 3: UI の更新
 - `DataSourceSettings.tsx`: 各ジョブの設定に「アーカイブジョブ」タブを追加し、定義・編集を可能にする。
 - `SourceConfigPanel.tsx`: 「展開（Decompress）」チェックボックスを追加。
-- `TargetConfigPanel.tsx`: 「圧縮形式」セレクトボックスを追加。
+- `TargetConfigPanel.tsx`: 「圧縮アクション」設定（複数指定・順序変更可能）を追加。
 
 ### Step 4: シミュレーション制御と監視への統合
 - `App.tsx` (SimulationManager): アーカイブジョブの開始/停止トグル、および手動実行（Arc+）ボタンを追加。
