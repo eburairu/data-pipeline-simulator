@@ -1,15 +1,22 @@
-## ドキュメント同期レポート - 2026-02-17
+## ドキュメント同期レポート - 2026-02-07
 
 ### 検出された変更
-- アーカイブ圧縮/展開機能の実装において、Zip形式のサポートが追加されていることを確認しました。
-- `Mapping` の `TargetConfig` インターフェースにおいて、圧縮設定が単一の `compression` ではなく、複数のアクションを指定可能な `compressionActions` 配列として実装されていることを確認しました。
+- **MappingEngineのリファクタリング**: 変換ロジックがStrategyパターンに基づいて `src/lib/transformations/` 配下に分割されました。
+- **UIコンポーネントの分割**: `MappingDesigner` が個別の `ConfigPanel` コンポーネントに分割され、`src/components/settings/mapping/` に配置されました。
+- **機能追加**:
+  - `019-archive-processing-simulation`: アーカイブ処理のシミュレーション機能が実装されました。
+  - `018-visualizer-deduplication`: Visualizer関連のコード重複排除が実施されました。
+- **技術スタック更新**: `React Flow` のバージョン記述を `v11` に更新しました。
 
 ### 更新したドキュメント
-- README.md: アーカイブサポート形式に `Zip` を追加しました。
-- .specify/specs/015-archive-compression-support/spec.md: `TargetConfig` の定義を `compressionActions` に修正し、UI要件の記述も「複数指定・順序変更可能」に更新しました。
+- **README.md**:
+  - 「主な機能」の「多様な変換」リストを更新し、実装された全Strategy（Filter, Expression, Aggregator, Validator, Source, Target など）を反映しました。
+  - 「技術スタック」のバージョン情報を更新しました。
+- **.specify/specs/010-mapping-engine-refactoring/spec.md**: ステータスを `実装完了 (Implemented)` に更新しました。
+- **.specify/specs/012-ui-component-decomposition/spec.md**: ステータスを `実装完了 (Implemented)` に更新しました。
 
 ### 注意が必要な項目
-- `ArchiveEngine.ts` では `isCompressed` 関数で `GZ`, `ZIP`, `TAR` のヘッダーをチェックしており、圧縮サポートの一貫性を確認しました。
+- **017-error-handling-enhancement**: 仕様書は存在しますが、ステータスは `Partially Implemented` のままです。完全な実装にはまだ作業が必要です。
 
 ### 推奨事項
-- 今後新しい圧縮形式を追加する場合は、`ArchiveEngine.ts` だけでなく、`CompressionFormat` 型定義と `README.md` の両方を更新するようにしてください。
+- 次回の開発サイクルで `017` のエラーハンドリング強化の実装完了を目指すことを推奨します。
