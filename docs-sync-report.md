@@ -1,22 +1,15 @@
-## ドキュメント同期レポート - 2026-02-16
+## ドキュメント同期レポート - 2026-02-17
 
 ### 検出された変更
-- 機能仕様書（Spec 017, 018, 019）の実装状況を確認し、ドキュメントと整合していることを確認しました。
-- ルートディレクトリにあった `specs/` ディレクトリ配下の仕様書は非推奨であり、`.specify/specs/` に移行済みであるため、クリーンアップを行いました。
-- 仕様書作成スクリプトが誤って非推奨の `specs/` ディレクトリを参照していたため修正しました。
+- アーカイブ圧縮/展開機能の実装において、Zip形式のサポートが追加されていることを確認しました。
+- `Mapping` の `TargetConfig` インターフェースにおいて、圧縮設定が単一の `compression` ではなく、複数のアクションを指定可能な `compressionActions` 配列として実装されていることを確認しました。
 
 ### 更新したドキュメント
-- **specs/spec.md**: 削除しました。
-- **specs/constitution.md**: 削除しました。
-- **CLAUDE.md**: `specs/` ディレクトリの説明を更新し、古いバージョン範囲記述を削除しました。
-- **.specify/scripts/bash/common.sh**: `specs/` への参照を `.specify/specs/` に修正しました。
-- **.specify/scripts/bash/create-new-feature.sh**: `specs/` への参照を `.specify/specs/` に修正しました。
+- README.md: アーカイブサポート形式に `Zip` を追加しました。
+- .specify/specs/015-archive-compression-support/spec.md: `TargetConfig` の定義を `compressionActions` に修正し、UI要件の記述も「複数指定・順序変更可能」に更新しました。
 
-### ドキュメントの整合性チェック結果
-- **.specify/specs/017-error-handling-enhancement**: ステータス「Partially Implemented」はコード（TargetStrategyのバリデーション未実装）と整合しています。
-- **.specify/specs/018-visualizer-deduplication**: ステータス「Completed」はコード（NumericWidget等の実装）と整合しています。
-- **.specify/specs/019-archive-processing-simulation**: ステータス「Completed」はコード（useSimulationEngineのアーカイブ処理）と整合しています。
-- **README.md**: 現状の機能と整合しています。
+### 注意が必要な項目
+- `ArchiveEngine.ts` では `isCompressed` 関数で `GZ`, `ZIP`, `TAR` のヘッダーをチェックしており、圧縮サポートの一貫性を確認しました。
 
 ### 推奨事項
-- 特になし。ドキュメントとコードの同期状態は良好です。
+- 今後新しい圧縮形式を追加する場合は、`ArchiveEngine.ts` だけでなく、`CompressionFormat` 型定義と `README.md` の両方を更新するようにしてください。
