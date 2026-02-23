@@ -377,6 +377,40 @@ const processTarget = async (
             const tableName = node.config.tableName || 'output';
             const tableDef = tables.find(t => t.name === tableName);
             const updateCols = node.config.updateColumns || [];
+            const dedupKeys = node.config.deduplicationKeys || [];
+
+            // Pre-fetch records if any row needs matching/deduplication
+            const needsLookup = batch.some(row => {
+                const s = (row['_strategy'] as string) || 'insert';
+                if (s === 'insert') return dedupKeys.length > 0;
+                if (s === 'update' || s === 'delete') return updateCols.length > 0;
+                return false;
+            });
+
+            let allRecords: (DbRecord | DataRow)[] = [];
+            if (needsLookup) {
+                allRecords = db.select(tableName);
+            }
+
+            // Build lookup maps for O(1) matching if keys are defined
+            const getRecordKey = (data: DataRow, keys: string[]) => keys.map(k => String(data[k])).join('::');
+            const dedupMap = new Map<string, DbRecord>();
+            const updateMap = new Map<string, DbRecord>();
+
+            if (needsLookup) {
+                allRecords.forEach(r => {
+                    const data = extractData(r);
+                    const record = r as DbRecord;
+                    if (dedupKeys.length > 0) {
+                        const key = getRecordKey(data, dedupKeys);
+                        if (!dedupMap.has(key)) dedupMap.set(key, record);
+                    }
+                    if (updateCols.length > 0) {
+                        const key = getRecordKey(data, updateCols);
+                        if (!updateMap.has(key)) updateMap.set(key, record);
+                    }
+                });
+            }
 
             // Simulate Database IO latency per chunk (simplified as one await here)
             await delay(20);
@@ -409,24 +443,18 @@ const processTarget = async (
 
                 if (strategy === 'insert') {
                     const dupBehavior = node.config.duplicateBehavior || 'error';
-                    const dedupKeys = node.config.deduplicationKeys || [];
 
                     if (dedupKeys.length > 0) {
-                        const allRecords = db.select(tableName);
-                        const match = allRecords.find((r) => {
-                            const data = extractData(r);
-                            return dedupKeys.every(k => String(data[k]) === String(row[k]));
-                        }) as DbRecord | undefined;
+                        const match = dedupMap.get(getRecordKey(row, dedupKeys));
 
                         if (match) {
                             shouldInsert = false;
                             matchId = match.id;
-                                                                        if (dupBehavior === 'error') {
-                                                                            stats.transformations[node.id].errors++;
-                                                                            checkStopOnErrors(stats, task);
-                                                                            continue;
-                                                                        } else if (dupBehavior === 'ignore') {
-                            
+                            if (dupBehavior === 'error') {
+                                stats.transformations[node.id].errors++;
+                                checkStopOnErrors(stats, task);
+                                continue;
+                            } else if (dupBehavior === 'ignore') {
                                 processedBatch.push(row); // Treat as success
                                 continue;
                             } else if (dupBehavior === 'update') {
@@ -444,11 +472,7 @@ const processTarget = async (
                     }
                 } else if (strategy === 'update' || strategy === 'delete') {
                     if (updateCols.length > 0) {
-                        const allRecords = db.select(tableName);
-                        const match = allRecords.find((r) => {
-                            const data = extractData(r);
-                            return updateCols.every(col => String(data[col]) === String(row[col]));
-                        }) as DbRecord | undefined;
+                        const match = updateMap.get(getRecordKey(row, updateCols));
 
                         if (match) {
                             if (strategy === 'update') {
