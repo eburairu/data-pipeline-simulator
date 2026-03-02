@@ -80,6 +80,7 @@ export const VirtualDBProvider: React.FC<VirtualDBProviderProps> = ({ children, 
 
       // LRU方式でレコードをパージ
       // 上限に達している場合、最も古いレコードを削除
+      const activeTables = Object.keys(next);
       while (totalRecords >= config.maxRecords) {
         if (config.showWarnings && !warningShownRef.current) {
           console.warn(
@@ -93,7 +94,8 @@ export const VirtualDBProvider: React.FC<VirtualDBProviderProps> = ({ children, 
         let oldestTable = '';
         let oldestTime = Infinity;
 
-        for (const t of Object.keys(next)) {
+        for (let i = 0; i < activeTables.length; i++) {
+          const t = activeTables[i];
           if (next[t].length > 0) {
             const record = next[t][0];
             if (record.insertedAt < oldestTime) {
